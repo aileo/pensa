@@ -37,7 +37,8 @@ docker compose down                            # conserver PostgreSQL
 docker compose down -v                         # supprimer également les données
 ```
 
-Le code est monté dans les conteneurs : Vite et `tsx watch` redémarrent automatiquement, les dépendances restent dans des volumes Docker distincts. Après changement de dépendances, reconstruire avec `docker compose up --build -V`. Les fichiers de migration générés sous `apps/api/drizzle/` sont versionnés.
+Le code est monté dans les conteneurs : Vite et `tsx watch` redémarrent automatiquement, les dépendances restent dans des volumes Docker distincts. Après changement de dépendances, exécuter `docker compose run --rm api npm ci` et/ou `docker compose run --rm web npm ci`, puis `docker compose up --build` ; ces commandes ne touchent pas au volume PostgreSQL. Les fichiers de migration générés sous `apps/api/drizzle/` sont versionnés.
+Les tests d'intégration utilisent la base de développement chargée avec le seed et créent des données de test ; `docker compose down -v` suivi d'un redémarrage et du seed permet de repartir de zéro.
 
 ## API (préfixe `/api`)
 

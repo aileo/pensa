@@ -53,6 +53,16 @@ describe('permissions métier sur l’API', () => {
     expect((await call('new', '/occasions')).data.some((o: {kind:string;nextDate:string}) =>
       o.kind === 'name_day' && o.nextDate.endsWith('11-12'))).toBe(true);
   });
+  it('calcule le prochain anniversaire du 29 février sur une année bissextile', async () => {
+    const registered = await call('', '/auth/register', 'POST', {
+      firstName: 'Leap', lastName: 'Year', email: `leap-${Date.now()}@example.test`,
+      password: 'LongSecret2026!', birthDate: '2000-02-29',
+    });
+    cookies.leap = registered.cookie!.split(';')[0];
+    await call('leap', '/families', 'POST', { name: 'Famille bissextile' });
+    const birthday = (await call('leap', '/occasions')).data.find((o: {kind:string}) => o.kind === 'birthday');
+    expect(birthday.nextDate).toMatch(/^\d{4}-02-29$/);
+  });
   it('isole les familles, les réservations du bénéficiaire et les demandes', async () => {
     const bob = await call('bob', '/auth/me');
     const bobId = bob.data.id;
@@ -83,6 +93,25 @@ describe('permissions métier sur l’API', () => {
     expect((await call('alice', `/families/${familyB.id}`, 'PATCH', { name: 'Intrusion' })).status).toBe(403);
     expect((await call('alice', `/families/${familyA.id}`, 'PATCH', { name: 'Famille A' })).status).toBe(200);
   });
+  it('ne retourne aucun souhait inaccessible dans la recherche et les filtres', async () => {
+    const isolated = await call('eloise', '/search?q=Console');
+    expect(isolated.data.wishes).toHaveLength(0);
+    const shared = await call('alice', '/search?q=Console');
+    expect(shared.data.wishes.some((w: {title:string}) => w.title === 'Console de jeux')).toBe(true);
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const filtered = await call('alice', `/users/${bobId}/wishes?availability=reserved&maxPrice=400`);
+    expect(filtered.data.some((w: {title:string}) => w.title === 'Console de jeux')).toBe(true);
+    expect(filtered.data.every((w: {reservation?:object}) => !!w.reservation)).toBe(true);
+    expect((await call('alice', `/users/${bobId}/wishes?maxPrice=invalid`)).status).toBe(400);
+    const tagged = await call('bob', '/wishes', 'POST', {
+      title: 'Test recherche', url: 'https://example.com', image: 'https://example.com/image.png',
+      tags: ['unique-search-tag'], price: 12,
+    });
+    expect((await call('alice', '/search?q=unique-search-tag')).data.wishes.some((w: {id:string}) => w.id === tagged.data.id)).toBe(true);
+    expect((await call('alice', `/users/${bobId}/wishes?tag=unique-search-tag&minPrice=10&maxPrice=20`)).data)
+      .toHaveLength(1);
+    await call('bob', `/wishes/${tagged.data.id}`, 'DELETE');
+  });
   it('utilise une invitation de foyer une seule fois', async () => {
     const householdId = (await call('alice', '/auth/me')).data.householdId;
     expect((await call('charlie', `/households/${householdId}/invitations`, 'POST', {})).status).toBe(403);
@@ -105,6 +134,7 @@ describe('permissions métier sur l’API', () => {
     const wish = wishes.data[0];
     expect((await call('bob', `/wishes/${wish.id}`, 'PATCH', { title: 'Changé', tags: ['test'] })).status).toBe(400);
     expect((await call('bob', `/wishes/${wish.id}`, 'PATCH', { tags: ['test'] })).status).toBe(200);
+    await call('bob', `/wishes/${wish.id}`, 'PATCH', { tags: wish.tags });
   });
   it('empêche une double réservation concurrente et conserve la confidentialité après suppression', async () => {
     const created = await call('bob', '/wishes', 'POST', {
@@ -113,7 +143,9 @@ describe('permissions métier sur l’API', () => {
     expect(created.status).toBe(201);
     const wishId = created.data.id;
     const occasions = await call('alice', `/occasions?recipientId=${(await call('bob', '/auth/me')).data.id}`);
-    const choices = occasions.data.filter((o: {nextDate:string|null}) => o.nextDate).slice(0, 2)
+    const familyA = (await call('alice', '/families')).data.find((f: {name:string}) => f.name === 'Famille A');
+    const choices = occasions.data.filter((o: {nextDate:string|null;family_id:string}) =>
+      o.nextDate && o.family_id === familyA.id).slice(0, 2)
       .map((o: {id:string;nextDate:string}) => ({ id: o.id, year: Number(o.nextDate.slice(0, 4)) }));
     expect(choices.length).toBe(2);
     const [one, two] = await Promise.all([
@@ -142,6 +174,7 @@ describe('permissions métier sur l’API', () => {
     const bobReservations = await call('bob', '/reservations');
     const gifted = bobReservations.data.find((r: {status:string}) => r.status === 'gifted');
     expect(gifted).toBeTruthy();
+    expect((await call('alice', `/reservations/${gifted.id}`)).status).toBe(404);
     expect((await call('bob', `/reservations/${gifted.id}`, 'PATCH', { status: 'wrapped' })).status).toBe(409);
   });
   it('gère demandes, occasions et transitions jusqu’au snapshot offert', async () => {

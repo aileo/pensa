@@ -1,6 +1,6 @@
 export type Id = string | number
-export type Person = { id: Id; firstName?: string; lastName?: string; email?: string; birthDate?: string; name?: string }
-export type Family = { id: Id; name: string; admin?: boolean; members?: Person[]; users?: Person[] }
+export type Person = { id: Id; firstName?: string; lastName?: string; email?: string; birthDate?: string; householdId?: Id; name?: string }
+export type Family = { id: Id; name: string; admin?: boolean; members?: Person[]; households?: { id: Id; name: string }[]; users?: Person[] }
 export type Occasion = { id: Id; name?: string; title?: string; nextDate?: string | null; date?: string; year?: number; kind?: 'fixed' | 'birthday' | 'name_day'; person?: Person }
 export type OccasionSelection = { id: Id; year: number }
 export type ParticipationRequest = { id: Id; userId?: Id; firstName?: string; lastName?: string; user?: Person; requester?: Person; status?: string }

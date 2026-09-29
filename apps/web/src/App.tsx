@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError, dateOf, initials, json, list, money, nameOf, type Family, type Id, type Occasion, type OccasionSelection, type ParticipationRequest, type Person, type Reservation, type Wish } from './api'
 import './index.css'
 
@@ -73,6 +73,8 @@ const titleByPage: Record<Page, string> = {
   dashboard: 'Tableau de bord', wishes: 'Mes envies', families: 'Ma famille',
   reservations: 'Réservations', history: 'Historique', search: 'Rechercher', profile: 'Mon profil',
 }
+type WishFilters = { tag: string; availability: string; minPrice: string; maxPrice: string }
+const emptyWishFilters: WishFilters = { tag: '', availability: '', minPrice: '', maxPrice: '' }
 
 function App() {
   const [me, setMe] = useState<Person | null>(null)
@@ -92,6 +94,8 @@ function App() {
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null)
   const [personWishes, setPersonWishes] = useState<Wish[]>([])
+  const [personFilterState, setPersonFilterState] = useState<WishFilters & { personId: string }>({ ...emptyWishFilters, personId: '' })
+  const personFilters = personFilterState.personId === String(selectedPerson?.id) ? personFilterState : emptyWishFilters
   const [modal, setModal] = useState<Modal>(null)
   const [selectedWish, setSelectedWish] = useState<Wish | null>(null)
   const [occasions, setOccasions] = useState<Occasion[]>([])
@@ -146,9 +150,15 @@ function App() {
   useEffect(() => {
     if (!selectedPerson) return
     let active = true
-    api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes`).then(data => { if (active) setPersonWishes(list(data)) }).catch(problem => { if (active) handleError(problem) })
+    const query = new URLSearchParams()
+    if (personFilters.tag.trim()) query.set('tag', personFilters.tag.trim())
+    if (selectedPerson.id !== me?.id && personFilters.availability) query.set('availability', personFilters.availability)
+    if (personFilters.minPrice.trim()) query.set('minPrice', personFilters.minPrice.trim())
+    if (personFilters.maxPrice.trim()) query.set('maxPrice', personFilters.maxPrice.trim())
+    const suffix = query.size ? `?${query}` : ''
+    api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes${suffix}`).then(data => { if (active) setPersonWishes(list(data)) }).catch(problem => { if (active) handleError(problem) })
     return () => { active = false }
-  }, [selectedPerson, revision])
+  }, [selectedPerson, me?.id, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision])
 
   async function perform(action: () => Promise<unknown>, success: string, close = true) {
     setBusy(true); setError('')
@@ -181,9 +191,14 @@ function App() {
   }
   const myWishes = wishes.filter(wish => String(wish.ownerId) === String(me?.id) || wish.ownerId == null)
   const allPeople = users
+  const activeFamily = selectedFamily && (families.find(family => String(family.id) === String(selectedFamily.id)) || selectedFamily)
   const dashboardOccasions = list<Occasion>(dashboard.occasions)
   const dashboardReservations = list<Reservation>(dashboard.reservations)
   const dashboardParticipating = list<Reservation>(dashboard.participating)
+  const setPersonFilter = (key: keyof WishFilters, value: string) => {
+    if (!selectedPerson) return
+    setPersonFilterState({ ...personFilters, personId: String(selectedPerson.id), [key]: value })
+  }
 
   if (!authChecked) return <div className="flex min-h-screen items-center justify-center text-[#795ca7]" role="status">Chargement de Giftit…</div>
   if (!me) return <Auth mode={authMode} setMode={setAuthMode} onAuth={user => { setSharedWishes([]); setMe(user); setError(''); setNotice('') }} error={error} setError={setError} />
@@ -225,8 +240,16 @@ function App() {
         </>}
         {page === 'wishes' && <><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-2">VOTRE LISTE PERSONNELLE</p><h1 className="font-['Outfit'] text-3xl font-bold">Mes envies <span className="text-[#ad98ca]">({myWishes.length})</span></h1><p className="muted mt-2">Vos idées cadeaux, toujours à portée de main.</p></div><button className="primary" onClick={() => { setModal('wish'); setError('') }}><Icon name="plus" size={18}/> Ajouter une envie</button></div>{myWishes.length ? <><p className="muted mb-4">Glissez les envies ou utilisez les flèches pour changer leur priorité.</p><div className="space-y-3">{myWishes.map((wish, index) => <div key={wish.id} draggable onDragStart={event => event.dataTransfer.setData('text/plain', String(index))} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) void reorder(from, index) }} className="card flex items-center gap-3 p-3 sm:gap-5 sm:p-4"><span className="hidden cursor-grab text-[#afa5b6] sm:block"><Icon name="grip"/></span><div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f3eff1] sm:size-20">{wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" className="text-[#b9a9c8]"/>}</div><div className="min-w-0 flex-1"><h2 className="truncate font-['Outfit'] font-semibold">{wish.title}</h2><p className="muted mt-1 truncate">{wish.description || wish.url || 'Une belle idée cadeau'}</p><div className="mt-1 flex flex-wrap gap-1">{wish.tags?.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div></div><strong className="hidden text-sm text-[#795ca7] sm:block">{money(wish.price)}</strong><div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row"><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => reorder(index, index - 1)} aria-label={`Monter ${wish.title}`}>↑</button><button className="icon-button !size-7" disabled={index === myWishes.length - 1 || busy} onClick={() => reorder(index, index + 1)} aria-label={`Descendre ${wish.title}`}>↓</button><button className="icon-button" onClick={() => { setSelectedWish(wish); setModal('tags') }} aria-label={`Modifier les tags de ${wish.title}`}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={() => removeWish(wish)} aria-label={`Supprimer ${wish.title}`}><Icon name="trash" size={17}/></button></div></div>)}</div></> : <Empty icon="heart" title="Votre liste attend ses premières envies" text="Collez le lien d’un produit et nous vous aiderons à l’ajouter." action={<button className="primary" onClick={() => setModal('wish')}><Icon name="plus" size={18}/> Ajouter une envie</button>}/>}</>}
         {page === 'families' && <><SectionTitle kicker="CEUX QUI COMPTENT" title={selectedPerson ? `Les envies de ${nameOf(selectedPerson)}` : selectedFamily ? selectedFamily.name : 'Ma famille'} action={selectedPerson || selectedFamily ? <button className="secondary" onClick={() => { setSelectedPerson(null); setSelectedFamily(null) }}>← Retour aux familles</button> : <button className="primary" onClick={() => setModal('family')}><Icon name="plus" size={18}/> Créer une famille</button>}/>
-          {selectedPerson ? personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div> : <Empty icon="heart" title="Pas encore d’envies" text="Cette personne n’a pas encore partagé sa liste."/>
-            : selectedFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">VOTRE TRIBU</p><p className="muted mt-1">Découvrez les envies des membres de cette famille.</p></div>{selectedFamily.admin && <button className="secondary" onClick={() => openOccasion(selectedFamily)}><Icon name="calendar" size={18}/> Ajouter une occasion</button>}</div>{selectedFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{selectedFamily.members.map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-4 p-5 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title="Aucun membre affiché" text="Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles."/>}</>
+          {selectedPerson ? <>
+            <div className="card mb-6 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div><label className="label" htmlFor="filter-tag">Tag</label><input className="field" id="filter-tag" value={personFilters.tag} onChange={event => setPersonFilter('tag', event.target.value)} placeholder="Ex. : livres"/></div>
+              {String(selectedPerson.id) !== String(me.id) && <div><label className="label" htmlFor="filter-availability">Disponibilité</label><select className="field" id="filter-availability" value={personFilters.availability} onChange={event => setPersonFilter('availability', event.target.value)}><option value="">Toutes</option><option value="available">Disponibles</option><option value="reserved">Réservées</option></select></div>}
+              <div><label className="label" htmlFor="filter-min-price">Prix minimum (€)</label><input className="field" id="filter-min-price" type="number" min="0" step="0.01" value={personFilters.minPrice} onChange={event => setPersonFilter('minPrice', event.target.value)} placeholder="0"/></div>
+              <div><label className="label" htmlFor="filter-max-price">Prix maximum (€)</label><input className="field" id="filter-max-price" type="number" min="0" step="0.01" value={personFilters.maxPrice} onChange={event => setPersonFilter('maxPrice', event.target.value)} placeholder="Sans limite"/></div>
+            </div>
+            {personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div> : <Empty icon="heart" title="Aucune envie trouvée" text="Modifiez les filtres pour découvrir d’autres envies."/>}
+          </>
+            : activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">VOTRE TRIBU</p><p className="muted mt-1">Découvrez les envies des membres de cette famille.</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> Ajouter une occasion</button>}</div>{activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-4 p-5 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title="Aucun membre affiché" text="Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles."/>}{activeFamily.admin && <FamilyManagement family={activeFamily} me={me} busy={busy} perform={perform} handleError={handleError} onRename={name => setSelectedFamily({ ...activeFamily, name })}/>}</>
             : families.length ? <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{families.map(family => <article className="card p-6" key={family.id}><div className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-[#f2eafa] text-[#795ca7]"><Icon name="users" size={25}/></div><h3 className="font-['Outfit'] text-xl font-semibold">{family.name}</h3><p className="muted mt-1">{family.admin ? 'Famille administrée' : 'Famille partagée'}</p><div className="mt-5 flex gap-2"><button className="secondary flex-1 !px-2" onClick={() => { setSelectedFamily(family); setSelectedPerson(null) }}>Voir la famille <Icon name="arrow" size={16}/></button>{family.admin && <button className="icon-button" onClick={() => openOccasion(family)} aria-label={`Créer une occasion pour ${family.name}`}><Icon name="calendar" size={19}/></button>}</div></article>)}</div> : <Empty icon="users" title="Créez votre première famille" text="Rassemblez les personnes qui comptent et découvrez leurs envies." action={<button className="primary" onClick={() => setModal('family')}>Créer une famille</button>}/>}
           {!selectedPerson && !selectedFamily && allPeople.filter(person => String(person.id) !== String(me.id)).length > 0 && <div className="mt-9"><SectionTitle title="Les personnes à découvrir"/><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{allPeople.filter(person => String(person.id) !== String(me.id)).map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-3 p-4 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={16}/></button>)}</div></div>}
         </>}
@@ -344,10 +367,68 @@ function OccasionForm({ family, busy, perform }: { family: Family; busy: boolean
   </form>
 }
 
+function FamilyManagement({ family, me, busy, perform, handleError, onRename }: {
+  family: Family; me: Person; busy: boolean;
+  perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean>;
+  handleError: (error: unknown) => void; onRename: (name: string) => void
+}) {
+  const [code, setCode] = useState('')
+  const [generating, setGenerating] = useState(false)
+  async function invite() {
+    if (!me.householdId) return
+    setGenerating(true); setCode('')
+    try {
+      const result = await api<{ code: string }>(`/households/${me.householdId}/invitations`, json('POST', {}))
+      setCode(result.code)
+    } catch (problem) { handleError(problem) }
+    finally { setGenerating(false) }
+  }
+  return <section className="card mt-8 p-5 sm:p-6" aria-label={`Administration de ${family.name}`}>
+    <h3 className="font-['Outfit'] text-xl font-semibold">Gérer la famille</h3>
+    <div className="mt-5 grid gap-6 lg:grid-cols-2">
+      <div>
+        <h4 className="label">Foyers rattachés</h4>
+        {family.households?.length ? <ul className="mb-5 space-y-2">{family.households.map(household => <li className="rounded-xl bg-[#f7f3f9] px-3 py-2 text-sm" key={household.id}><strong>{household.name}</strong> <span className="block break-all text-xs text-[#807789]">{household.id}</span></li>)}</ul> : <p className="muted mb-5">Aucun foyer disponible.</p>}
+        <form onSubmit={event => {
+          event.preventDefault()
+          const householdId = String(new FormData(event.currentTarget).get('householdId')).trim()
+          void perform(() => api(`/families/${family.id}/households`, json('POST', { householdId })), 'Foyer rattaché à la famille.', false)
+        }}>
+          <label className="label" htmlFor="attach-household">Rattacher un foyer par identifiant</label>
+          <div className="flex flex-wrap gap-2"><input className="field min-w-0 flex-1" id="attach-household" name="householdId" placeholder="Identifiant UUID du foyer" required/><button disabled={busy} className="secondary">Rattacher</button></div>
+        </form>
+      </div>
+      <div className="space-y-5">
+        <form onSubmit={event => {
+          event.preventDefault()
+          const name = String(new FormData(event.currentTarget).get('name')).trim()
+          void perform(() => api(`/families/${family.id}`, json('PATCH', { name })), 'Famille renommée.', false).then(ok => { if (ok) onRename(name) })
+        }}>
+          <label className="label" htmlFor="rename-family">Renommer la famille</label>
+          <div className="flex flex-wrap gap-2"><input key={family.name} className="field min-w-0 flex-1" id="rename-family" name="name" defaultValue={family.name} required/><button disabled={busy} className="secondary">Renommer</button></div>
+        </form>
+        <div>
+          <p className="label">Inviter dans mon foyer</p>
+          <p className="muted mb-3">Générez un code valable 7 jours, à communiquer à la personne invitée. L’administration du foyer est requise.</p>
+          <button type="button" disabled={generating || !me.householdId} className="secondary" onClick={() => void invite()}>{generating ? 'Création…' : 'Créer un code d’invitation'}</button>
+          {code && <div role="status" className="mt-3 rounded-xl bg-[#f2eafa] p-3"><p className="mb-1 text-sm font-semibold">Code d’invitation (visible uniquement maintenant)</p><output className="block break-all font-mono text-sm text-[#634797]">{code}</output></div>}
+        </div>
+      </div>
+    </div>
+  </section>
+}
+
 const selectionOf = (occasion: Occasion): OccasionSelection | null => {
   const year = occasion.year ?? (occasion.nextDate ? Number(occasion.nextDate.slice(0, 4)) : NaN)
   return Number.isInteger(year) ? { id: occasion.id, year } : null
 }
+const occurrences = (occasions: Occasion[]) => occasions.flatMap(occasion => {
+  const first = selectionOf(occasion)
+  if (!first) return []
+  return [first, { id: first.id, year: first.year + 1 }]
+    .filter(selection => selection.year <= 2200)
+    .map(selection => ({ occasion, selection }))
+})
 const sameSelection = (a: OccasionSelection, b: OccasionSelection) => String(a.id) === String(b.id) && a.year === b.year
 const statusLabels: Record<string, string> = { reserved: 'Réservé', purchased: 'Acheté', wrapped: 'Emballé', gifted: 'Offert' }
 const nextStatuses: Record<string, string[]> = { reserved: ['purchased'], purchased: ['reserved', 'wrapped'], wrapped: ['purchased', 'gifted'] }
@@ -356,15 +437,22 @@ function ReservationForm({ wish, reservations, occasions, people, me, busy, perf
   const existing = reservations.find(item => String(item.wishId) === String(wish.id) && !item.cancelled && item.status !== 'gifted') || wish.reservation
   const mine = existing && String(existing.creator?.id) === String(me.id)
   const [selectedOccasions, setSelectedOccasions] = useState<OccasionSelection[]>(existing?.occasionIds || existing?.occasions?.map(selectionOf).filter((item): item is OccasionSelection => item !== null) || [])
+  const changedOccasions = useRef(false)
   const [selectedParticipants, setSelectedParticipants] = useState<Id[]>(existing?.participantIds || existing?.participants?.map(person => person.id) || [])
   const [open, setOpen] = useState(existing?.openToContributions ?? false)
   const togglePerson = (id: Id) => setSelectedParticipants(values => values.some(value => String(value) === String(id)) ? values.filter(value => String(value) !== String(id)) : [...values, id])
-  const available = occasions.map(occasion => ({ occasion, selection: selectionOf(occasion) })).filter((item): item is { occasion: Occasion; selection: OccasionSelection } => item.selection !== null)
+  const available = occurrences(occasions)
+  useEffect(() => {
+    const first = occasions.map(selectionOf).find((item): item is OccasionSelection => item !== null)
+    if (!existing && !changedOccasions.current && first) {
+      setSelectedOccasions(current => current.length || changedOccasions.current ? current : [first])
+    }
+  }, [occasions, existing])
   if (existing && !mine) return <div><p className="mb-4 text-sm text-[#807687]">Cette envie est réservée par <strong>{nameOf(existing.creator)}</strong>.</p>{existing.participants?.length ? <p className="muted mb-4">Participants : {existing.participants.map(nameOf).join(', ')}</p> : null}{existing.participants?.some(person => String(person.id) === String(me.id)) ? <p className="muted">Vous participez déjà à ce cadeau.</p> : existing.openToContributions ? <button disabled={busy} className="primary w-full" onClick={() => { void perform(() => api(`/reservations/${existing.id}/requests`, json('POST', {})), 'Demande de participation envoyée.') }}>Demander à participer</button> : <p className="muted">Cette réservation n’est pas ouverte aux participations.</p>}</div>
   const options = [...available, ...(existing?.occasions || []).filter(occasion => !available.some(item => item.occasion.id === occasion.id && item.selection.year === occasion.year)).map(occasion => ({ occasion, selection: selectionOf(occasion) })).filter((item): item is { occasion: Occasion; selection: OccasionSelection } => item.selection !== null)]
   return <form onSubmit={event => { event.preventDefault(); const body = { occasionIds: selectedOccasions, participantIds: selectedParticipants, openToContributions: open }; void perform(() => existing ? api(`/reservations/${existing.id}`, json('PATCH', body)) : api('/reservations', json('POST', { wishId: wish.id, ...body })), existing ? 'Réservation mise à jour.' : 'Envie réservée !') }}>
     <p className="muted mb-5">Pour <strong className="text-[#4b3e59]">{wish.title}</strong></p>
-    <fieldset className="mb-5"><legend className="label">Occasions (au moins une)</legend>{options.length ? <div className="max-h-36 space-y-2 overflow-y-auto">{options.map(({ occasion, selection }) => <label key={`${selection.id}-${selection.year}`} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={selectedOccasions.some(value => sameSelection(value, selection))} onChange={() => setSelectedOccasions(values => values.some(value => sameSelection(value, selection)) ? values.filter(value => !sameSelection(value, selection)) : [...values, selection])}/>{occasion.name || occasion.title || 'Occasion'} <span className="text-[#9a91a0]">{occasion.nextDate ? dateOf(occasion.nextDate) : selection.year}</span></label>)}</div> : <p className="muted">Aucune occasion datée pour cette personne. Créez une occasion dans une famille commune avant de réserver.</p>}</fieldset>
+    <fieldset className="mb-5"><legend className="label">Occasions (au moins une)</legend>{options.length ? <div className="max-h-36 space-y-2 overflow-y-auto">{options.map(({ occasion, selection }) => <label key={`${selection.id}-${selection.year}`} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={selectedOccasions.some(value => sameSelection(value, selection))} onChange={() => { changedOccasions.current = true; setSelectedOccasions(values => values.some(value => sameSelection(value, selection)) ? values.filter(value => !sameSelection(value, selection)) : [...values, selection]) }}/>{occasion.name || occasion.title || 'Occasion'} <span className="text-[#9a91a0]">{occasion.nextDate && Number(occasion.nextDate.slice(0, 4)) === selection.year ? dateOf(occasion.nextDate) : `année ${selection.year}`}</span></label>)}</div> : <p className="muted">Aucune occasion datée pour cette personne. Créez une occasion dans une famille commune avant de réserver.</p>}</fieldset>
     <fieldset className="mb-5"><legend className="label">Inviter des participants</legend><div className="max-h-32 space-y-2 overflow-y-auto">{people.filter(person => String(person.id) !== String(me.id) && String(person.id) !== String(wish.ownerId)).map(person => <label key={person.id} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={selectedParticipants.some(id => String(id) === String(person.id))} onChange={() => togglePerson(person.id)}/>{nameOf(person)}</label>)}</div></fieldset>
     <label className="mb-5 flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/>Autoriser les demandes de participation</label>
     <button disabled={busy || selectedOccasions.length === 0} className="primary w-full">{existing ? 'Enregistrer les modifications' : 'Confirmer la réservation'}</button>
@@ -401,9 +489,10 @@ function ReservationRow({ reservation, users, me, busy, perform }: { reservation
       setLocalError(problem instanceof Error ? problem.message : 'Occasions indisponibles.')
     }
   }
-  const options = [...(reservation.occasions || []), ...available.filter(occasion => !reservation.occasions?.some(item => item.id === occasion.id && item.year === Number(occasion.nextDate?.slice(0, 4))))]
-    .map(occasion => ({ occasion, selection: selectionOf(occasion) }))
-    .filter((item): item is { occasion: Occasion; selection: OccasionSelection } => item.selection !== null)
+  const options = [
+    ...(reservation.occasions || []).map(occasion => ({ occasion, selection: selectionOf(occasion) })).filter((item): item is { occasion: Occasion; selection: OccasionSelection } => item.selection !== null),
+    ...occurrences(available).filter(item => !reservation.occasions?.some(saved => sameSelection(item.selection, { id: saved.id, year: saved.year ?? 0 }))),
+  ]
   return <article className="card p-5">
     <div className="flex flex-wrap items-start gap-4"><span className="rounded-2xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="gift" size={23}/></span><div className="min-w-0 flex-1"><h3 className="font-['Outfit'] text-lg font-semibold">Réservation #{String(reservation.id).slice(0, 8)}</h3><p className="muted mt-1">{reservation.occasions?.map(item => `${item.name} ${item.year}`).join(', ') || 'Cadeau en préparation'} · {reservation.cancelled ? 'Annulé' : statusLabels[reservation.status || 'reserved'] || reservation.status}</p><p className="muted mt-1">Organisé par {nameOf(reservation.creator)} · Participants : {reservation.participants?.map(nameOf).join(', ') || 'Aucun'}</p>{reservation.wishDeleted && <p className="muted">L’envie a été supprimée.</p>}</div>{editable && <button className="secondary text-sm" onClick={() => void openEditor()}><Icon name="edit" size={16}/> {editing ? 'Fermer' : 'Gérer'}</button>}</div>
     {localError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{localError}</p>}

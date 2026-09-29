@@ -226,7 +226,8 @@ const upcoming = async (viewer: Person, recipientId: string) => {
     if (!month || !day) return { ...r, nextDate: null };
     let year = now.getUTCFullYear();
     let candidate = new Date(Date.UTC(year, month - 1, day));
-    if (candidate < new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))) {
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    while (candidate.getUTCMonth() !== month - 1 || candidate.getUTCDate() !== day || candidate < today) {
       year++; candidate = new Date(Date.UTC(year, month - 1, day));
     }
     return { ...r, nextDate: candidate.toISOString().slice(0, 10) };
@@ -265,6 +266,12 @@ const wishAccess = async (id: string, viewer: string) => {
   if (!wish || !await visible(viewer, wish.owner_id)) fail(404, 'Souhait introuvable');
   return wish;
 };
+const wishFilters = z.strictObject({
+  tag: z.string().trim().min(1).max(40).optional(),
+  availability: z.enum(['available', 'reserved']).optional(),
+  minPrice: z.coerce.number().finite().min(0).optional(),
+  maxPrice: z.coerce.number().finite().min(0).optional(),
+});
 const reservationView = async (wish: Wish, viewer: string) => {
   const result: Record<string, unknown> = {
     id: wish.id, ownerId: wish.owner_id, title: wish.title, description: wish.description,
@@ -282,21 +289,21 @@ const reservationView = async (wish: Wish, viewer: string) => {
   }
   return result;
 };
-const listWishes = async (viewer: string, owner: string, filters: Record<string, unknown> = {}) => {
+const listWishes = async (viewer: string, owner: string, filters: z.infer<typeof wishFilters> = {}) => {
   if (!await visible(viewer, owner)) fail(403, 'Personne inaccessible');
   const rows = await query<Wish>(`SELECT * FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL AND gifted_at IS NULL
     ORDER BY position,created_at`, [owner]);
   const result = await Promise.all(rows.map(row => reservationView(row, viewer)));
   return result.filter(row => {
     if (filters.tag && !(row.tags as string[]).includes(String(filters.tag))) return false;
-    if (filters.minPrice && (row.price === null || Number(row.price) < Number(filters.minPrice))) return false;
-    if (filters.maxPrice && (row.price === null || Number(row.price) > Number(filters.maxPrice))) return false;
+    if (filters.minPrice !== undefined && (row.price === null || Number(row.price) < filters.minPrice)) return false;
+    if (filters.maxPrice !== undefined && (row.price === null || Number(row.price) > filters.maxPrice)) return false;
     if (filters.availability && viewer !== owner && (filters.availability === 'reserved') !== !!row.reservation) return false;
     return true;
   });
 };
-api.get('/wishes', async (req, res) => res.json(await listWishes(person(req).id, person(req).id, req.query)));
-api.get('/users/:id/wishes', async (req, res) => res.json(await listWishes(person(req).id, uuid.parse(req.params.id), req.query)));
+api.get('/wishes', async (req, res) => res.json(await listWishes(person(req).id, person(req).id, wishFilters.parse(req.query))));
+api.get('/users/:id/wishes', async (req, res) => res.json(await listWishes(person(req).id, uuid.parse(req.params.id), wishFilters.parse(req.query))));
 api.get('/wishes/:id', async (req, res) => {
   const wish = await wishAccess(uuid.parse(req.params.id), person(req).id);
   if (wish.deleted_at || wish.gifted_at) fail(404, 'Souhait introuvable');
