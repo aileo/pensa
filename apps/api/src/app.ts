@@ -538,7 +538,16 @@ api.patch('/reservations/:id/requests/:requestId', async (req, res) => {
     const q = (await client.query<{user_id:string}>(`UPDATE requests SET status=$1 WHERE id=$2 AND reservation_id=$3 AND status='pending' RETURNING user_id`,
       [status, uuid.parse(req.params.requestId), r.id])).rows[0];
     if (!q) fail(404, 'Demande introuvable');
-    if (status === 'accepted') await client.query('INSERT INTO participants VALUES($1,$2) ON CONFLICT DO NOTHING', [r.id, q.user_id]);
+    if (status === 'accepted') {
+      const access = await client.query(`SELECT f.id FROM families f
+        JOIN memberships requester ON requester.family_id=f.id
+        JOIN users applicant ON applicant.household_id=requester.household_id AND applicant.id=$1
+        JOIN memberships recipient ON recipient.family_id=f.id
+        JOIN users beneficiary ON beneficiary.household_id=recipient.household_id AND beneficiary.id=$2
+        FOR SHARE OF f`, [q.user_id, r.owner_id]);
+      if (!access.rowCount) fail(403, 'Participant hors des familles du bénéficiaire');
+      await client.query('INSERT INTO participants VALUES($1,$2) ON CONFLICT DO NOTHING', [r.id, q.user_id]);
+    }
     await client.query('COMMIT'); res.json({ status });
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 });
@@ -569,7 +578,11 @@ api.get('/dashboard', async (req, res) => {
     WHERE mine.household_id=$1 ORDER BY u.first_name`, [actor.household_id]);
   const reservationsRows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at FROM reservations r JOIN wishes w ON w.id=r.wish_id
     WHERE w.owner_id<>$1 AND r.cancelled_at IS NULL AND r.status!='gifted'
-    AND (r.creator_id=$1 OR EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$1))`, [actor.id]);
+    AND (r.creator_id=$1 OR EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$1))
+    AND EXISTS(SELECT 1 FROM users viewer JOIN memberships mine ON mine.household_id=viewer.household_id
+      JOIN users recipient ON recipient.id=w.owner_id JOIN memberships theirs
+        ON theirs.household_id=recipient.household_id AND theirs.family_id=mine.family_id
+      WHERE viewer.id=$1)`, [actor.id]);
   const reservations = await Promise.all(reservationsRows.map(r => reservationDetails(r, actor.id)));
   const occasions = (await Promise.all(people.map(async p => (await upcoming(actor, p.id))
     .filter(o => o.nextDate).map(o => ({ ...o, person: publicPerson(p) })))))

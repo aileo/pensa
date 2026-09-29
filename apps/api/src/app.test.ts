@@ -124,6 +124,36 @@ describe('permissions métier sur l’API', () => {
     expect((await call('guest', `/reservations/${booking.data.id}`)).status).toBe(404);
     await call('bob', `/wishes/${wish.data.id}`, 'DELETE');
   });
+  it('refuse une demande en attente après retrait du foyer et cache la réservation du dashboard', async () => {
+    const familyA = (await call('alice', '/families')).data.find((f: {name:string}) => f.name === 'Famille A');
+    const registered = await call('', '/auth/register', 'POST', {
+      firstName: 'Pending', lastName: 'Guest', email: `pending-${Date.now()}@example.test`,
+      password: 'LongSecret2026!', birthDate: '1995-07-10',
+    });
+    expect(registered.status).toBe(201);
+    cookies.pending = registered.cookie!.split(';')[0];
+    const invite = await call('alice', `/families/${familyA.id}/invitations`, 'POST', {});
+    expect((await call('pending', '/families/join', 'POST', { code: invite.data.code })).status).toBe(201);
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const wish = (await call('alice', `/users/${bobId}/wishes`)).data
+      .find((w: {reservation?: {openToContributions?: boolean}}) => w.reservation?.openToContributions);
+    expect(wish.reservation.creator.firstName).toBe('Alice');
+    const requested = await call('pending', `/reservations/${wish.reservation.id}/requests`, 'POST', {});
+    expect(requested.status).toBe(201);
+    expect((await call('alice', `/families/${familyA.id}/households/${registered.data.householdId}`, 'DELETE')).status).toBe(200);
+    expect((await call('alice', `/reservations/${wish.reservation.id}/requests/${requested.data.id}`, 'PATCH',
+      { status: 'accepted' })).status).toBe(403);
+    await pool.query('INSERT INTO participants(reservation_id,user_id) VALUES($1,$2)',
+      [wish.reservation.id, registered.data.id]);
+    try {
+      const dashboard = await call('pending', '/dashboard');
+      expect(dashboard.data.participating.some((r: {id:string}) => r.id === wish.reservation.id)).toBe(false);
+      expect((await call('pending', '/reservations')).data.some((r: {id:string}) => r.id === wish.reservation.id)).toBe(false);
+    } finally {
+      await pool.query('DELETE FROM participants WHERE reservation_id=$1 AND user_id=$2',
+        [wish.reservation.id, registered.data.id]);
+    }
+  });
   it('ne retourne aucun souhait inaccessible dans la recherche et les filtres', async () => {
     const isolated = await call('eloise', '/search?q=Console');
     expect(isolated.data.wishes).toHaveLength(0);
