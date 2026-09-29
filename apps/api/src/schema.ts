@@ -25,6 +25,11 @@ export const invitations = pgTable('invitations', {
   email: text('email'), expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   usedAt: timestamp('used_at', { withTimezone: true }),
 });
+export const familyInvitations = pgTable('family_invitations', {
+  tokenHash: text('token_hash').primaryKey(), familyId: uuid('family_id').notNull().references(() => families.id),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+});
 export const occasions = pgTable('occasions', {
   id: id(), familyId: uuid('family_id').notNull().references(() => families.id),
   name: text('name').notNull(), kind: text('kind').notNull(),

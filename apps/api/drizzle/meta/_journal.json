@@ -15,6 +15,13 @@
       "when": 1790700307609,
       "tag": "0001_red_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790702030438,
+      "tag": "0002_odd_terrax",
+      "breakpoints": true
     }
   ]
 }

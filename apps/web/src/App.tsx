@@ -77,9 +77,27 @@ type WishFilters = { tag: string; availability: string; minPrice: string; maxPri
 const emptyWishFilters: WishFilters = { tag: '', availability: '', minPrice: '', maxPrice: '' }
 
 function App() {
-  const [me, setMe] = useState<Person | null>(null)
+  const [account, setAccount] = useState<{ person: Person; session: number } | null>(null)
+  const session = useRef(0)
   const [authChecked, setAuthChecked] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+  const [error, setError] = useState('')
+  const onAuth = (person: Person) => { setAccount({ person, session: ++session.current }); setError('') }
+
+  useEffect(() => {
+    let active = true
+    api<Person>('/auth/me').then(person => { if (active) onAuth(person) }).catch(problem => {
+      if (active && !(problem instanceof ApiError && problem.status === 401)) setError(problem instanceof Error ? problem.message : 'Une erreur inattendue est survenue.')
+    }).finally(() => { if (active) setAuthChecked(true) })
+    return () => { active = false }
+  }, [])
+
+  if (!authChecked) return <div className="flex min-h-screen items-center justify-center text-[#795ca7]" role="status">Chargement de Giftit…</div>
+  if (!account) return <Auth mode={authMode} setMode={setAuthMode} onAuth={onAuth} error={error} setError={setError} />
+  return <AuthenticatedApp key={account.session} me={account.person} onLogout={() => setAccount(null)} />
+}
+
+function AuthenticatedApp({ me, onLogout }: { me: Person; onLogout: () => void }) {
   const [page, setPage] = useState<Page>('dashboard')
   const [mobileNav, setMobileNav] = useState(false)
   const [families, setFamilies] = useState<Family[]>([])
@@ -108,12 +126,6 @@ function App() {
   const handleError = (problem: unknown) => setError(problem instanceof Error ? problem.message : 'Une erreur inattendue est survenue.')
 
   useEffect(() => {
-    api<Person>('/auth/me').then(setMe).catch(problem => {
-      if (!(problem instanceof ApiError && problem.status === 401)) handleError(problem)
-    }).finally(() => setAuthChecked(true))
-  }, [])
-  useEffect(() => {
-    if (!me) return
     let active = true
     Promise.all([
       api<unknown>('/dashboard'), api<Family[]>('/families'), api<Person[]>('/users'),
@@ -132,13 +144,13 @@ function App() {
     return () => { active = false }
   }, [me, revision])
   useEffect(() => {
-    if (!me || page !== 'history') return
+    if (page !== 'history') return
     let active = true
     api<unknown[]>('/history').then(data => { if (active) setHistory(list(data)) }).catch(problem => { if (active) handleError(problem) })
     return () => { active = false }
   }, [me, page, revision])
   useEffect(() => {
-    if (!me || page !== 'search') return
+    if (page !== 'search') return
     let active = true
     const timer = window.setTimeout(() => {
       api<unknown>(`/search?q=${encodeURIComponent(searchText.trim())}`).then(data => {
@@ -200,9 +212,6 @@ function App() {
     setPersonFilterState({ ...personFilters, personId: String(selectedPerson.id), [key]: value })
   }
 
-  if (!authChecked) return <div className="flex min-h-screen items-center justify-center text-[#795ca7]" role="status">Chargement de Giftit…</div>
-  if (!me) return <Auth mode={authMode} setMode={setAuthMode} onAuth={user => { setSharedWishes([]); setMe(user); setError(''); setNotice('') }} error={error} setError={setError} />
-
   return <div className="min-h-screen bg-[#faf9f7] lg:flex">
     {mobileNav && <button className="fixed inset-0 z-30 bg-[#241a35]/40 lg:hidden" aria-label="Fermer le menu" onClick={() => setMobileNav(false)} />}
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[#eee9ef] bg-white px-4 py-7 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${mobileNav ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -249,14 +258,15 @@ function App() {
             </div>
             {personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div> : <Empty icon="heart" title="Aucune envie trouvée" text="Modifiez les filtres pour découvrir d’autres envies."/>}
           </>
-            : activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">VOTRE TRIBU</p><p className="muted mt-1">Découvrez les envies des membres de cette famille.</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> Ajouter une occasion</button>}</div>{activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-4 p-5 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title="Aucun membre affiché" text="Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles."/>}{activeFamily.admin && <FamilyManagement family={activeFamily} me={me} busy={busy} perform={perform} handleError={handleError} onRename={name => setSelectedFamily({ ...activeFamily, name })}/>}</>
+            : activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">VOTRE TRIBU</p><p className="muted mt-1">Découvrez les envies des membres de cette famille.</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> Ajouter une occasion</button>}</div>{activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-4 p-5 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title="Aucun membre affiché" text="Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles."/>}{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} me={me} busy={busy} perform={perform} handleError={handleError} onRename={name => setSelectedFamily({ ...activeFamily, name })}/>}</>
             : families.length ? <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{families.map(family => <article className="card p-6" key={family.id}><div className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-[#f2eafa] text-[#795ca7]"><Icon name="users" size={25}/></div><h3 className="font-['Outfit'] text-xl font-semibold">{family.name}</h3><p className="muted mt-1">{family.admin ? 'Famille administrée' : 'Famille partagée'}</p><div className="mt-5 flex gap-2"><button className="secondary flex-1 !px-2" onClick={() => { setSelectedFamily(family); setSelectedPerson(null) }}>Voir la famille <Icon name="arrow" size={16}/></button>{family.admin && <button className="icon-button" onClick={() => openOccasion(family)} aria-label={`Créer une occasion pour ${family.name}`}><Icon name="calendar" size={19}/></button>}</div></article>)}</div> : <Empty icon="users" title="Créez votre première famille" text="Rassemblez les personnes qui comptent et découvrez leurs envies." action={<button className="primary" onClick={() => setModal('family')}>Créer une famille</button>}/>}
+          {!selectedPerson && !selectedFamily && me.householdId != null && <JoinFamily busy={busy} perform={perform}/>}
           {!selectedPerson && !selectedFamily && allPeople.filter(person => String(person.id) !== String(me.id)).length > 0 && <div className="mt-9"><SectionTitle title="Les personnes à découvrir"/><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{allPeople.filter(person => String(person.id) !== String(me.id)).map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-3 p-4 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={16}/></button>)}</div></div>}
         </>}
         {page === 'reservations' && <><SectionTitle kicker="CADEAUX EN PRÉPARATION" title="Mes réservations"/>{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform}/>)}</div> : <Empty icon="gift" title="Aucune réservation pour le moment" text="Explorez les listes de vos proches pour leur préparer une surprise." action={<button className="primary" onClick={() => go('families')}>Découvrir les envies <Icon name="arrow" size={17}/></button>}/>}</>}
         {page === 'history' && <><SectionTitle kicker="SOUVENIRS PARTAGÉS" title="Historique"/>{history.length ? <div className="card divide-y divide-[#f0edf1]">{history.map((entry, index) => { const item = entry as { id?: Id; snapshot?: { title?: string; occasions?: { name: string; year: number }[] }; created_at?: string }; return <div className="flex items-start gap-4 p-5" key={String(item.id ?? index)}><span className="rounded-xl bg-[#f2eafa] p-2.5 text-[#795ca7]"><Icon name="clock" size={19}/></span><div><p className="font-semibold">{item.snapshot?.title || 'Un cadeau offert'}</p><p className="muted mt-1">{item.snapshot?.occasions?.map(occasion => `${occasion.name} ${occasion.year}`).join(', ')} · {dateOf(item.created_at)}</p></div></div> })}</div> : <Empty icon="clock" title="Vos souvenirs commencent ici" text="L’historique de vos cadeaux et occasions s’affichera ici."/>}</>}
         {page === 'search' && <><SectionTitle kicker="TROUVEZ L’INSPIRATION" title="Rechercher"/><label htmlFor="global-search" className="label">Personnes et envies</label><div className="relative mb-7"><Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#a399ac]"/><input id="global-search" autoComplete="off" className="field !py-3 !pl-12" placeholder="Rechercher une personne, une envie…" value={searchText} onChange={event => setSearchText(event.target.value)}/></div>{searchResults.length ? <div className="space-y-3">{searchResults.map((result, index) => { const item = result as Record<string, unknown>; const person = item as Person; const wish = item as Wish; const isWish = typeof item.title === 'string'; return <div key={String(item.id ?? index)} className="card flex items-center gap-4 p-4">{isWish ? <span className="rounded-xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="heart"/></span> : <Avatar person={person}/>}<div className="min-w-0 flex-1"><p className="truncate font-semibold">{isWish ? wish.title : nameOf(person)}</p><p className="muted">{isWish ? money(wish.price) || 'Envie cadeau' : 'Personne'}</p></div><button className="secondary !px-3 !py-2 text-sm" onClick={() => isWish ? String(wish.ownerId) === String(me.id) ? go('wishes') : openReserve(wish) : (setSelectedPerson(person), setPage('families'))}>Voir <Icon name="arrow" size={15}/></button></div> })}</div> : <Empty icon="search" title={searchText ? 'Aucun résultat' : 'Que recherchez-vous ?'} text={searchText ? 'Essayez d’autres mots-clés.' : 'Retrouvez une personne ou une idée cadeau en quelques lettres.'}/>}</>}
-        {page === 'profile' && <><SectionTitle kicker="VOTRE ESPACE" title="Mon profil"/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-[#eee9ef] pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">Votre compte Giftit</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">ADRESSE E-MAIL</dt><dd>{me.email || 'Non renseignée'}</dd></div><div><dt className="eyebrow mb-1">DATE DE NAISSANCE</dt><dd>{dateOf(me.birthDate) || 'Non renseignée'}</dd></div></dl><button className="secondary" onClick={async () => { const ok = await perform(() => api('/auth/logout', { method: 'POST' }), 'Déconnexion réussie.'); if (ok) { setMe(null); setPage('dashboard') } }}><Icon name="logout" size={17}/> Se déconnecter</button></div></>}
+        {page === 'profile' && <><SectionTitle kicker="VOTRE ESPACE" title="Mon profil"/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-[#eee9ef] pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">Votre compte Giftit</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">ADRESSE E-MAIL</dt><dd>{me.email || 'Non renseignée'}</dd></div><div><dt className="eyebrow mb-1">DATE DE NAISSANCE</dt><dd>{dateOf(me.birthDate) || 'Non renseignée'}</dd></div></dl><button className="secondary" disabled={busy} onClick={async () => { const ok = await perform(() => api('/auth/logout', { method: 'POST' }), 'Déconnexion réussie.'); if (ok) onLogout() }}><Icon name="logout" size={17}/> Se déconnecter</button></div></>}
       </main>
     </div>
     {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241a35]/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-8"><div className="mb-6 flex items-start justify-between gap-3"><div><p className="eyebrow mb-1">GIFTIT</p><h2 id="modal-title" className="font-['Outfit'] text-2xl font-bold">{modal === 'wish' ? 'Ajouter une envie' : modal === 'family' ? 'Créer une famille' : modal === 'occasion' ? 'Nouvelle occasion' : modal === 'tags' ? 'Modifier les tags' : 'Réserver une envie'}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label="Fermer"><Icon name="close"/></button></div>
@@ -367,21 +377,47 @@ function OccasionForm({ family, busy, perform }: { family: Family; busy: boolean
   </form>
 }
 
+function JoinFamily({ busy, perform }: { busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
+  const [code, setCode] = useState('')
+  return <section className="card mt-8 p-5 sm:p-6">
+    <h3 className="font-['Outfit'] text-xl font-semibold">Rejoindre une famille</h3>
+    <p className="muted mt-2">Vous administrez un foyer ? Saisissez le code d’invitation à la famille reçu de son administrateur pour y rattacher votre foyer.</p>
+    <form className="mt-4 flex flex-wrap gap-2" onSubmit={event => {
+      event.preventDefault()
+      void perform(() => api<{ familyId: Id; householdId: Id }>('/families/join', json('POST', { code: code.trim() })), 'Votre foyer a rejoint la famille.', false).then(ok => { if (ok) setCode('') })
+    }}>
+      <label className="sr-only" htmlFor="join-family-code">Code d’invitation à la famille</label>
+      <input className="field min-w-0 flex-1" id="join-family-code" value={code} onChange={event => setCode(event.target.value)} placeholder="Code d’invitation à la famille" required/>
+      <button className="secondary" disabled={busy || !code.trim()}>Rejoindre la famille</button>
+    </form>
+  </section>
+}
+
 function FamilyManagement({ family, me, busy, perform, handleError, onRename }: {
   family: Family; me: Person; busy: boolean;
   perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean>;
   handleError: (error: unknown) => void; onRename: (name: string) => void
 }) {
-  const [code, setCode] = useState('')
-  const [generating, setGenerating] = useState(false)
-  async function invite() {
+  const [householdCode, setHouseholdCode] = useState('')
+  const [familyCode, setFamilyCode] = useState('')
+  const [generatingHousehold, setGeneratingHousehold] = useState(false)
+  const [generatingFamily, setGeneratingFamily] = useState(false)
+  async function inviteHousehold() {
     if (!me.householdId) return
-    setGenerating(true); setCode('')
+    setGeneratingHousehold(true); setHouseholdCode('')
     try {
       const result = await api<{ code: string }>(`/households/${me.householdId}/invitations`, json('POST', {}))
-      setCode(result.code)
+      setHouseholdCode(result.code)
     } catch (problem) { handleError(problem) }
-    finally { setGenerating(false) }
+    finally { setGeneratingHousehold(false) }
+  }
+  async function inviteFamily() {
+    setGeneratingFamily(true); setFamilyCode('')
+    try {
+      const result = await api<{ code: string }>(`/families/${family.id}/invitations`, json('POST', {}))
+      setFamilyCode(result.code)
+    } catch (problem) { handleError(problem) }
+    finally { setGeneratingFamily(false) }
   }
   return <section className="card mt-8 p-5 sm:p-6" aria-label={`Administration de ${family.name}`}>
     <h3 className="font-['Outfit'] text-xl font-semibold">Gérer la famille</h3>
@@ -389,14 +425,10 @@ function FamilyManagement({ family, me, busy, perform, handleError, onRename }: 
       <div>
         <h4 className="label">Foyers rattachés</h4>
         {family.households?.length ? <ul className="mb-5 space-y-2">{family.households.map(household => <li className="rounded-xl bg-[#f7f3f9] px-3 py-2 text-sm" key={household.id}><strong>{household.name}</strong> <span className="block break-all text-xs text-[#807789]">{household.id}</span></li>)}</ul> : <p className="muted mb-5">Aucun foyer disponible.</p>}
-        <form onSubmit={event => {
-          event.preventDefault()
-          const householdId = String(new FormData(event.currentTarget).get('householdId')).trim()
-          void perform(() => api(`/families/${family.id}/households`, json('POST', { householdId })), 'Foyer rattaché à la famille.', false)
-        }}>
-          <label className="label" htmlFor="attach-household">Rattacher un foyer par identifiant</label>
-          <div className="flex flex-wrap gap-2"><input className="field min-w-0 flex-1" id="attach-household" name="householdId" placeholder="Identifiant UUID du foyer" required/><button disabled={busy} className="secondary">Rattacher</button></div>
-        </form>
+        <p className="label">Inviter un foyer dans cette famille</p>
+        <p className="muted mb-3">Communiquez ce code à l’administrateur du foyer pour qu’il rejoigne la famille.</p>
+        <button type="button" disabled={generatingFamily} className="secondary" onClick={() => void inviteFamily()}>{generatingFamily ? 'Création…' : 'Créer un code d’invitation à la famille'}</button>
+        {familyCode && <div role="status" className="mt-3 rounded-xl bg-[#f2eafa] p-3"><p className="mb-1 text-sm font-semibold">Code d’invitation à la famille (visible uniquement maintenant)</p><output className="block break-all font-mono text-sm text-[#634797]">{familyCode}</output></div>}
       </div>
       <div className="space-y-5">
         <form onSubmit={event => {
@@ -410,8 +442,8 @@ function FamilyManagement({ family, me, busy, perform, handleError, onRename }: 
         <div>
           <p className="label">Inviter dans mon foyer</p>
           <p className="muted mb-3">Générez un code valable 7 jours, à communiquer à la personne invitée. L’administration du foyer est requise.</p>
-          <button type="button" disabled={generating || !me.householdId} className="secondary" onClick={() => void invite()}>{generating ? 'Création…' : 'Créer un code d’invitation'}</button>
-          {code && <div role="status" className="mt-3 rounded-xl bg-[#f2eafa] p-3"><p className="mb-1 text-sm font-semibold">Code d’invitation (visible uniquement maintenant)</p><output className="block break-all font-mono text-sm text-[#634797]">{code}</output></div>}
+          <button type="button" disabled={generatingHousehold || !me.householdId} className="secondary" onClick={() => void inviteHousehold()}>{generatingHousehold ? 'Création…' : 'Créer un code d’invitation au foyer'}</button>
+          {householdCode && <div role="status" className="mt-3 rounded-xl bg-[#f2eafa] p-3"><p className="mb-1 text-sm font-semibold">Code d’invitation au foyer pour l’inscription (visible uniquement maintenant)</p><output className="block break-all font-mono text-sm text-[#634797]">{householdCode}</output></div>}
         </div>
       </div>
     </div>

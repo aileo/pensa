@@ -49,7 +49,7 @@ La session utilise un cookie HTTP-only SameSite ; les écritures navigateur cont
 | Authentification | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
 | Profil, personnes | `GET/PATCH /profile`, `GET /users`, `GET /users/:id/wishes` |
 | Foyers, invitations | `GET /households`, `PATCH /households/:id`, `POST /households/:id/invitations` (code à fournir lors de l'inscription) |
-| Familles | `GET/POST /families`, `PATCH /families/:id`, `POST/DELETE /families/:id/households`, `POST /families/:id/admins` |
+| Familles | `GET/POST /families`, `PATCH /families/:id`, `POST /families/:id/invitations`, `POST /families/join`, `DELETE /families/:id/households/:householdId`, `POST /families/:id/admins` |
 | Occasions | `GET /occasions?recipientId=…`, `POST /families/:id/occasions`, `PATCH/DELETE /occasions/:id` |
 | Souhaits | `GET/POST /wishes`, `POST /wishes/preview`, `GET/PATCH/DELETE /wishes/:id`, `PATCH /wishes/order` |
 | Réservations | `GET/POST /reservations`, `GET/PATCH/DELETE /reservations/:id` |
@@ -57,6 +57,7 @@ La session utilise un cookie HTTP-only SameSite ; les écritures navigateur cont
 | Vue d'ensemble | `GET /dashboard`, `GET /history`, `GET /search?q=…` |
 
 Les occasions des réservations sont un tableau `occasionIds: [{ "id": "uuid", "year": 2026 }]`, autorisant plusieurs occurrences. Une réservation n'est active que si elle n'est pas annulée : un index unique partiel PostgreSQL et le verrouillage de la ligne du souhait empêchent les doubles réservations concurrentes. Le bénéficiaire ne reçoit aucune information de réservation sur ses souhaits et les endpoints de réservation lui répondent 404. L'historique offert est un snapshot JSON indépendant, lisible uniquement par bénéficiaire ou participant.
+Pour rattacher un foyer à une famille, l'administrateur de famille crée un code d'invitation temporaire ; **un administrateur du foyer invité** doit le confirmer via `POST /families/join` (`{ "code": "…" }`). Un identifiant de foyer seul ne donne jamais ce droit. Les réservations actives bloquent le retrait d'un foyer concerné afin de ne pas laisser de cadeau inaccessible.
 
 Les occasions « anniversaire » prennent la date de naissance ; les occasions « fête » prennent `nameDay` au format `MM-DD` renseigné dans le profil (`PATCH /profile`), et n'ont pas de prochaine occurrence tant que cette date n'est pas définie. Les occasions fixes utilisent `month` et `day`.
 

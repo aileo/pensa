@@ -93,6 +93,37 @@ describe('permissions métier sur l’API', () => {
     expect((await call('alice', `/families/${familyB.id}`, 'PATCH', { name: 'Intrusion' })).status).toBe(403);
     expect((await call('alice', `/families/${familyA.id}`, 'PATCH', { name: 'Famille A' })).status).toBe(200);
   });
+  it('exige le consentement du foyer avant rattachement et empêche une révocation qui orphelinerait un cadeau', async () => {
+    const familyA = (await call('alice', '/families')).data.find((f: {name:string}) => f.name === 'Famille A');
+    const registered = await call('', '/auth/register', 'POST', {
+      firstName: 'Guest', lastName: 'Family', email: `family-${Date.now()}@example.test`,
+      password: 'LongSecret2026!', birthDate: '1995-07-10',
+    });
+    cookies.guest = registered.cookie!.split(';')[0];
+    const householdId = registered.data.householdId;
+    expect((await call('alice', `/families/${familyA.id}/households`, 'POST', { householdId })).status).toBe(404);
+    expect((await call('bob', `/families/${familyA.id}/invitations`, 'POST', {})).status).toBe(403);
+    const invite = await call('alice', `/families/${familyA.id}/invitations`, 'POST', {});
+    expect(invite.status).toBe(201);
+    expect((await call('guest', '/families/join', 'POST', { code: invite.data.code })).status).toBe(201);
+    expect((await call('guest', '/families/join', 'POST', { code: invite.data.code })).status).toBe(403);
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const wish = await call('bob', '/wishes', 'POST', {
+      title: 'Cadeau accès révoqué', url: 'https://example.com', image: 'https://example.com/image.png',
+    });
+    const event = (await call('guest', `/occasions?recipientId=${bobId}`)).data
+      .find((o: {family_id:string;nextDate:string|null}) => o.family_id === familyA.id && o.nextDate);
+    const booking = await call('guest', '/reservations', 'POST', {
+      wishId: wish.data.id, occasionIds: [{ id: event.id, year: Number(event.nextDate.slice(0, 4)) }],
+    });
+    expect(booking.status).toBe(201);
+    expect((await call('alice', `/families/${familyA.id}/households/${householdId}`, 'DELETE')).status).toBe(409);
+    expect((await call('guest', `/reservations/${booking.data.id}`, 'DELETE')).status).toBe(200);
+    expect((await call('alice', `/families/${familyA.id}/households/${householdId}`, 'DELETE')).status).toBe(200);
+    expect((await call('guest', '/reservations')).data.some((r: {id:string}) => r.id === booking.data.id)).toBe(false);
+    expect((await call('guest', `/reservations/${booking.data.id}`)).status).toBe(404);
+    await call('bob', `/wishes/${wish.data.id}`, 'DELETE');
+  });
   it('ne retourne aucun souhait inaccessible dans la recherche et les filtres', async () => {
     const isolated = await call('eloise', '/search?q=Console');
     expect(isolated.data.wishes).toHaveLength(0);

@@ -174,12 +174,29 @@ api.patch('/families/:id', async (req, res) => {
   const { name } = z.object({ name: z.string().trim().min(1).max(100) }).parse(req.body);
   res.json(await first('UPDATE families SET name=$1 WHERE id=$2 RETURNING *', [name, id]));
 });
-api.post('/families/:id/households', async (req, res) => {
+api.post('/families/:id/invitations', async (req, res) => {
   const id = uuid.parse(req.params.id); await ownFamily(person(req), id);
-  const { householdId } = z.object({ householdId: uuid }).parse(req.body);
-  if (!await first('SELECT 1 FROM households WHERE id=$1', [householdId])) fail(404, 'Foyer introuvable');
-  await query('INSERT INTO memberships VALUES($1,$2) ON CONFLICT DO NOTHING', [id, householdId]);
-  res.status(201).json({ familyId: id, householdId });
+  const value = token();
+  await query('INSERT INTO family_invitations(token_hash,family_id,expires_at) VALUES($1,$2,now()+interval \'7 days\')',
+    [digest(value), id]);
+  res.status(201).json({ code: value, expiresInDays: 7 });
+});
+api.post('/families/join', async (req, res) => {
+  if (!await first('SELECT 1 FROM users WHERE id=$1 AND household_admin=true', [person(req).id]))
+    fail(403, 'Administration du foyer requise');
+  const { code } = z.object({ code: z.string().min(1).max(128) }).parse(req.body);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const invite = (await client.query<{family_id:string}>(`UPDATE family_invitations SET used_at=now()
+      WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() RETURNING family_id`, [digest(code)])).rows[0];
+    if (!invite) fail(403, 'Invitation invalide ou expirée');
+    if ((await client.query('SELECT 1 FROM memberships WHERE family_id=$1 AND household_id=$2',
+      [invite.family_id, person(req).household_id])).rowCount) fail(409, 'Foyer déjà membre');
+    await client.query('INSERT INTO memberships VALUES($1,$2)', [invite.family_id, person(req).household_id]);
+    await client.query('COMMIT');
+    res.status(201).json({ familyId: invite.family_id, householdId: person(req).household_id });
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 });
 api.delete('/families/:id/households/:householdId', async (req, res) => {
   const id = uuid.parse(req.params.id), householdId = uuid.parse(req.params.householdId);
@@ -190,6 +207,14 @@ api.delete('/families/:id/households/:householdId', async (req, res) => {
     await client.query('SELECT id FROM families WHERE id=$1 FOR UPDATE', [id]);
     const count = (await client.query<{count:string}>('SELECT count(*) FROM memberships WHERE family_id=$1', [id])).rows[0];
     if (Number(count.count) <= 1) fail(409, 'Une famille doit conserver un foyer');
+    const active = await client.query(`SELECT 1 FROM reservations r JOIN wishes w ON w.id=r.wish_id
+      JOIN users owner ON owner.id=w.owner_id JOIN users creator ON creator.id=r.creator_id
+      JOIN memberships scope ON scope.household_id=owner.household_id AND scope.family_id=$1
+      WHERE r.cancelled_at IS NULL AND r.status!='gifted' AND
+      (owner.household_id=$2 OR creator.household_id=$2 OR EXISTS(
+        SELECT 1 FROM participants p JOIN users member ON member.id=p.user_id
+        WHERE p.reservation_id=r.id AND member.household_id=$2)) LIMIT 1`, [id, householdId]);
+    if (active.rowCount) fail(409, 'Terminer les réservations avant de retirer ce foyer');
     await client.query('DELETE FROM family_admins WHERE family_id=$1 AND user_id IN(SELECT id FROM users WHERE household_id=$2)', [id, householdId]);
     const admins = (await client.query<{count:string}>('SELECT count(*) FROM family_admins WHERE family_id=$1', [id])).rows[0];
     if (!Number(admins.count)) fail(409, 'Une famille doit conserver un administrateur');
@@ -402,7 +427,12 @@ api.post('/reservations', async (req, res) => {
     const wish = (await client.query<Wish>('SELECT * FROM wishes WHERE id=$1 FOR UPDATE', [d.wishId])).rows[0];
     if (!wish || wish.deleted_at || wish.gifted_at) fail(404, 'Souhait indisponible');
     if (wish.owner_id === actor.id) fail(403, 'Impossible de réserver son propre souhait');
-    if (!await visible(actor.id, wish.owner_id)) fail(403, 'Personne inaccessible');
+    const common = await client.query(`SELECT f.id FROM families f JOIN memberships mine ON mine.family_id=f.id
+      JOIN users buyer ON buyer.household_id=mine.household_id
+      JOIN users recipient ON recipient.id=$2 JOIN memberships theirs
+        ON theirs.family_id=f.id AND theirs.household_id=recipient.household_id
+      WHERE buyer.id=$1 ORDER BY f.id FOR SHARE OF f`, [actor.id, wish.owner_id]);
+    if (!common.rowCount) fail(403, 'Personne inaccessible');
     if ((await client.query('SELECT 1 FROM reservations WHERE wish_id=$1 AND cancelled_at IS NULL', [wish.id])).rowCount)
       fail(409, 'Souhait déjà réservé');
     const r = (await client.query<Reservation>(`INSERT INTO reservations(wish_id,creator_id,open_to_contributions)
@@ -417,6 +447,10 @@ api.get('/reservations', async (req, res) => {
   const rows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at FROM reservations r
     JOIN wishes w ON w.id=r.wish_id WHERE w.owner_id<>$1 AND
     (r.creator_id=$1 OR EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$1))
+    AND EXISTS(SELECT 1 FROM users viewer JOIN memberships mine ON mine.household_id=viewer.household_id
+      JOIN users recipient ON recipient.id=w.owner_id JOIN memberships theirs
+        ON theirs.household_id=recipient.household_id AND theirs.family_id=mine.family_id
+      WHERE viewer.id=$1)
     ORDER BY r.created_at DESC`, [person(req).id]);
   res.json(await Promise.all(rows.map(row => reservationDetails(row, person(req).id))));
 });
@@ -543,6 +577,7 @@ api.get('/dashboard', async (req, res) => {
   res.json({ people: people.map(publicPerson), reservations: reservations.filter(r => r.creator.id === actor.id),
     participating: reservations.filter(r => r.creator.id !== actor.id), occasions });
 });
+app.use('/api', (_req, res) => res.status(404).json({ error: 'Ressource introuvable' }));
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;
   const pg = error as { code?: string; status?: number };
