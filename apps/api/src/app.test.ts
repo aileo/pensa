@@ -29,6 +29,13 @@ afterAll(async () => {
   await pool.end();
 });
 describe('permissions métier sur l’API', () => {
+  it('renvoie 400 pour un JSON malformé', async () => {
+    const response = await fetch(`${base}/api/auth/login`, {
+      method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://localhost:5173' },
+      body: '{broken',
+    });
+    expect(response.status).toBe(400);
+  });
   it('inscrit, authentifie et protège les foyers invités', async () => {
     const email = `new-${Date.now()}@example.test`;
     const registered = await call('', '/auth/register', 'POST', {
@@ -76,6 +83,20 @@ describe('permissions métier sur l’API', () => {
     expect((await call('alice', `/families/${familyB.id}`, 'PATCH', { name: 'Intrusion' })).status).toBe(403);
     expect((await call('alice', `/families/${familyA.id}`, 'PATCH', { name: 'Famille A' })).status).toBe(200);
   });
+  it('utilise une invitation de foyer une seule fois', async () => {
+    const householdId = (await call('alice', '/auth/me')).data.householdId;
+    expect((await call('charlie', `/households/${householdId}/invitations`, 'POST', {})).status).toBe(403);
+    const invite = await call('alice', `/households/${householdId}/invitations`, 'POST', {});
+    expect(invite.status).toBe(201);
+    const register = (email: string) => call('', '/auth/register', 'POST', {
+      firstName: 'Invité', lastName: 'Test', email, password: 'Invitation2026!', birthDate: '1999-02-01',
+      invitation: invite.data.code,
+    });
+    const joined = await register(`invite-${Date.now()}@example.test`);
+    expect(joined.status).toBe(201);
+    expect(joined.data.householdId).toBe(householdId);
+    expect((await register(`replay-${Date.now()}@example.test`)).status).toBe(403);
+  });
   it('refuse les modifications principales et les souhaits incomplets', async () => {
     expect((await call('bob', '/wishes', 'POST', { title: 'Sans image', url: 'https://example.com' })).status).toBe(400);
     expect((await call('bob', '/wishes/preview', 'POST', { url: 'http://127.0.0.1/' })).status).toBe(400);
@@ -112,6 +133,7 @@ describe('permissions métier sur l’API', () => {
     expect((await call(winner, '/reservations')).data.find((r: {id:string}) => r.id === reservation.id).wishDeleted).toBe(true);
     expect((await call(loser, '/reservations', 'POST', { wishId, occasionIds: choices })).status).toBe(404);
     expect((await call(winner, `/reservations/${reservation.id}`, 'DELETE')).status).toBe(200);
+    expect((await call(loser, `/reservations/${reservation.id}/requests`, 'POST')).status).toBe(409);
   });
   it('rend le statut offert irréversible et protège l’historique', async () => {
     const history = await call('alice', '/history');
@@ -142,6 +164,9 @@ describe('permissions métier sur l’API', () => {
     expect((await call('bob', `/reservations/${id}/requests`)).status).toBe(404);
     expect((await call('alice', `/reservations/${id}/requests/${asked.data.id}`, 'PATCH', { status: 'accepted' })).status).toBe(200);
     expect((await call('alice', `/reservations/${id}/requests/${declined.data.id}`, 'PATCH', { status: 'refused' })).status).toBe(200);
+    expect((await call('alice', `/reservations/${id}`, 'PATCH', {
+      occasionIds: [occasions[0], { ...occasions[1], year: occasions[1].year + 1 }],
+    })).data.occasions).toHaveLength(2);
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { occasionIds: occasions.slice(0, 1) })).data.occasions).toHaveLength(1);
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'gifted' })).status).toBe(409);
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'purchased' })).status).toBe(200);
@@ -152,6 +177,8 @@ describe('permissions métier sur l’API', () => {
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'reserved' })).status).toBe(409);
     expect((await call('bob', '/wishes')).data.some((w: {id:string}) => w.id === wish.data.id)).toBe(false);
     expect((await call('bob', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(true);
+    expect((await call('bob', '/history')).data.find((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)
+      .snapshot.recipient.first_name).toBe('Bob');
     expect((await call('charlie', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(true);
     expect((await call('david', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(false);
   });

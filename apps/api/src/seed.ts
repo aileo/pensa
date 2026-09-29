@@ -57,8 +57,12 @@ try {
     const gifted = await reserve(camera, bob, 'gifted', false, [bob, david], [[b[1], 2025]]);
     await client.query('UPDATE wishes SET gifted_at=now() WHERE id=$1', [camera]);
     const snapshot = (await client.query('SELECT * FROM wishes WHERE id=$1', [camera])).rows[0];
+    const giftReservation = (await client.query('SELECT created_at FROM reservations WHERE id=$1', [gifted])).rows[0];
+    const recipient = (await client.query('SELECT id,first_name,last_name,birth_date FROM users WHERE id=$1', [alice])).rows[0];
+    const people = (await client.query('SELECT id,first_name,last_name FROM users WHERE id=ANY($1::uuid[])', [[bob, david]])).rows;
     await client.query('INSERT INTO history(reservation_id,recipient_id,snapshot) VALUES($1,$2,$3)',
-      [gifted, alice, JSON.stringify({ ...snapshot, recipientId: alice, creatorId: bob, participants: [{ id: bob }, { id: david }], occasions: [{ name: 'Noël', year: 2025 }] })]);
+      [gifted, alice, JSON.stringify({ ...snapshot, recipientId: alice, creatorId: bob, recipient, creator: people.find(p => p.id === bob), participants: people,
+        occasions: [{ name: 'Noël', year: 2025 }], reservedAt: giftReservation.created_at, giftedAt: snapshot.gifted_at })]);
     await client.query('COMMIT');
     console.log('Seed chargé. alice/bob/charlie/david/eloise@example.test : GiftitDemo2026!');
   }

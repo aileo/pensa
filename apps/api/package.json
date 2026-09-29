@@ -10,7 +10,8 @@
     "migrate": "drizzle-kit migrate",
     "generate": "drizzle-kit generate",
     "seed": "tsx src/seed.ts",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "format": "prettier --write src"
   },
   "keywords": [],
   "author": "",

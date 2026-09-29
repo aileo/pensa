@@ -346,7 +346,7 @@ api.delete('/wishes/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-type Reservation = { id: string; wish_id: string; creator_id: string; status: string; open_to_contributions: boolean; cancelled_at: Date | null; owner_id: string; deleted_at: Date | null; gifted_at: Date | null };
+type Reservation = { id: string; wish_id: string; creator_id: string; status: string; open_to_contributions: boolean; cancelled_at: Date | null; created_at: Date; owner_id: string; deleted_at: Date | null; gifted_at: Date | null };
 const getReservation = async (id: string, viewer: string) => {
   const row = await first<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at FROM reservations r JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1`, [id]);
   if (!row || row.owner_id === viewer || !await visible(viewer, row.owner_id)) fail(404, 'Réservation introuvable');
@@ -444,9 +444,12 @@ api.patch('/reservations/:id', async (req, res) => {
     if (d.status === 'gifted') {
       const wish = (await client.query<Wish>('UPDATE wishes SET gifted_at=now() WHERE id=$1 RETURNING *', [r.wish_id])).rows[0];
       const people = (await client.query('SELECT u.id,u.first_name,u.last_name FROM users u JOIN participants p ON p.user_id=u.id WHERE p.reservation_id=$1', [id])).rows;
+      const recipient = (await client.query('SELECT id,first_name,last_name,birth_date FROM users WHERE id=$1', [r.owner_id])).rows[0];
+      const creator = people.find(p => p.id === r.creator_id);
       const occ = (await client.query('SELECT o.name,ro.year FROM reservation_occasions ro JOIN occasions o ON o.id=ro.occasion_id WHERE ro.reservation_id=$1', [id])).rows;
       await client.query('INSERT INTO history(reservation_id,recipient_id,snapshot) VALUES($1,$2,$3)',
-        [id, r.owner_id, JSON.stringify({ ...wish, recipientId: r.owner_id, creatorId: r.creator_id, participants: people, occasions: occ, giftedAt: wish.gifted_at })]);
+        [id, r.owner_id, JSON.stringify({ ...wish, recipientId: r.owner_id, creatorId: r.creator_id,
+          recipient, creator, participants: people, occasions: occ, reservedAt: r.created_at, giftedAt: wish.gifted_at })]);
     }
     await client.query('COMMIT');
     res.json(await reservationDetails({ ...r, status: d.status ?? r.status }, actor.id));
@@ -462,13 +465,19 @@ api.delete('/reservations/:id', async (req, res) => {
 });
 api.post('/reservations/:id/requests', async (req, res) => {
   const r = await getReservation(uuid.parse(req.params.id), person(req).id);
-  if (r.cancelled_at || r.status === 'gifted' || !r.open_to_contributions || r.creator_id === person(req).id)
-    fail(409, 'Participation fermée');
-  if (await first('SELECT 1 FROM participants WHERE reservation_id=$1 AND user_id=$2', [r.id, person(req).id]))
-    fail(409, 'Déjà participant');
-  const row = await first(`INSERT INTO requests(reservation_id,user_id) VALUES($1,$2)
-    ON CONFLICT(reservation_id,user_id) DO UPDATE SET status='pending' RETURNING *`, [r.id, person(req).id]);
-  res.status(201).json(row);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = (await client.query<Reservation>('SELECT * FROM reservations WHERE id=$1 FOR UPDATE', [r.id])).rows[0];
+    if (current.cancelled_at || current.status === 'gifted' || !current.open_to_contributions ||
+      current.creator_id === person(req).id) fail(409, 'Participation fermée');
+    if ((await client.query('SELECT 1 FROM participants WHERE reservation_id=$1 AND user_id=$2', [r.id, person(req).id])).rowCount)
+      fail(409, 'Déjà participant');
+    const row = (await client.query(`INSERT INTO requests(reservation_id,user_id) VALUES($1,$2)
+      ON CONFLICT(reservation_id,user_id) DO UPDATE SET status='pending' RETURNING *`, [r.id, person(req).id])).rows[0];
+    await client.query('COMMIT');
+    res.status(201).json(row);
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 });
 api.get('/reservations/:id/requests', async (req, res) => {
   const r = await getReservation(uuid.parse(req.params.id), person(req).id);
@@ -529,11 +538,13 @@ api.get('/dashboard', async (req, res) => {
 });
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   void _next;
-  const pg = error as { code?: string };
+  const pg = error as { code?: string; status?: number };
   const status = error instanceof HttpError ? error.code : error instanceof ZodError ? 400 :
-    pg.code === '23505' ? 409 : pg.code === '23503' ? 400 : 500;
+    pg.status === 400 ? 400 : pg.status === 413 ? 413 :
+      pg.code === '23505' ? 409 : pg.code === '23503' ? 400 : 500;
   if (status === 500) console.error(error);
   res.status(status).json({ error: error instanceof HttpError ? error.message :
-    error instanceof ZodError ? 'Données invalides' : status === 409 ? 'Conflit' : 'Erreur serveur' });
+    error instanceof ZodError || status === 400 ? 'Données invalides' :
+      status === 409 ? 'Conflit' : status === 413 ? 'Corps trop volumineux' : 'Erreur serveur' });
 });
 export { app };

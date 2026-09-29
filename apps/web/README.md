@@ -17,4 +17,4 @@ npm run lint
 
 Les écrans s’appuient sur les réponses JSON directes de l’API. Les occasions sélectionnées pour une réservation sont envoyées sous forme `{ id, year }`, l’année provenant de `nextDate`. Une occasion sans date calculée ne peut pas être sélectionnée. Les demandes de participation d’une réservation organisée sont récupérées séparément.
 
-`GET /families` ne fournit pas les membres de chaque famille : la vue d’une famille affiche donc les personnes accessibles du réseau, sans prétendre les rattacher à cette famille.
+La vue d’une famille affiche uniquement son tableau `members` renvoyé par `GET /families` ; elle ne mélange pas les personnes d’autres familles.
