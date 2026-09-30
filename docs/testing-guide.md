@@ -191,7 +191,7 @@ Log in as **Charlie**.
 The wording is built around one promise: **organizing gifts without the mental load**. Warmth
 stays, but every screen names the task it moves forward rather than the emotion.
 
-- [ ] **Sign-in page:** *Fini la charge mentale des cadeaux* / *Organisez les cadeaux, l'esprit tranquille* (EN *No more gift-planning overload* / *Gifts organized, mind at ease*).
+- [ ] **Sign-in page:** *Fini la charge mentale des cadeaux* / *Organisez les cadeaux, l'esprit tranquille* (EN *No more gift-planning overload* / *Gifts organized, mind at ease*), followed by the scrollable pitch described in §3.13.
 - [ ] **Browser tab:** *Giftit — Organisez les cadeaux, l'esprit tranquille*, and it switches with the language.
 - [ ] **Sidebar card:** *Rien à retenir / Giftit suit les dates, les listes et les cadeaux à votre place*.
 - [ ] **Dashboard hero:** *VOTRE ORGANISATION DU JOUR*, followed by what is coming up and what is left to do.
@@ -222,6 +222,20 @@ Paste a product URL in *Mes envies → Ajouter une envie*. There is no button: t
 - [ ] **Unknown domain:** a link to a domain that does not exist is refused with *Site introuvable* and fills nothing.
 - [ ] **Rejected addresses:** a URL pointing to a local address (`http://localhost:3000`) is refused with *Adresse non autorisée*.
 - [ ] **No lockout:** after several failed previews you can still sign out and sign back in — previews have their own rate limit.
+
+### 3.13 Landing page
+
+Log out to reach the sign-in page. It doubles as the landing page: it scrolls so a visitor can
+understand what Giftit is for before creating an account.
+
+- [ ] **It scrolls:** below the hero, four sections follow — *Organiser des cadeaux, c'est un travail invisible*, *Quatre gestes, et vous n'avez plus rien à retenir*, *Une seule place pour tout ce qui concerne les cadeaux* and *Vous ne verrez jamais ce qui vous est destiné* — then a closing *Prêt à vous libérer la tête ?*
+- [ ] **On a wide screen:** the sign-in form stays pinned on the right while you read; it never scrolls out of sight. A hint under the hero invites you to scroll.
+- [ ] **On a narrow screen** (resize below 1024 px): the order is hero, then the form, then the sections — signing in never requires scrolling past the whole pitch.
+- [ ] **Long form stays reachable:** switch to *S'inscrire* on a short window; the taller form scrolls inside its own column, with the top of the form still reachable.
+- [ ] **Closing call to action:** *Commencer maintenant* jumps back to the form.
+- [ ] **Content is accurate:** the sections describe what the app really does — pasted links filling themselves in, occasions arriving in order, reservations hidden from their recipient, off-list gifts, contributions, households, history.
+- [ ] **In English:** switch the language from the hero; every section is rewritten English, not a word-for-word translation.
+- [ ] **Headings:** a single *Organisez les cadeaux, l'esprit tranquille* as the page title, one heading per section.
 
 ## 4. Automated checks
 
