@@ -44,6 +44,11 @@ try {
     await wish(charlie, 'Lampe de bureau', 'Une lampe LED orientable avec lumière chaude.', 49, ['maison'], 0);
     await wish(david, 'Jeu de société', 'Un jeu coopératif rapide pour 2 à 6 joueurs.', 39, ['jeux'], 0);
     await wish(eloise, 'Vélo', 'Un vélo de ville léger avec porte-bagages.', 500, ['sport'], 0);
+    // A child of the household: no credentials, so her list is written by Alice and Bob.
+    const lucie = (await client.query<{id:string}>(`INSERT INTO users(household_id,first_name,last_name,birth_date,name_day)
+      VALUES($1,$2,$3,$4,$5) RETURNING id`, [homes[0], 'Lucie', 'Martin', '2016-05-04', '12-13'])).rows[0].id;
+    await wish(lucie, 'Trottinette', 'Une trottinette pliable pour aller à l’école.', 89, ['sport'], 0);
+    await wish(lucie, 'Coffret de peinture', 'Gouaches, pinceaux et papier épais.', 25, ['loisirs'], 1);
     const reserve = async (wishId: string, creator: string, status: string, open: boolean, people: string[], events: [string, number][]) => {
       const id = (await client.query<{id:string}>('INSERT INTO reservations(wish_id,creator_id,status,open_to_contributions) VALUES($1,$2,$3,$4) RETURNING id',
         [wishId, creator, status, open])).rows[0].id;

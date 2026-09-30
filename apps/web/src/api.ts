@@ -1,11 +1,11 @@
 import { formatDate, formatMoney, getLocale, translate } from './locale'
 
 export type Id = string | number
-export type Person = { id: Id; firstName?: string; lastName?: string; email?: string; birthDate?: string; householdId?: Id; name?: string; nameDay?: string | null; householdAdmin?: boolean; familyAdmin?: boolean }
+export type Person = { id: Id; firstName?: string; lastName?: string; email?: string; birthDate?: string; householdId?: Id; name?: string; nameDay?: string | null; householdAdmin?: boolean; familyAdmin?: boolean; managed?: boolean }
 export type Household = { id: Id; name: string; mine?: boolean; members?: Person[] }
 export type Family = { id: Id; name: string; admin?: boolean; members?: Person[]; households?: Household[]; users?: Person[] }
 export type Todo = {
-  type: 'occasion_without_gift' | 'pending_requests' | 'reservation_to_buy' | 'reservation_to_wrap' | 'reservation_to_give';
+  type: 'occasion_without_gift' | 'pending_requests' | 'reservation_to_buy' | 'reservation_to_wrap' | 'reservation_to_give' | 'managed_list_empty';
   date?: string | null; urgent?: boolean; person?: Person; occasion?: string | null; count?: number;
   reservation?: { id: Id; wishTitle?: string; status?: string; wishDeleted?: boolean };
 }

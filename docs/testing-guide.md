@@ -49,6 +49,7 @@ All accounts use the password **`PensaDemo2026!`**.
 | `charlie@example.test` | Charlie | A | 8 Jun | 2 Mar |
 | `david@example.test` | David | B | 20 Mar | 29 Dec |
 | `eloise@example.test` | Éloïse | C | 30 Nov | 11 Mar |
+| *no account* (Lucie, managed by Alice & Bob) | Alice & Bob | A, B | 4 May | 13 Dec |
 
 Each family has three occasions: *Anniversaire* (birthday), *Fête* (name day) and *Noël* (25 Dec). Alice and Bob belong to two families, so their occasions are stored twice in the database. The app must show them only once.
 
@@ -62,6 +63,8 @@ Wishes and reservations:
 | Lampe de bureau | Charlie | — |
 | Jeu de société | David | — |
 | Vélo | Éloïse | — |
+| Trottinette | Lucie *(managed)* | — |
+| Coffret de peinture | Lucie *(managed)* | — |
 | Week-end spa *(off-list)* | for Bob | Organised by David, visible and open to contributions, Noël 2026 |
 | Cours de poterie *(off-list)* | for Alice | Organised by Charlie, private, Anniversaire 2026 |
 
@@ -304,8 +307,40 @@ Behind your own reverse proxy, on a real domain over HTTPS:
 - [ ] **A refusal is diagnosable:** `docker compose logs api` prints the origin received and
       the one expected, on one line.
 
-## 4. The name, the AI disclosure and the published images
+### 3.16 Managed members (children of the household)
 
+Log in as `alice@example.test` (admin of the *Alice & Bob* household).
+
+- [ ] **She is there, without an account:** *Ma famille → Mon foyer* lists Lucie with a
+      *Géré par le foyer* badge, and no *Nommer admin* button next to her.
+- [ ] **Her list is editable:** open Lucie's page. A banner says you keep her list for her,
+      and her two wishes can be re-tagged and deleted. *Ajouter une envie* adds to her list,
+      not yours — check *Mes envies* is unchanged afterwards.
+- [ ] **The household is reminded:** delete both of her wishes. The dashboard *À faire* list
+      shows *La liste de Lucie est vide…*; adding a wish back makes it disappear.
+- [ ] **Others see an ordinary list:** log in as `charlie@example.test`, open Lucie's page.
+      No banner, no edit buttons — her wishes can be reserved like anyone else's.
+- [ ] **She cannot sign in:** there is no email to try. Creating a new member through
+      *Ajouter un membre sans compte* asks only for a name and a date of birth.
+- [ ] **Claim code:** as Alice, generate one for your new member, log out, click *J'ai un
+      code de rattachement* on the sign-in screen and use it with an email and a password of
+      at least 12 characters. You land in the app, in the same household, with the wishes the
+      household wrote for you, and the badge is gone.
+- [ ] **A claim code is not a registration code:** try the same code on the normal sign-up
+      form. It is refused.
+- [ ] **Credentials set directly:** as Alice, use *Définir ses identifiants* on another
+      managed member, then log in as that person with what you typed.
+- [ ] **Removal is protected:** reserve a gift for a managed member from another account,
+      then try to remove them. It is refused because gifts are in progress. Removing someone
+      with no gift history works and takes their wishes with them.
+- [ ] **Moving out:** on a member who now has an account, use *Lui donner son foyer*. They
+      get a household named *Foyer de <prénom>*, they administer it, and it appears in the
+      same families as before. The action is not offered for managed members.
+- [ ] **Leaving on your own:** as that person, *Quitter ce foyer* does the same thing. A
+      household is never left without a member or without an administrator — the button is
+      disabled when it would be.
+
+## 4. The name, the AI disclosure and the published images
 ### 4.1 The old name is gone
 
 - [ ] Search the repository for the old name, case-insensitively. The only hits allowed are

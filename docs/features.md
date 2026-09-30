@@ -51,6 +51,31 @@ Each family view shows only that family's members — belonging to two families
 never mixes their members together. Family administrators can rename the family
 and generate invitation codes; household administrators accept them.
 
+## Members without an account
+
+Children, and anyone else who should not sign in, exist as **managed members**:
+real people in the app, with a date of birth, occasions and a wish list, but no
+credentials. Any administrator of their household creates them, writes their
+list, edits their tags and removes what no longer fits. From the outside nothing
+changes — the rest of the family sees an ordinary list and reserves gifts on it
+without ever learning who wrote it.
+
+The dashboard reminds the household when a managed list is still empty, so a
+child's birthday does not arrive with nothing on their list.
+
+Nobody stays managed forever:
+
+- **a claim code** lets the person open their own account from the sign-in
+  screen, choosing their own email and password and keeping their wishes;
+- **credentials set by an administrator** do the same on the spot, for someone
+  who is not there to do it themselves.
+
+Once independent, they can **leave the household**: they get one of their own,
+automatically attached to the same families, so the gift circle survives someone
+moving out. Either they or an administrator of their household can trigger it, a
+household never loses its last member or its last administrator, and a managed
+member is never a household or family administrator.
+
 ## Occasions
 
 Three kinds:

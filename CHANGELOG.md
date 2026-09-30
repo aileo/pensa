@@ -8,6 +8,15 @@ minor bump may change behaviour.
 
 ### Added
 
+- **Members without an account, managed by the household.** A child now exists
+  in Pensa as a real person — date of birth, occasions, wish list — without
+  being able to sign in. Any administrator of their household writes and curates
+  their list, and the dashboard says so when that list is still empty. Nothing
+  changes for the rest of the family: they see an ordinary list and reserve on
+  it. Two routes end the arrangement, a claim code the person redeems from the
+  sign-in screen, or credentials an administrator sets on the spot; once
+  independent, they or an administrator can move them out into their own
+  household, automatically attached to the same families.
 - **A first account can be created from the environment.** Set the `BOOTSTRAP_*`
   variables and the account, its household and optionally its family exist the
   moment the instance answers — no sign-up form to fill in, so an instance can

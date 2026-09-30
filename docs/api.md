@@ -13,9 +13,10 @@ and their text follows `Accept-Language`, French or English.
 | --- | --- |
 | Health | `GET /health` |
 | Configuration | `GET /config` |
-| Authentication | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
-| Profile, people | `GET/PATCH /profile`, `GET /users`, `GET /users/:id/wishes` |
+| Authentication | `POST /auth/register`, `POST /auth/claim`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
+| Profile, people | `GET/PATCH /profile`, `GET /users`, `GET /users/:id/wishes`, `POST /users/:id/wishes`, `PATCH /users/:id/wishes/order` |
 | Households, invitations | `GET /households`, `PATCH /households/:id`, `POST /households/:id/invitations` |
+| Managed members | `POST /households/:id/members`, `PATCH/DELETE /households/:id/members/:userId`, `POST /households/:id/members/:userId/invitations`, `POST /households/:id/members/:userId/account`, `POST /households/:id/members/:userId/move-out` |
 | Families | `GET/POST /families`, `PATCH /families/:id`, `POST /families/:id/invitations`, `POST /families/join`, `DELETE /families/:id/households/:householdId`, `POST /families/:id/admins` |
 | Occasions | `GET /occasions?recipientId=…`, `POST /families/:id/occasions`, `PATCH/DELETE /occasions/:id` |
 | Wishes | `GET/POST /wishes`, `POST /wishes/preview`, `GET/PATCH/DELETE /wishes/:id`, `PATCH /wishes/order` |
@@ -56,6 +57,43 @@ one cannot tell which they were given:
 | household | the invitation's | no | unchanged |
 | family | created automatically | yes | joined |
 | none | created automatically | yes | none |
+
+## Managed members
+
+A household administrator can create a person who has no credentials at all:
+`POST /households/:id/members` with `firstName`, `lastName`, `birthDate` and an
+optional `nameDay`. The person is real everywhere else in the app — occasions,
+wishes, reservations — but cannot sign in.
+
+There is no `managed` column: a member is managed when `password_hash IS NULL`,
+and a database check keeps `email` and `password_hash` either both set or both
+null, so no third state can exist. `POST /auth/login` refuses rows without a
+password hash, and the API refuses to make a managed member a household or
+family administrator.
+
+Administrators of their own household write their lists through
+`POST /users/:id/wishes`, `PATCH /users/:id/wishes/order` and the usual
+`PATCH/DELETE /wishes/:id`. `GET /dashboard` adds a `managed_list_empty` todo
+while such a list is still empty.
+
+Two routes turn a managed member into an independent account:
+
+| Route | Who finishes it | Result |
+| --- | --- | --- |
+| `POST …/members/:userId/invitations` | the person, with `POST /auth/claim` | a claim code valid 7 days, then they choose their own email and password |
+| `POST …/members/:userId/account` | the administrator, on the spot | credentials set directly from `email` and `password` |
+
+Claim codes are stored as invitations bound to a `user_id`, and
+`POST /auth/register` ignores them: only `POST /auth/claim` can redeem one.
+
+`DELETE …/members/:userId` removes a managed member entirely, and is refused as
+soon as any reservation, participation, request or history entry mentions them.
+
+`POST …/members/:userId/move-out` gives a member their own household, still
+attached to every family the origin household belongs to. It requires an
+independent account, can be triggered by the person themselves or by an
+administrator of their household, and is refused when it would leave the
+household empty or without an administrator.
 
 ## Reservations
 

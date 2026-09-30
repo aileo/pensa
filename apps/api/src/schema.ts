@@ -1,15 +1,18 @@
-import { pgTable, uuid, text, timestamp, date, boolean, integer, numeric, uniqueIndex, index, primaryKey, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, date, boolean, integer, numeric, uniqueIndex, index, primaryKey, jsonb, check } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 const id = () => uuid('id').primaryKey().defaultRandom();
 const created = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 export const households = pgTable('households', { id: id(), name: text('name').notNull() });
+// A member with no credentials is a managed member: a child the household administrators look
+// after. The check keeps the two columns in step, so `password_hash IS NULL` is the only test
+// the rest of the code ever has to make. Several NULL e-mails coexist under a unique index.
 export const users = pgTable('users', {
   id: id(), householdId: uuid('household_id').notNull().references(() => households.id),
   firstName: text('first_name').notNull(), lastName: text('last_name').notNull(),
-  email: text('email').notNull().unique(), passwordHash: text('password_hash').notNull(),
+  email: text('email').unique(), passwordHash: text('password_hash'),
   birthDate: date('birth_date').notNull(), nameDay: text('name_day'), avatar: text('avatar'), householdAdmin: boolean('household_admin').notNull().default(false),
-});
+}, t => [check('credentials_together', sql`(${t.email} IS NULL) = (${t.passwordHash} IS NULL)`)]);
 export const families = pgTable('families', { id: id(), name: text('name').notNull() });
 export const memberships = pgTable('memberships', {
   familyId: uuid('family_id').notNull().references(() => families.id),
@@ -24,6 +27,9 @@ export const invitations = pgTable('invitations', {
   tokenHash: text('token_hash').primaryKey(), householdId: uuid('household_id').notNull().references(() => households.id),
   email: text('email'), expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   usedAt: timestamp('used_at', { withTimezone: true }),
+  // Set, this is a claim code for an existing managed member rather than an invitation to join
+  // the household as a new person. Registration only ever spends rows where it is NULL.
+  userId: uuid('user_id').references(() => users.id),
 });
 export const familyInvitations = pgTable('family_invitations', {
   tokenHash: text('token_hash').primaryKey(), familyId: uuid('family_id').notNull().references(() => families.id),

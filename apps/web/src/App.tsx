@@ -55,7 +55,7 @@ const sectionTones = {
 function SectionTitle({ kicker, title, action, icon, tone = 'brand' }: { kicker?: string; title: string; action?: ReactNode; icon?: IconName; tone?: keyof typeof sectionTones }) {
   return <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div className="flex items-center gap-3">{icon && <span className={`hidden shrink-0 rounded-2xl p-2.5 sm:block ${sectionTones[tone]}`}><Icon name={icon} size={22}/></span>}<div>{kicker && <p className="eyebrow mb-1">{kicker}</p>}<h2 className="font-['Outfit'] text-2xl font-semibold tracking-tight text-ink-900">{title}</h2></div></div>{action}</div>
 }
-function WishCard({ wish, mine, onReserve, onTags, onDelete }: { wish: Wish; mine: boolean; onReserve: () => void; onTags?: () => void; onDelete?: () => void }) {
+function WishCard({ wish, mine, curated, onReserve, onTags, onDelete }: { wish: Wish; mine: boolean; curated?: boolean; onReserve: () => void; onTags?: () => void; onDelete?: () => void }) {
   const { t } = useTranslation()
   return <article className="card group flex h-full flex-col overflow-hidden">
     <div className="relative flex h-44 items-center justify-center bg-surface-soft">
@@ -69,7 +69,7 @@ function WishCard({ wish, mine, onReserve, onTags, onDelete }: { wish: Wish; min
       {!mine && wish.reservation && <p className="mt-3 text-xs text-ink-500">{t('Réservé par {name}', { name: nameOf(wish.reservation.creator) })}{wish.reservation.openToContributions ? ` · ${t('Participation possible')}` : ''}</p>}
       <div className="mt-auto flex items-center gap-1 border-t border-line-soft pt-3" style={{ marginTop: 'auto', paddingTop: 12 }}>
         {wish.url && <a className="icon-button" href={wish.url} target="_blank" rel="noopener noreferrer" aria-label={t('Voir {title} sur le site marchand', { title: wish.title })}><Icon name="external" size={17} /></a>}
-        {mine ? <div className="ml-auto flex gap-1"><button className="icon-button" onClick={onTags} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={onDelete} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button></div>
+        {mine || curated ? <div className="ml-auto flex items-center gap-1"><button className="icon-button" onClick={onTags} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={onDelete} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button>{curated && <button className="secondary !px-3 !py-1.5 text-xs" onClick={onReserve}>{wish.reservation ? t('Voir la réservation') : t('Réserver')} <Icon name="arrow" size={14}/></button>}</div>
           : <button className="secondary ml-auto !px-3 !py-1.5 text-xs" onClick={onReserve}>{wish.reservation ? t('Voir la réservation') : t('Réserver')} <Icon name="arrow" size={14}/></button>}
       </div>
     </div>
@@ -134,6 +134,7 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
   const personFilters = personFilterState.personId === String(selectedPerson?.id) ? personFilterState : emptyWishFilters
   const [modal, setModal] = useState<Modal>(null)
   const [selectedWish, setSelectedWish] = useState<Wish | null>(null)
+  const [wishOwner, setWishOwner] = useState<Person | null>(null)
   const [occasions, setOccasions] = useState<Occasion[]>([])
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -247,6 +248,8 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
   const myHousehold = households.find(household => household.mine)
   const isHouseholdAdmin = myHousehold?.members?.find(member => String(member.id) === String(me.id))?.householdAdmin ?? !!me.householdAdmin
   const otherHouseholds = households.filter(household => !household.mine)
+  const curating = isHouseholdAdmin && !!selectedPerson && !!myHousehold?.members?.some(member => String(member.id) === String(selectedPerson.id) && member.managed)
+  const openWish = (owner: Person | null = null) => { setWishOwner(owner); setModal('wish'); setError('') }
   const openPerson = (person: Person) => {
     if (String(person.id) === String(me.id)) { go('wishes'); return }
     setPage('families'); setSelectedFamily(null); setSelectedPerson(person); setPersonWishes([]); setPersonGifts([]); setError(''); setNotice('')
@@ -279,13 +282,13 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
         {error && <div role="alert" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{localizeMessage(error, locale)}<button aria-label={t('Masquer l’erreur')} onClick={() => setError('')}><Icon name="close" size={16}/></button></div>}
         {notice && <div role="status" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{localizeMessage(notice, locale)}<button aria-label={t('Masquer la notification')} onClick={() => setNotice('')}><Icon name="close" size={16}/></button></div>}
         {loading && <p role="status" className="muted mb-3">{t('Actualisation des données…')}</p>}
-        {page === 'dashboard' && <><div className="relative mb-8 overflow-hidden rounded-[26px] bg-brand-100 px-7 py-9 sm:px-10 sm:py-11"><div className="relative z-10 max-w-[580px]"><p className="eyebrow mb-3">{t('VOTRE ORGANISATION DU JOUR')}</p><h1 className="font-['Outfit'] text-3xl font-bold leading-tight tracking-tight text-ink-900 sm:text-[42px]">{t('Bonjour {name}', { name: me.firstName || t('vous') })} <span aria-hidden="true">👋</span></h1><p className="mt-3 max-w-md text-sm leading-relaxed text-ink-500 sm:text-base">{t('Voici ce qui arrive et ce qu’il reste à faire. Le reste vous attend ici, vous n’avez rien à retenir.')}</p><button className="primary mt-6" onClick={() => { setModal('wish'); setError('') }}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div><div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 size-72 rounded-full border-[38px] border-white/20 sm:right-0"/><div aria-hidden="true" className="pointer-events-none absolute -bottom-36 right-20 size-72 rounded-full bg-white/25"/></div>
+        {page === 'dashboard' && <><div className="relative mb-8 overflow-hidden rounded-[26px] bg-brand-100 px-7 py-9 sm:px-10 sm:py-11"><div className="relative z-10 max-w-[580px]"><p className="eyebrow mb-3">{t('VOTRE ORGANISATION DU JOUR')}</p><h1 className="font-['Outfit'] text-3xl font-bold leading-tight tracking-tight text-ink-900 sm:text-[42px]">{t('Bonjour {name}', { name: me.firstName || t('vous') })} <span aria-hidden="true">👋</span></h1><p className="mt-3 max-w-md text-sm leading-relaxed text-ink-500 sm:text-base">{t('Voici ce qui arrive et ce qu’il reste à faire. Le reste vous attend ici, vous n’avez rien à retenir.')}</p><button className="primary mt-6" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div><div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 size-72 rounded-full border-[38px] border-white/20 sm:right-0"/><div aria-hidden="true" className="pointer-events-none absolute -bottom-36 right-20 size-72 rounded-full bg-white/25"/></div>
           <div className="mb-9 grid gap-4 sm:grid-cols-3">{[
             { label: t('Mes envies'), count: myWishes.length, icon: 'heart' as IconName, color: 'bg-brand-50 text-brand-500', target: 'wishes' as Page },
             { label: t('Mes familles'), count: families.length, icon: 'users' as IconName, color: 'bg-clay-50 text-clay-500', target: 'families' as Page },
             { label: t('Réservations'), count: reservations.length, icon: 'gift' as IconName, color: 'bg-sage-50 text-sage-600', target: 'reservations' as Page },
           ].map(stat => <button key={stat.target} onClick={() => go(stat.target)} className="card flex items-center gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-md"><span className={`rounded-2xl p-3 ${stat.color}`}><Icon name={stat.icon} size={23}/></span><span><strong className="block font-['Outfit'] text-2xl">{stat.count}</strong><span className="muted">{stat.label}</span></span><Icon name="chevron" size={17} className="ml-auto text-ink-400"/></button>)}</div>
-          <Guidance me={me} onboarding={onboarding} todos={dashboardTodos} busy={busy} onAddWish={() => { setModal('wish'); setError('') }} onGo={go} onPerson={openPerson} onReservation={openReservation} onStatus={changeStatus}/>
+          <Guidance me={me} onboarding={onboarding} todos={dashboardTodos} busy={busy} onAddWish={() => openWish()} onGo={go} onPerson={openPerson} onReservation={openReservation} onStatus={changeStatus}/>
           {dashboardOpenGifts.length > 0 && <div className="mb-9"><SectionTitle icon="spark" tone="clay" kicker={t('HORS LISTE')} title={t('Cadeaux ouverts aux participations')}/><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{dashboardOpenGifts.map(gift => <OffListGiftCard key={gift.id} gift={gift} me={me} busy={busy} showRecipient onRequest={() => void requestGift(gift)} onOpen={() => openReservation(gift.id)} onRecipient={gift.recipient ? () => openPerson(gift.recipient!) : undefined}/>)}</div></div>}
           <div className="mb-9 grid gap-5 lg:grid-cols-2">
             <div><SectionTitle icon="calendar" kicker={t('À VENIR')} title={t('Les prochaines occasions')}/>{dashboardOccasions.length ? <div className="card divide-y divide-line-soft">{dashboardOccasions.slice(0, 4).map(occasion => <div key={`${occasion.id}-${occasion.person?.id}`} className="flex items-center gap-3 p-4"><span className="rounded-xl bg-brand-50 p-2 text-brand-600"><Icon name="calendar" size={19}/></span><div className="min-w-0 flex-1"><p className="truncate font-semibold">{occasionLabel(occasion.name, locale, { kind: occasion.kind, year: occasion.nextDate ? Number(occasion.nextDate.slice(0, 4)) : null, birthDate: occasion.person?.birthDate })} · {nameOf(occasion.person)}</p><p className="muted">{dateOf(occasion.nextDate)}</p></div></div>)}</div> : <Empty icon="calendar" title={t('Aucune date à venir')} text={t('Les occasions de vos proches apparaîtront ici.')}/>}</div>
@@ -294,16 +297,17 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
           <SectionTitle icon="heart" kicker={t('POUR VOUS')} title={t('Les envies de vos proches')} action={<button className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline" onClick={() => go('families')}>{t('Voir la famille')} <Icon name="arrow" size={15}/></button>}/>
           {sharedWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{sharedWishes.slice(0, 4).map(wish => <WishCard key={wish.id} wish={wish} mine={false} onReserve={() => openReserve(wish)}/>)}</div> : <Empty icon="users" title={t('Aucune envie partagée pour l’instant')} text={t('Les envies de vos proches apparaîtront ici dès qu’ils les partageront.')} action={<button className="secondary" onClick={() => go('families')}>{t('Voir ma famille')}</button>}/>}
         </>}
-        {page === 'wishes' && <><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-2">{t('VOTRE LISTE PERSONNELLE')}</p><h1 className="font-['Outfit'] text-3xl font-bold">{t('Mes envies')} <span className="text-brand-500">({myWishes.length})</span></h1><p className="muted mt-2">{t('Notez vos idées une fois : vos proches sauront quoi offrir.')}</p></div><button className="primary" onClick={() => { setModal('wish'); setError('') }}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div>{myWishes.length ? <><p className="muted mb-4">{t('Glissez les envies ou utilisez les flèches pour changer leur priorité.')}</p><div className="space-y-3">{myWishes.map((wish, index) => <div key={wish.id} draggable onDragStart={event => event.dataTransfer.setData('text/plain', String(index))} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) void reorder(from, index) }} className="card flex items-center gap-3 p-3 sm:gap-5 sm:p-4"><span className="hidden cursor-grab text-ink-400 sm:block"><Icon name="grip"/></span><div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-soft sm:size-20">{wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" className="text-brand-300"/>}</div><div className="min-w-0 flex-1"><h2 className="truncate font-['Outfit'] font-semibold">{wish.title}</h2><p className="muted mt-1 truncate">{wish.description || wish.url || t('Sans description')}</p><div className="mt-1 flex flex-wrap gap-1">{wish.tags?.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div></div><strong className="hidden text-sm text-brand-600 sm:block">{money(wish.price)}</strong><div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row"><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => reorder(index, index - 1)} aria-label={t('Monter {title}', { title: wish.title })}><Icon name="arrowUp" size={16}/></button><button className="icon-button !size-7" disabled={index === myWishes.length - 1 || busy} onClick={() => reorder(index, index + 1)} aria-label={t('Descendre {title}', { title: wish.title })}><Icon name="arrowDown" size={16}/></button><button className="icon-button" onClick={() => { setSelectedWish(wish); setModal('tags') }} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={() => removeWish(wish)} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button></div></div>)}</div></> : <Empty icon="heart" title={t('Votre liste est encore vide')} text={t('Collez le lien d’un produit et nous vous aiderons à l’ajouter.')} action={<button className="primary" onClick={() => setModal('wish')}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button>}/>}</>}
+        {page === 'wishes' && <><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-2">{t('VOTRE LISTE PERSONNELLE')}</p><h1 className="font-['Outfit'] text-3xl font-bold">{t('Mes envies')} <span className="text-brand-500">({myWishes.length})</span></h1><p className="muted mt-2">{t('Notez vos idées une fois : vos proches sauront quoi offrir.')}</p></div><button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div>{myWishes.length ? <><p className="muted mb-4">{t('Glissez les envies ou utilisez les flèches pour changer leur priorité.')}</p><div className="space-y-3">{myWishes.map((wish, index) => <div key={wish.id} draggable onDragStart={event => event.dataTransfer.setData('text/plain', String(index))} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) void reorder(from, index) }} className="card flex items-center gap-3 p-3 sm:gap-5 sm:p-4"><span className="hidden cursor-grab text-ink-400 sm:block"><Icon name="grip"/></span><div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-soft sm:size-20">{wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" className="text-brand-300"/>}</div><div className="min-w-0 flex-1"><h2 className="truncate font-['Outfit'] font-semibold">{wish.title}</h2><p className="muted mt-1 truncate">{wish.description || wish.url || t('Sans description')}</p><div className="mt-1 flex flex-wrap gap-1">{wish.tags?.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div></div><strong className="hidden text-sm text-brand-600 sm:block">{money(wish.price)}</strong><div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row"><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => reorder(index, index - 1)} aria-label={t('Monter {title}', { title: wish.title })}><Icon name="arrowUp" size={16}/></button><button className="icon-button !size-7" disabled={index === myWishes.length - 1 || busy} onClick={() => reorder(index, index + 1)} aria-label={t('Descendre {title}', { title: wish.title })}><Icon name="arrowDown" size={16}/></button><button className="icon-button" onClick={() => { setSelectedWish(wish); setModal('tags') }} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={() => removeWish(wish)} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button></div></div>)}</div></> : <Empty icon="heart" title={t('Votre liste est encore vide')} text={t('Collez le lien d’un produit et nous vous aiderons à l’ajouter.')} action={<button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button>}/>}</>}
         {page === 'families' && <><SectionTitle icon="users" kicker={t('VOS PROCHES')} title={selectedPerson ? t('Les envies de {name}', { name: nameOf(selectedPerson) }) : selectedFamily ? selectedFamily.name : t('Ma famille')} action={selectedPerson || selectedFamily ? <button className="secondary" onClick={() => { setSelectedPerson(null); setSelectedFamily(null) }}><Icon name="arrowLeft" size={16}/> {t('Retour aux familles')}</button> : undefined}/>
           {selectedPerson ? <>
+            {curating && <div className="card mb-6 flex flex-wrap items-center justify-between gap-3 border-sage-200 bg-sage-50 p-4"><div><p className="eyebrow">{t('LISTE GÉRÉE PAR VOTRE FOYER')}</p><p className="muted mt-1">{t('{name} n’a pas de compte : vous tenez sa liste à sa place.', { name: nameOf(selectedPerson) })}</p></div><button className="primary" onClick={() => openWish(selectedPerson)}><Icon name="plus" size={17}/> {t('Ajouter une envie')}</button></div>}
             <div className="card mb-6 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
               <div><label className="label" htmlFor="filter-tag">{t('Tag')}</label><input className="field" id="filter-tag" value={personFilters.tag} onChange={event => setPersonFilter('tag', event.target.value)} placeholder={t('Ex. : livres')}/></div>
               {String(selectedPerson.id) !== String(me.id) && <div><label className="label" htmlFor="filter-availability">{t('Disponibilité')}</label><select className="field" id="filter-availability" value={personFilters.availability} onChange={event => setPersonFilter('availability', event.target.value)}><option value="">{t('Toutes')}</option><option value="available">{t('Disponibles')}</option><option value="reserved">{t('Réservées')}</option></select></div>}
               <div><label className="label" htmlFor="filter-min-price">{t('Prix minimum (€)')}</label><input className="field" id="filter-min-price" type="number" min="0" step="0.01" value={personFilters.minPrice} onChange={event => setPersonFilter('minPrice', event.target.value)} placeholder="0"/></div>
               <div><label className="label" htmlFor="filter-max-price">{t('Prix maximum (€)')}</label><input className="field" id="filter-max-price" type="number" min="0" step="0.01" value={personFilters.maxPrice} onChange={event => setPersonFilter('maxPrice', event.target.value)} placeholder={t('Sans limite')}/></div>
             </div>
-            {personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div> : <Empty icon="heart" title={t('Aucune envie trouvée')} text={t('Modifiez les filtres pour découvrir d’autres envies.')}/>}
+            {personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} curated={curating} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div> : <Empty icon="heart" title={t('Aucune envie trouvée')} text={curating ? t('Ajoutez ses idées de cadeaux pour que vos proches sachent quoi offrir.') : t('Modifiez les filtres pour découvrir d’autres envies.')} action={curating ? <button className="primary" onClick={() => openWish(selectedPerson)}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button> : undefined}/>}
             {String(selectedPerson.id) !== String(me.id) && <div className="mt-9"><SectionTitle icon="spark" tone="clay" kicker={t('SANS PASSER PAR LA LISTE')} title={t('Cadeaux prévus hors liste')} action={<button className="secondary" onClick={() => openOffList(selectedPerson)}><Icon name="plus" size={17}/> {t('Prévoir un cadeau hors liste')}</button>}/>{personGifts.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{personGifts.map(gift => <OffListGiftCard key={gift.id} gift={gift} me={me} busy={busy} onRequest={() => void requestGift(gift)} onOpen={() => openReservation(gift.id)}/>)}</div> : <p className="muted rounded-xl bg-brand-50 p-4">{t('Aucun cadeau hors liste partagé pour {name}. Une idée qui n’est pas sur sa liste ? Prévoyez-la ici, sans qu’il ou elle ne le voie.', { name: nameOf(selectedPerson) })}</p>}</div>}
           </>
             : activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">{t('LES MEMBRES')}</p><p className="muted mt-1">{t('Découvrez les envies des membres de cette famille.')}</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> {t('Ajouter une occasion')}</button>}</div>{activeFamily.households?.length ? <FamilyHouseholds family={activeFamily} me={me} onPerson={openPerson}/> : activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => openPerson(person)} className="card flex items-center gap-4 p-5 text-left hover:border-brand-200"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title={t('Aucun membre affiché')} text={t('Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles.')}/ >}{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} busy={busy} perform={perform} handleError={handleError} onRename={name => setSelectedFamily({ ...activeFamily, name })}/>}</>
@@ -323,7 +327,7 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
     </div>
     {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-8"><div className="mb-6 flex items-start justify-between gap-3"><div><p className="eyebrow mb-1">{t('PENSA')}</p><h2 id="modal-title" className="font-['Outfit'] text-2xl font-bold">{t(modal === 'wish' ? 'Ajouter une envie' : modal === 'family' ? 'Créer une famille' : modal === 'occasion' ? 'Nouvelle occasion' : modal === 'tags' ? 'Modifier les tags' : modal === 'offList' ? 'Prévoir un cadeau hors liste' : 'Réserver une envie')}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label={t('Fermer')}><Icon name="close"/></button></div>
       {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {modal === 'wish' && <WishForm busy={busy} perform={perform} handleError={handleError}/>}
+      {modal === 'wish' && <WishForm owner={wishOwner} busy={busy} perform={perform} handleError={handleError}/>}
       {modal === 'family' && <form onSubmit={event => { event.preventDefault(); const name = String(new FormData(event.currentTarget).get('name')).trim(); if (name) void perform(() => api('/families', json('POST', { name })), t('Famille créée.')) }}><label className="label" htmlFor="family-name">{t('Nom de la famille')}</label><input className="field" id="family-name" name="name" placeholder={t('Ex. : La famille Martin')} required/><button disabled={busy} className="primary mt-5 w-full">{t('Créer la famille')}</button></form>}
       {modal === 'occasion' && selectedFamily && <OccasionForm family={selectedFamily} busy={busy} perform={perform}/>}
       {modal === 'tags' && selectedWish && <form onSubmit={event => { event.preventDefault(); const tags = String(new FormData(event.currentTarget).get('tags')).split(',').map(tag => tag.trim()).filter(Boolean); void perform(() => api(`/wishes/${selectedWish.id}`, json('PATCH', { tags })), t('Tags mis à jour.')) }}><label htmlFor="wish-tags" className="label">{t('Tags séparés par des virgules')}</label><input id="wish-tags" name="tags" className="field" defaultValue={selectedWish.tags?.join(', ')} placeholder={t('livre, déco, anniversaire')}/><button disabled={busy} className="primary mt-5 w-full">{t('Enregistrer les tags')}</button></form>}
@@ -336,6 +340,7 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
 function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'register'; setMode: (mode: 'login' | 'register') => void; onAuth: (person: Person) => void; error: string; setError: (message: string) => void }) {
   const { locale, t } = useTranslation()
   const [busy, setBusy] = useState(false)
+  const [claiming, setClaiming] = useState(false)
   // Whether an invitation is required is the server's decision, and the form has to know it
   // before it is submitted: asking someone to fill in six fields only to be told they were
   // never allowed to is the kind of small cruelty that makes people give up. Assumed open
@@ -351,7 +356,9 @@ function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'reg
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('')
     const data = new FormData(event.currentTarget)
-    const fields = mode === 'register'
+    const fields = claiming
+      ? { code: String(data.get('claim') || '').trim(), email: data.get('email'), password: data.get('password') }
+      : mode === 'register'
       ? {
           firstName: data.get('firstName'),
           lastName: data.get('lastName'),
@@ -361,13 +368,13 @@ function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'reg
           ...(String(data.get('invitation') || '').trim() ? { invitation: String(data.get('invitation')).trim() } : {}),
         }
       : { email: data.get('email'), password: data.get('password') }
-    if (mode === 'register' && String(data.get('password')).length < 12) {
+    if ((mode === 'register' || claiming) && String(data.get('password')).length < 12) {
       setError(t('Le mot de passe doit contenir au moins 12 caractères.'))
       setBusy(false)
       return
     }
     try {
-      await api(`/auth/${mode}`, json('POST', fields))
+      await api(`/auth/${claiming ? 'claim' : mode}`, json('POST', fields))
       onAuth(await api<Person>('/auth/me'))
     } catch (problem) { setError(problem instanceof Error ? problem.message : t('Connexion impossible.')) }
     finally { setBusy(false) }
@@ -389,23 +396,25 @@ function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'reg
     <div id="auth-panel" className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
       <div className="flex items-center justify-center px-6 py-12 lg:sticky lg:top-0 lg:h-screen lg:flex-col lg:justify-start lg:overflow-y-auto"><div className="w-full max-w-[420px] lg:my-auto">
       <p className="eyebrow mb-3">{t('BIENVENUE SUR PENSA')}</p>
-      <h2 className="font-['Outfit'] text-3xl font-bold">{mode === 'login' ? t('Reprenez où vous en étiez') : t('Créons votre compte')}</h2>
-      <p className="muted mb-8 mt-2">{mode === 'login' ? t('Connectez-vous pour retrouver vos listes et vos cadeaux en cours.') : t('Quelques informations suffisent pour commencer.')}</p>
+      <h2 className="font-['Outfit'] text-3xl font-bold">{claiming ? t('Reprenez votre liste en main') : mode === 'login' ? t('Reprenez où vous en étiez') : t('Créons votre compte')}</h2>
+      <p className="muted mb-8 mt-2">{claiming ? t('Votre foyer tenait votre liste : ce code vous donne votre propre compte, avec vos envies déjà dedans.') : mode === 'login' ? t('Connectez-vous pour retrouver vos listes et vos cadeaux en cours.') : t('Quelques informations suffisent pour commencer.')}</p>
       {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{localizeMessage(error, locale)}</p>}
       <form onSubmit={submit} className="space-y-4">
-        {mode === 'register' && <>
+        {mode === 'register' && !claiming && <>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="label" htmlFor="firstName">{t('Prénom')}</label><input className="field" id="firstName" name="firstName" autoComplete="given-name" required/></div>
             <div><label className="label" htmlFor="lastName">{t('Nom')}</label><input className="field" id="lastName" name="lastName" autoComplete="family-name" required/></div>
           </div>
           <div><label className="label" htmlFor="birthDate">{t('Date de naissance')}</label><input className="field" id="birthDate" name="birthDate" type="date" required/></div>
         </>}
+        {claiming && <div><label className="label" htmlFor="claim">{t('Code de rattachement')}</label><input className="field" id="claim" name="claim" type="text" autoComplete="off" placeholder={t('Le code remis par votre foyer')} required/><p className="muted mt-1.5">{t('Ce code vous a été donné par un admin de votre foyer.')}</p></div>}
         <div><label className="label" htmlFor="email">{t('Adresse e-mail')}</label><input className="field" id="email" name="email" type="email" autoComplete="email" placeholder={t('vous@exemple.fr')} required/></div>
-        <div><label className="label" htmlFor="password">{t('Mot de passe')}</label><input className="field" id="password" name="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'register' ? 12 : undefined} required/></div>
-        {mode === 'register' && <div><label className="label" htmlFor="invitation">{t('Code d’invitation')} <span className="font-normal">{openRegistration ? t('(facultatif)') : t('(requis)')}</span></label><input className="field" id="invitation" name="invitation" type="text" autoComplete="off" placeholder={t('Votre code d’invitation')} required={!openRegistration}/><p className="muted mt-1.5">{openRegistration ? t('Un proche vous a invité dans son foyer ou dans sa famille ? Saisissez son code ici.') : t('Cet espace est sur invitation. Demandez son code à la personne qui vous a invité, dans son foyer ou dans sa famille.')}</p></div>}
-        <button disabled={busy} className="primary !mt-6 w-full">{busy ? t('Veuillez patienter…') : mode === 'login' ? t('Se connecter') : t('Créer mon compte')} <Icon name="arrow" size={17}/></button>
+        <div><label className="label" htmlFor="password">{t('Mot de passe')}</label><input className="field" id="password" name="password" type="password" autoComplete={mode === 'login' && !claiming ? 'current-password' : 'new-password'} minLength={mode === 'register' || claiming ? 12 : undefined} required/></div>
+        {mode === 'register' && !claiming && <div><label className="label" htmlFor="invitation">{t('Code d’invitation')} <span className="font-normal">{openRegistration ? t('(facultatif)') : t('(requis)')}</span></label><input className="field" id="invitation" name="invitation" type="text" autoComplete="off" placeholder={t('Votre code d’invitation')} required={!openRegistration}/><p className="muted mt-1.5">{openRegistration ? t('Un proche vous a invité dans son foyer ou dans sa famille ? Saisissez son code ici.') : t('Cet espace est sur invitation. Demandez son code à la personne qui vous a invité, dans son foyer ou dans sa famille.')}</p></div>}
+        <button disabled={busy} className="primary !mt-6 w-full">{busy ? t('Veuillez patienter…') : claiming ? t('Activer mon compte') : mode === 'login' ? t('Se connecter') : t('Créer mon compte')} <Icon name="arrow" size={17}/></button>
       </form>
-      <p className="mt-7 text-center text-sm text-ink-500">{mode === 'login' ? t('Pas encore de compte ?') : t('Déjà un compte ?')} <button className="font-bold text-brand-600 hover:underline" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? t('S’inscrire') : t('Se connecter')}</button></p>
+      <p className="mt-7 text-center text-sm text-ink-500">{mode === 'login' ? t('Pas encore de compte ?') : t('Déjà un compte ?')} <button className="font-bold text-brand-600 hover:underline" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setClaiming(false); setError('') }}>{mode === 'login' ? t('S’inscrire') : t('Se connecter')}</button></p>
+      <p className="mt-2 text-center text-sm text-ink-500"><button className="font-bold text-brand-600 hover:underline" onClick={() => { setClaiming(!claiming); setError('') }}>{claiming ? t('Revenir à la connexion classique') : t('J’ai un code de rattachement')}</button></p>
     </div></div></div>
     <div className="px-7 pb-14 sm:px-12 lg:col-start-1 lg:row-start-2">
       <LandingSection id="landing-load" kicker={t('CE QUE PERSONNE NE COMPTE')} title={t('Organiser des cadeaux, c’est un travail invisible.')} intro={t('Ce n’est pas l’achat qui pèse. C’est tout ce qu’il faut garder en tête avant.')}>
@@ -473,7 +482,7 @@ function LandingPoint({ icon, step, title, text }: { icon?: IconName; step?: num
   </div>
 }
 
-function WishForm({ busy, perform, handleError }: { busy: boolean; perform: (action: () => Promise<unknown>, success: string) => Promise<boolean>; handleError: (error: unknown) => void }) {
+function WishForm({ owner, busy, perform, handleError }: { owner?: Person | null; busy: boolean; perform: (action: () => Promise<unknown>, success: string) => Promise<boolean>; handleError: (error: unknown) => void }) {
   const { locale, t } = useTranslation()
   const [url, setUrl] = useState('')
   const [preview, setPreview] = useState<Partial<Wish> | null>(null)
@@ -504,11 +513,11 @@ function WishForm({ busy, perform, handleError }: { busy: boolean; perform: (act
     }, 600)
     return () => { clearTimeout(timer); controller.abort() }
   }, [url])
-  return <form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void perform(() => api('/wishes', json('POST', { url, title: data.get('title'), image: data.get('image') || '', description: data.get('description') || undefined, price: data.get('price') ? Number(data.get('price')) : undefined, tags: String(data.get('tags') || '').split(',').map(tag => tag.trim()).filter(Boolean) })), t('Envie ajoutée à votre liste.')) }}>
+  return <form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void perform(() => api(owner ? `/users/${owner.id}/wishes` : '/wishes', json('POST', { url, title: data.get('title'), image: data.get('image') || '', description: data.get('description') || undefined, price: data.get('price') ? Number(data.get('price')) : undefined, tags: String(data.get('tags') || '').split(',').map(tag => tag.trim()).filter(Boolean) })), owner ? t('Envie ajoutée à la liste de {name}.', { name: nameOf(owner) }) : t('Envie ajoutée à votre liste.')) }}>
     <label className="label" htmlFor="product-url">{t('Lien du produit')}</label><input className="field" id="product-url" type="url" placeholder="https://example.com/product" value={url} onChange={event => { setUrl(event.target.value); setPreview(null); setNotice(''); setLoading(false) }} required/><p className="muted mt-1.5">{loading ? t('Lecture du lien…') : t('Collez un lien : les informations se remplissent toutes seules.')}</p>
     {notice && <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"><span className="font-semibold">{localizeMessage(notice, locale)}.</span> {preview ? t('Nous avons repris le nom depuis le lien : vérifiez-le et complétez si besoin.') : t('Vous pouvez remplir les champs à la main : seul le nom est nécessaire.')}</p>}
     {preview && <div className="mt-4 flex items-center gap-3 rounded-xl bg-brand-50 p-3">{preview.image && <img src={preview.image} alt="" className="size-14 rounded-lg object-cover"/>}<span className="text-sm font-semibold">{preview.title || t('Produit trouvé')}</span></div>}
-    <div className="mt-5 space-y-4" key={preview?.url || preview?.title || 'empty'}><div><label className="label" htmlFor="product-title">{t('Nom de l’envie')}</label><input className="field" id="product-title" name="title" defaultValue={preview?.title || ''} required/></div><div><label className="label" htmlFor="product-image">{t('URL de l’image')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id="product-image" name="image" type="url" defaultValue={preview?.image || ''} placeholder="https://…"/></div><div><label className="label" htmlFor="product-description">{t('Description')} <span className="font-normal">{t('(facultatif)')}</span></label><textarea className="field min-h-20" id="product-description" name="description" defaultValue={preview?.description || ''}/></div><div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor="product-price">{t('Prix (€)')}</label><input className="field" id="product-price" name="price" type="number" min="0" step="0.01" defaultValue={preview?.price ?? ''}/></div><div><label className="label" htmlFor="product-tags">{t('Tags')}</label><input className="field" id="product-tags" name="tags" defaultValue={preview?.tags?.join(', ') || ''} placeholder={t('livre, déco')}/></div></div></div><button disabled={busy} className="primary mt-6 w-full"><Icon name="plus" size={17}/> {t('Ajouter à ma liste')}</button>
+    <div className="mt-5 space-y-4" key={preview?.url || preview?.title || 'empty'}><div><label className="label" htmlFor="product-title">{t('Nom de l’envie')}</label><input className="field" id="product-title" name="title" defaultValue={preview?.title || ''} required/></div><div><label className="label" htmlFor="product-image">{t('URL de l’image')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id="product-image" name="image" type="url" defaultValue={preview?.image || ''} placeholder="https://…"/></div><div><label className="label" htmlFor="product-description">{t('Description')} <span className="font-normal">{t('(facultatif)')}</span></label><textarea className="field min-h-20" id="product-description" name="description" defaultValue={preview?.description || ''}/></div><div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor="product-price">{t('Prix (€)')}</label><input className="field" id="product-price" name="price" type="number" min="0" step="0.01" defaultValue={preview?.price ?? ''}/></div><div><label className="label" htmlFor="product-tags">{t('Tags')}</label><input className="field" id="product-tags" name="tags" defaultValue={preview?.tags?.join(', ') || ''} placeholder={t('livre, déco')}/></div></div></div><button disabled={busy} className="primary mt-6 w-full"><Icon name="plus" size={17}/> {owner ? t('Ajouter à sa liste') : t('Ajouter à ma liste')}</button>
   </form>
 }
 
@@ -592,6 +601,7 @@ function RoleBadges({ person }: { person: Person }) {
   return <>
     {person.householdAdmin && <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700">{t('Admin du foyer')}</span>}
     {person.familyAdmin && <span className="rounded-full bg-clay-50 px-2 py-0.5 text-[11px] font-bold text-clay-600">{t('Admin de la famille')}</span>}
+    {person.managed && <span className="rounded-full bg-sage-50 px-2 py-0.5 text-[11px] font-bold text-sage-700">{t('Géré par le foyer')}</span>}
   </>
 }
 
@@ -619,6 +629,39 @@ function HouseholdCard({ household, me, onPerson }: { household: Household; me: 
   </article>
 }
 
+function ManagedMemberActions({ household, member, busy, perform, handleError }: {
+  household: Household; member: Person; busy: boolean;
+  perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean>; handleError: (error: unknown) => void
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState<'' | 'code' | 'account'>('')
+  const [code, setCode] = useState('')
+  const path = `/households/${household.id}/members/${member.id}`
+  async function claimCode() {
+    setOpen('code'); setCode('')
+    try { setCode((await api<{ code: string }>(`${path}/invitations`, json('POST', {}))).code) }
+    catch (problem) { handleError(problem) }
+  }
+  return <div className="w-full space-y-3">
+    <div className="flex flex-wrap gap-2">
+      <button className="secondary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => void claimCode()}>{t('Créer un code de rattachement')}</button>
+      <button className="secondary !px-3 !py-1.5 text-xs" disabled={busy} onClick={() => setOpen(open === 'account' ? '' : 'account')}>{t('Définir ses identifiants')}</button>
+      <button className="secondary !px-3 !py-1.5 text-xs hover:!text-red-600" disabled={busy}
+        onClick={() => { if (window.confirm(t('Retirer {name} du foyer ? Sa liste sera supprimée.', { name: nameOf(member) }))) void perform(() => api(path, { method: 'DELETE' }), t('Membre retiré du foyer.'), false) }}>{t('Retirer du foyer')}</button>
+    </div>
+    {open === 'code' && code && <div role="status" className="rounded-xl bg-brand-50 p-3"><p className="mb-1 text-sm font-semibold">{t('Code de rattachement (visible uniquement maintenant)')}</p><output className="block break-all font-mono text-sm text-brand-700">{code}</output><p className="muted mt-1 text-xs">{t('À saisir sur l’écran de connexion, rubrique « J’ai un code de rattachement ».')}</p></div>}
+    {open === 'account' && <form className="flex flex-wrap items-end gap-2 rounded-xl bg-brand-50 p-3" onSubmit={event => {
+      event.preventDefault()
+      const data = new FormData(event.currentTarget)
+      void perform(() => api(`${path}/account`, json('POST', { email: String(data.get('email')).trim(), password: String(data.get('password')) })), t('Compte créé : cette personne peut se connecter.'), false)
+    }}>
+      <div className="min-w-0 flex-1"><label className="label" htmlFor={`email-${member.id}`}>{t('Adresse e-mail')}</label><input className="field" id={`email-${member.id}`} name="email" type="email" required/></div>
+      <div className="min-w-0 flex-1"><label className="label" htmlFor={`password-${member.id}`}>{t('Mot de passe')}</label><input className="field" id={`password-${member.id}`} name="password" type="password" minLength={12} required/></div>
+      <button className="secondary" disabled={busy}>{t('Créer le compte')}</button>
+    </form>}
+  </div>
+}
+
 function HouseholdPanel({ household, me, isAdmin, busy, perform, handleError, onPerson }: {
   household: Household; me: Person; isAdmin: boolean; busy: boolean;
   perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean>;
@@ -627,6 +670,7 @@ function HouseholdPanel({ household, me, isAdmin, busy, perform, handleError, on
   const { t } = useTranslation()
   const [code, setCode] = useState('')
   const [generating, setGenerating] = useState(false)
+  const [adding, setAdding] = useState(false)
   const members = household.members ?? []
   const adminCount = members.filter(member => member.householdAdmin).length
   async function invite() {
@@ -635,6 +679,13 @@ function HouseholdPanel({ household, me, isAdmin, busy, perform, handleError, on
     catch (problem) { handleError(problem) }
     finally { setGenerating(false) }
   }
+  const moveOut = (member: Person) => {
+    const self = String(member.id) === String(me.id)
+    const question = self
+      ? t('Créer votre propre foyer et le quitter ? Vous resterez dans les mêmes familles.')
+      : t('Donner son propre foyer à {name} ? Ce foyer restera dans les mêmes familles.', { name: nameOf(member) })
+    if (window.confirm(question)) void perform(() => api(`/households/${household.id}/members/${member.id}/move-out`, json('POST', {})), t('Nouveau foyer créé.'), false)
+  }
   return <section aria-labelledby="my-household-title">
     <div className="mb-5"><p className="eyebrow mb-1">{t('MON FOYER')}</p><h2 id="my-household-title" className="font-['Outfit'] text-2xl font-semibold tracking-tight text-ink-900">{household.name}</h2><p className="muted mt-1">{t('Les personnes qui vivent avec vous. Votre foyer rejoint les familles ensemble.')}</p></div>
     <div className="grid gap-5 lg:grid-cols-2">
@@ -642,12 +693,37 @@ function HouseholdPanel({ household, me, isAdmin, busy, perform, handleError, on
         <h3 className="label">{t('Membres du foyer')}</h3>
         <ul className="divide-y divide-line-soft">{members.map(member => {
           const lastAdmin = member.householdAdmin && adminCount <= 1
+          const self = String(member.id) === String(me.id)
           return <PersonRow key={member.id} person={member} me={me} onPerson={onPerson}>
-            {isAdmin && <button className="secondary !px-3 !py-1.5 text-xs" disabled={busy || lastAdmin} title={lastAdmin ? t('Un foyer doit conserver un administrateur') : undefined}
+            {isAdmin && !member.managed && <button className="secondary !px-3 !py-1.5 text-xs" disabled={busy || lastAdmin} title={lastAdmin ? t('Un foyer doit conserver un administrateur') : undefined}
               onClick={() => void perform(() => api(`/households/${household.id}/members/${member.id}`, json('PATCH', { admin: !member.householdAdmin })), member.householdAdmin ? t('Droits d’admin retirés.') : t('Droits d’admin accordés.'), false)}>
               {member.householdAdmin ? t('Retirer l’admin') : t('Nommer admin')}</button>}
+            {!member.managed && (self || isAdmin) && members.length > 1 && <button className="secondary !px-3 !py-1.5 text-xs" disabled={busy || lastAdmin} title={lastAdmin ? t('Un foyer doit conserver un administrateur') : undefined} onClick={() => moveOut(member)}>
+              {self ? t('Quitter ce foyer') : t('Lui donner son foyer')}</button>}
+            {isAdmin && member.managed && <ManagedMemberActions household={household} member={member} busy={busy} perform={perform} handleError={handleError}/>}
           </PersonRow>
         })}</ul>
+        {isAdmin && <div className="mt-4 border-t border-line-soft pt-4">
+          {adding ? <form className="space-y-3" onSubmit={event => {
+            event.preventDefault()
+            const data = new FormData(event.currentTarget)
+            void perform(async () => {
+              await api(`/households/${household.id}/members`, json('POST', {
+                firstName: String(data.get('firstName')).trim(), lastName: String(data.get('lastName')).trim(),
+                birthDate: String(data.get('birthDate')),
+              }))
+              setAdding(false)
+            }, t('Membre ajouté au foyer.'), false)
+          }}>
+            <p className="muted">{t('Pour un enfant ou toute personne sans compte : votre foyer tient sa liste à sa place.')}</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div><label className="label" htmlFor="member-first-name">{t('Prénom')}</label><input className="field" id="member-first-name" name="firstName" required/></div>
+              <div><label className="label" htmlFor="member-last-name">{t('Nom')}</label><input className="field" id="member-last-name" name="lastName" required/></div>
+            </div>
+            <div><label className="label" htmlFor="member-birth-date">{t('Date de naissance')}</label><input className="field" id="member-birth-date" name="birthDate" type="date" required/></div>
+            <div className="flex gap-2"><button className="primary" disabled={busy}>{t('Ajouter au foyer')}</button><button type="button" className="secondary" onClick={() => setAdding(false)}>{t('Annuler')}</button></div>
+          </form> : <button className="secondary" onClick={() => setAdding(true)}><Icon name="plus" size={17}/> {t('Ajouter un membre sans compte')}</button>}
+        </div>}
       </div>
       {isAdmin ? <div className="card space-y-6 p-5 sm:p-6">
         <form onSubmit={event => {
@@ -757,6 +833,7 @@ function Guidance({ me, onboarding, todos, busy, onAddWish, onGo, onPerson, onRe
   const describe = (todo: Todo) => {
     const name = nameOf(todo.person), occasion = occasionLabel(todo.occasion, locale, { year: todo.date ? Number(todo.date.slice(0, 4)) : null, birthDate: todo.person?.birthDate }), date = dateOf(todo.date), title = todo.reservation?.wishTitle ?? ''
     if (todo.type === 'occasion_without_gift') return { text: t('{occasion} de {name} le {date} : aucun cadeau prévu', { occasion: occasionName(todo.occasion, locale), name, date }), action: t('Voir ses envies'), icon: 'calendar' as IconName, run: () => todo.person && onPerson(todo.person) }
+    if (todo.type === 'managed_list_empty') return { text: t('La liste de {name} est vide : votre foyer la tient à jour', { name }), action: t('Compléter sa liste'), icon: 'heart' as IconName, run: () => todo.person && onPerson(todo.person) }
     const step = statusTodos[todo.type]
     if (step && todo.reservation) {
       const reservation = todo.reservation

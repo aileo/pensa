@@ -6,10 +6,12 @@ import { pool } from './db.js';
 let server: Server;
 let base: string;
 const cookies: Record<string, string> = {};
-const call = async (as: string, path: string, method = 'GET', body?: unknown, language?: string) => {
+// A client address can be supplied so a test that signs in and out repeatedly gets its own
+// rate-limit budget instead of spending the one shared by the whole suite.
+const call = async (as: string, path: string, method = 'GET', body?: unknown, language?: string, ip?: string) => {
   const response = await fetch(`${base}/api${path}`, {
     method, headers: { 'content-type': 'application/json', cookie: cookies[as] ?? '', origin: 'http://localhost:5173',
-      ...(language ? { 'accept-language': language } : {}) },
+      ...(language ? { 'accept-language': language } : {}), ...(ip ? { 'x-forwarded-for': ip } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: response.status, data: await response.json() as Record<string, any>, cookie: response.headers.get('set-cookie') };
@@ -481,5 +483,107 @@ describe('permissions métier sur l’API', () => {
       expect((await call('familyGuest', '/households/mine')).data.name).toBe('Foyer de Closed');
       await call('alice', `/families/${familyA.id}/households/${joined.data.householdId}`, 'DELETE');
     } finally { process.env.OPEN_REGISTRATION = 'true'; }
+  });
+  it('confie la liste d’un membre géré aux administrateurs du foyer', async () => {
+    // Test people are named uniquely per run, because the suite runs against a database that
+    // keeps whatever an earlier failed run left behind.
+    const name = (label: string) => `${label}${Date.now().toString(36)}`;
+    const ninaName = name('Nina');
+    const mine = (await call('alice', '/households/mine')).data;
+    const created = await call('alice', `/households/${mine.id}/members`, 'POST',
+      { firstName: ninaName, lastName: 'Martin', birthDate: '2015-02-09', nameDay: '01-21' });
+    expect(created.status).toBe(201);
+    const nina = created.data.members.find((m: {firstName:string}) => m.firstName === ninaName);
+    expect(nina).toMatchObject({ managed: true, householdAdmin: false });
+    // Both parents curate the list; nobody outside the household can.
+    const wish = await call('bob', `/users/${nina.id}/wishes`, 'POST',
+      { title: 'Patins à roulettes', url: 'https://example.com/patins', price: 55, tags: ['sport'] });
+    expect(wish.status).toBe(201);
+    expect((await call('charlie', `/users/${nina.id}/wishes`, 'POST',
+      { title: 'Interdit', url: 'https://example.com/non' }, 'en')).data.error).toBe('Person not accessible');
+    expect((await call('charlie', `/wishes/${wish.data.id}`, 'PATCH', { tags: ['autre'] })).status).toBe(404);
+    expect((await call('alice', `/wishes/${wish.data.id}`, 'PATCH', { tags: ['roulettes'] })).status).toBe(200);
+    const second = await call('alice', `/users/${nina.id}/wishes`, 'POST',
+      { title: 'Casque', url: 'https://example.com/casque', price: 30 });
+    expect((await call('alice', `/users/${nina.id}/wishes/order`, 'PATCH',
+      { ids: [second.data.id, wish.data.id] })).status).toBe(200);
+    expect((await call('alice', `/users/${nina.id}/wishes`)).data.map((w: {title:string}) => w.title))
+      .toEqual(['Casque', 'Patins à roulettes']);
+    // Relatives see the list like any other, through the family they share.
+    expect((await call('charlie', `/users/${nina.id}/wishes`)).data).toHaveLength(2);
+    // Administration needs someone who can sign in.
+    expect((await call('alice', `/households/${mine.id}/members/${nina.id}`, 'PATCH', { admin: true }, 'en')).data.error)
+      .toBe('A managed member cannot administrate');
+    const familyA = (await call('alice', '/families')).data.find((f: {name:string}) => f.name === 'Famille A');
+    expect((await call('alice', `/families/${familyA.id}/admins`, 'POST', { userId: nina.id }, 'en')).data.error)
+      .toBe('A managed member cannot administrate');
+    // Profile edits are reserved for managed members.
+    expect((await call('alice', `/households/${mine.id}/members/${nina.id}`, 'PATCH', { firstName: `${ninaName}lle` })).status).toBe(200);
+    const bobId = (await call('alice', '/households/mine')).data.members.find((m: {firstName:string}) => m.firstName === 'Bob').id;
+    expect((await call('alice', `/households/${mine.id}/members/${bobId}`, 'PATCH', { firstName: 'Bobby' }, 'en')).data.error)
+      .toBe('This member manages their own account');
+    await call('alice', `/wishes/${wish.data.id}`, 'DELETE');
+    await call('alice', `/wishes/${second.data.id}`, 'DELETE');
+    expect((await call('alice', `/households/${mine.id}/members/${nina.id}`, 'DELETE')).status).toBe(200);
+  });
+  it('convertit un membre géré en compte indépendant puis le laisse partir', async () => {
+    const name = (label: string) => `${label}${Date.now().toString(36)}`;
+    const mine = (await call('alice', '/households/mine')).data;
+    const add = async (firstName: string) => (await call('alice', `/households/${mine.id}/members`, 'POST',
+      { firstName, lastName: 'Martin', birthDate: '2008-07-03' }))
+      .data.members.find((m: {firstName:string}) => m.firstName === firstName);
+    const theoName = name('Theo');
+    const theo = await add(theoName);
+    const invitation = await call('alice', `/households/${mine.id}/members/${theo.id}/invitations`, 'POST', {});
+    expect(invitation.status).toBe(201);
+    // A claim code attaches credentials to a person who already exists; it never creates one.
+    expect((await call('', '/auth/register', 'POST', { firstName: 'Faux', lastName: 'Compte',
+      email: `faux-${Date.now()}@example.test`, password: 'LongSecret2026!', birthDate: '1990-01-01',
+      invitation: invitation.data.code }, 'en', '10.9.0.1')).data.error).toBe('Invalid or expired invitation');
+    const claim = await call('', '/auth/claim', 'POST',
+      { code: invitation.data.code, email: `theo-${Date.now()}@example.test`, password: 'LongSecret2026!' }, undefined, '10.9.0.1');
+    expect(claim.status).toBe(200);
+    expect(claim.data).toMatchObject({ id: theo.id, firstName: theoName, managed: false, householdAdmin: false });
+    cookies.theo = claim.cookie!.split(';')[0];
+    expect((await call('', '/auth/claim', 'POST',
+      { code: invitation.data.code, email: `autre-${Date.now()}@example.test`, password: 'LongSecret2026!' }, 'en', '10.9.0.1')).data.error)
+      .toBe('Invalid or expired claim code');
+    // Once independent the list belongs to them, and nobody else may write in it.
+    expect((await call('alice', `/users/${theo.id}/wishes`, 'POST',
+      { title: 'Interdit', url: 'https://example.com/non' }, 'en')).data.error).toBe('Person not accessible');
+    // The direct route covers the case where the administrator sets the password themselves.
+    const jadeId = (await add(name('Jade'))).id;
+    const jadeEmail = `jade-${Date.now()}@example.test`;
+    expect((await call('alice', `/households/${mine.id}/members/${jadeId}/account`, 'POST',
+      { email: jadeEmail, password: 'LongSecret2026!' })).status).toBe(200);
+    expect((await call('alice', `/households/${mine.id}/members/${jadeId}/account`, 'POST',
+      { email: `encore-${Date.now()}@example.test`, password: 'LongSecret2026!' }, 'en')).data.error)
+      .toBe('This member manages their own account');
+    const jade = await call('', '/auth/login', 'POST', { email: jadeEmail, password: 'LongSecret2026!' }, undefined, '10.9.0.1');
+    expect(jade.status).toBe(200);
+    cookies.jade = jade.cookie!.split(';')[0];
+    // Moving out needs an account, so it is refused while the person is still managed.
+    const enzoId = (await add(name('Enzo'))).id;
+    expect((await call('alice', `/households/${mine.id}/members/${enzoId}/move-out`, 'POST', {}, 'en')).data.error)
+      .toBe('An independent account is required');
+    expect((await call('alice', `/households/${mine.id}/members/${enzoId}`, 'DELETE')).status).toBe(200);
+    // Either the person or an administrator can trigger it; the new household keeps the families.
+    const families = (await call('theo', '/families')).data.map((f: {id:string}) => f.id).sort();
+    const moved = await call('theo', `/households/${mine.id}/members/${theo.id}/move-out`, 'POST', {});
+    expect(moved.status).toBe(200);
+    expect(moved.data.householdId).not.toBe(mine.id);
+    const own = await call('theo', '/households/mine');
+    expect(own.data.name).toBe(`Foyer de ${theoName}`);
+    expect(own.data.members.map((m: {id:string}) => m.id)).toEqual([theo.id]);
+    expect((await call('theo', '/auth/me')).data.householdAdmin).toBe(true);
+    expect((await call('theo', '/families')).data.map((f: {id:string}) => f.id).sort()).toEqual(families);
+    // Alice still sees him, because both households belong to the same families.
+    expect((await call('alice', '/users')).data.some((p: {id:string}) => p.id === theo.id)).toBe(true);
+    const jadeHousehold = (await call('alice', `/households/${mine.id}/members/${jadeId}/move-out`, 'POST', {})).data.householdId;
+    expect(jadeHousehold).toBeTruthy();
+    for (const family of (await call('jade', '/families')).data as unknown as {id: string}[])
+      await call('alice', `/families/${family.id}/households/${jadeHousehold}`, 'DELETE');
+    for (const family of (await call('theo', '/families')).data as unknown as {id: string}[])
+      await call('alice', `/families/${family.id}/households/${moved.data.householdId}`, 'DELETE');
   });
 });

@@ -29,6 +29,13 @@
       "when": 1790763926380,
       "tag": "0003_off_list_gifts",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790785651356,
+      "tag": "0004_managed_members",
+      "breakpoints": true
     }
   ]
 }
