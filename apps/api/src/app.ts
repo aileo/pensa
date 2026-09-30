@@ -6,7 +6,7 @@ import { rateLimit } from 'express-rate-limit';
 import { pool, query } from './db.js';
 import { preview } from './metadata.js';
 
-type Person = { id: string; household_id: string; first_name: string; last_name: string; email: string; birth_date: Date | string; name_day: string | null; avatar: string | null };
+type Person = { id: string; household_id: string; first_name: string; last_name: string; email: string; birth_date: Date | string; name_day: string | null; avatar: string | null; household_admin?: boolean };
 type AuthRequest = Request & { person?: Person };
 class HttpError extends Error { constructor(public code: number, message: string) { super(message); } }
 const fail = (code: number, message: string): never => { throw new HttpError(code, message); };
@@ -23,6 +23,8 @@ const english: Record<string, string> = {
   'Terminer les réservations avant de retirer ce foyer': 'Complete reservations before removing this household',
   'Une famille doit conserver un administrateur': 'A family must retain an administrator',
   'Utilisateur hors famille': 'User is not in this family',
+  'Un foyer doit conserver un administrateur': 'A household must retain an administrator',
+  'Membre du foyer introuvable': 'Household member not found',
   'Personne inaccessible': 'Person not accessible',
   'Occasion introuvable': 'Occasion not found',
   'Occasion utilisée dans une réservation': 'Occasion is used in a reservation',
@@ -81,7 +83,14 @@ const ownFamily = async (person: Person, familyId: string) => {
 };
 const birthday = (p: Person) => p.birth_date instanceof Date ? p.birth_date.toISOString().slice(0, 10) : p.birth_date;
 const publicPerson = (p: Person) => ({ id: p.id, firstName: p.first_name, lastName: p.last_name, avatar: p.avatar, birthDate: birthday(p) });
-const privatePerson = (p: Person) => ({ ...publicPerson(p), email: p.email, householdId: p.household_id, nameDay: p.name_day });
+const privatePerson = (p: Person) => ({ ...publicPerson(p), email: p.email, householdId: p.household_id, nameDay: p.name_day, householdAdmin: !!p.household_admin });
+const requireHouseholdAdmin = async (p: Person) => {
+  if (!await first('SELECT 1 FROM users WHERE id=$1 AND household_admin=true', [p.id]))
+    fail(403, 'Administration du foyer requise');
+};
+const householdMembers = async (householdId: string) =>
+  (await query<Person>('SELECT * FROM users WHERE household_id=$1 ORDER BY first_name', [householdId]))
+    .map(p => ({ ...publicPerson(p), householdAdmin: !!p.household_admin }));
 const sessionCookie = (res: Response, value: string) => res.cookie('session', value, {
   httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 14 * 86400_000,
 });
@@ -179,9 +188,30 @@ api.get('/users', async (req, res) => {
   res.json(rows.map(publicPerson));
 });
 api.get('/households', async (req, res) => {
-  res.json(await query(`SELECT DISTINCT h.id,h.name FROM households h LEFT JOIN memberships m ON m.household_id=h.id
+  const rows = await query<{id:string;name:string}>(`SELECT DISTINCT h.id,h.name FROM households h LEFT JOIN memberships m ON m.household_id=h.id
     LEFT JOIN memberships mine ON mine.family_id=m.family_id AND mine.household_id=$1
-    WHERE h.id=$1 OR mine.household_id IS NOT NULL`, [person(req).household_id]));
+    WHERE h.id=$1 OR mine.household_id IS NOT NULL ORDER BY h.name`, [person(req).household_id]);
+  res.json(await Promise.all(rows.map(async h => ({ ...h, mine: h.id === person(req).household_id, members: await householdMembers(h.id) }))));
+});
+api.get('/households/mine', async (req, res) => {
+  const h = await first<{id:string;name:string}>('SELECT id,name FROM households WHERE id=$1', [person(req).household_id]);
+  res.json({ ...h, members: await householdMembers(h.id) });
+});
+api.patch('/households/:id/members/:userId', async (req, res) => {
+  const id = uuid.parse(req.params.id), userId = uuid.parse(req.params.userId);
+  const { admin } = z.object({ admin: z.boolean() }).parse(req.body);
+  if (id !== person(req).household_id) fail(403, 'Administration du foyer requise');
+  await requireHouseholdAdmin(person(req));
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const members = (await client.query<{id:string;household_admin:boolean}>('SELECT id,household_admin FROM users WHERE household_id=$1 FOR UPDATE', [id])).rows;
+    if (!members.some(m => m.id === userId)) fail(404, 'Membre du foyer introuvable');
+    if (!admin && !members.some(m => m.id !== userId && m.household_admin)) fail(409, 'Un foyer doit conserver un administrateur');
+    await client.query('UPDATE users SET household_admin=$1 WHERE id=$2', [admin, userId]);
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+  res.json({ members: await householdMembers(id) });
 });
 api.patch('/households/:id', async (req, res) => {
   const id = uuid.parse(req.params.id), data = z.object({ name: z.string().trim().min(1).max(100) }).parse(req.body);
@@ -204,15 +234,21 @@ api.get('/families', async (req, res) => {
   const rows = await query<{id:string;name:string;admin:boolean}>(`SELECT f.*, EXISTS(SELECT 1 FROM family_admins a WHERE a.family_id=f.id AND a.user_id=$2) AS admin
     FROM families f JOIN memberships m ON m.family_id=f.id WHERE m.household_id=$1 ORDER BY f.name`,
     [person(req).household_id, person(req).id]);
-  res.json(await Promise.all(rows.map(async f => ({
-    ...f,
-    members: (await query<Person>(`SELECT u.* FROM users u JOIN memberships m ON m.household_id=u.household_id
-      WHERE m.family_id=$1 ORDER BY u.first_name`, [f.id])).map(publicPerson),
-    households: await query(`SELECT h.id,h.name FROM households h JOIN memberships m ON m.household_id=h.id
-      WHERE m.family_id=$1`, [f.id]),
-  }))));
+  res.json(await Promise.all(rows.map(async f => {
+    const admins = new Set((await query<{user_id:string}>('SELECT user_id FROM family_admins WHERE family_id=$1', [f.id])).map(a => a.user_id));
+    const households = await query<{id:string;name:string}>(`SELECT h.id,h.name FROM households h JOIN memberships m ON m.household_id=h.id
+      WHERE m.family_id=$1 ORDER BY h.name`, [f.id]);
+    return {
+      ...f,
+      members: (await query<Person>(`SELECT u.* FROM users u JOIN memberships m ON m.household_id=u.household_id
+        WHERE m.family_id=$1 ORDER BY u.first_name`, [f.id])).map(p => ({ ...publicPerson(p), familyAdmin: admins.has(p.id) })),
+      households: await Promise.all(households.map(async h => ({ ...h,
+        members: (await householdMembers(h.id)).map(m => ({ ...m, familyAdmin: admins.has(m.id) })) }))),
+    };
+  })));
 });
 api.post('/families', async (req, res) => {
+  await requireHouseholdAdmin(person(req));
   const { name } = z.object({ name: z.string().trim().min(1).max(100) }).parse(req.body);
   const client = await pool.connect();
   try {
@@ -238,8 +274,7 @@ api.post('/families/:id/invitations', async (req, res) => {
   res.status(201).json({ code: value, expiresInDays: 7 });
 });
 api.post('/families/join', async (req, res) => {
-  if (!await first('SELECT 1 FROM users WHERE id=$1 AND household_admin=true', [person(req).id]))
-    fail(403, 'Administration du foyer requise');
+  await requireHouseholdAdmin(person(req));
   const { code } = z.object({ code: z.string().min(1).max(128) }).parse(req.body);
   const client = await pool.connect();
   try {
@@ -649,11 +684,47 @@ api.get('/dashboard', async (req, res) => {
         ON theirs.household_id=recipient.household_id AND theirs.family_id=mine.family_id
       WHERE viewer.id=$1)`, [actor.id]);
   const reservations = await Promise.all(reservationsRows.map(r => reservationDetails(r, actor.id)));
-  const occasions = (await Promise.all(people.filter(p => p.id !== actor.id).map(async p => (await upcoming(actor, p.id))
+  const allOccasions = (await Promise.all(people.filter(p => p.id !== actor.id).map(async p => (await upcoming(actor, p.id))
     .filter(o => o.nextDate).map(o => ({ ...o, person: publicPerson(p) })))))
-    .flat().sort((a, b) => (a.nextDate ?? '').localeCompare(b.nextDate ?? '')).slice(0, 12);
+    .flat().sort((a, b) => (a.nextDate ?? '').localeCompare(b.nextDate ?? ''));
+  const occasions = allOccasions.slice(0, 12);
+  const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
+  const daysUntil = (date: string) => Math.round((new Date(date + 'T00:00:00Z').getTime() - today) / 86400_000);
+  const covered = new Set(reservations.map(r => r.recipient.id));
+  const todos: Record<string, unknown>[] = [];
+  const noGift = new Set<string>();
+  for (const o of allOccasions) {
+    if (!o.nextDate || daysUntil(o.nextDate) > 30 || covered.has(o.person.id) || noGift.has(o.person.id)) continue;
+    noGift.add(o.person.id);
+    todos.push({ type: 'occasion_without_gift', date: o.nextDate, person: o.person, occasion: o.name });
+  }
+  for (const r of reservations) {
+    if (!r.status || !['reserved', 'purchased'].includes(r.status)) continue;
+    const names = new Set(r.occasions.map(o => (o as { name: string }).name));
+    const next = allOccasions.filter(o => o.person.id === r.recipient.id && names.has(o.name) && o.nextDate)[0];
+    if (!next?.nextDate) continue;
+    const limit = r.status === 'reserved' ? 14 : 7;
+    if (daysUntil(next.nextDate) <= limit)
+      todos.push({ type: r.status === 'reserved' ? 'reservation_to_buy' : 'reservation_to_wrap', date: next.nextDate,
+        person: r.recipient, occasion: next.name, reservation: { id: r.id, wishTitle: r.wish?.title } });
+  }
+  const pending = await query<{id:string;title:string;count:string}>(`SELECT r.id,w.title,count(*) AS count FROM requests q
+    JOIN reservations r ON r.id=q.reservation_id JOIN wishes w ON w.id=r.wish_id
+    WHERE r.creator_id=$1 AND q.status='pending' AND r.cancelled_at IS NULL AND r.status<>'gifted'
+    GROUP BY r.id,w.title ORDER BY w.title`, [actor.id]);
+  for (const p of pending)
+    todos.push({ type: 'pending_requests', count: Number(p.count), reservation: { id: p.id, wishTitle: p.title } });
+  todos.sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')));
+  const onboarding = {
+    hasWishes: !!await first('SELECT 1 FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL LIMIT 1', [actor.id]),
+    hasSharedFamily: !!await first(`SELECT 1 FROM memberships mine JOIN memberships other ON other.family_id=mine.family_id
+      AND other.household_id<>mine.household_id WHERE mine.household_id=$1 LIMIT 1`, [actor.household_id]),
+    hasNameDay: !!actor.name_day,
+    hasReservation: !!await first(`SELECT 1 FROM reservations r WHERE r.creator_id=$1
+      OR EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$1) LIMIT 1`, [actor.id]),
+  };
   res.json({ people: people.map(publicPerson), reservations: reservations.filter(r => r.creator.id === actor.id),
-    participating: reservations.filter(r => r.creator.id !== actor.id), occasions });
+    participating: reservations.filter(r => r.creator.id !== actor.id), occasions, todos, onboarding });
 });
 app.use('/api', (req, res) => res.vary('Accept-Language').status(404).json({ error: localized(req, 'Ressource introuvable') }));
 app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {

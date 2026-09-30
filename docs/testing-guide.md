@@ -108,7 +108,44 @@ Log in as **Alice** and look at *Les envies de vos proches* on the dashboard.
 
 - [ ] Each wish has a real description (e.g. *Console de jeux*: "Une console récente pour jouer en famille le week-end."), not "Un cadeau pour {title}".
 
-### 3.5 Regression checks
+### 3.5 Profile menu
+
+Log in as **Alice**.
+
+- [ ] The profile is reachable **only** from the avatar at the top right. The sidebar has no profile button and no language selector.
+- [ ] Clicking the avatar opens a menu with *Mon profil*, the language selector and *Se déconnecter*. `Esc` or a click outside closes it.
+- [ ] Switching to English from the menu translates the whole UI.
+- [ ] *Mon profil* lets you change first name, last name and name day (day + month). After saving, the avatar shows the new name and the *Fête* occasion moves to the new date for the other members.
+- [ ] *Se déconnecter* returns to the login screen.
+
+### 3.6 Dashboard guidance
+
+Log in as **Alice** and open *Tableau de bord*.
+
+- [ ] A **getting-started checklist** shows progress (add a wish, join a family shared with another household, set your name day, reserve a gift). All steps are done for Alice; each step links to the right page.
+- [ ] The checklist can be dismissed and stays hidden after reload.
+- [ ] The **À faire** list shows *1 demande de participation à traiter pour « Console de jeux »* (David's request), with a *Répondre* button opening *Réservations*.
+- [ ] Occasions within 30 days for which you have no gift yet appear as *… : aucun cadeau prévu* items with a *Voir ses envies* button (depends on today's date). Reservations still *Réservé* 14 days before, or *Acheté* 7 days before the occasion, appear as reminders.
+- [ ] When nothing is due, the list shows *Rien d'urgent pour le moment…*.
+
+Register a new account: the checklist starts at 0 and the À faire list is empty.
+
+### 3.7 Ma famille
+
+Log in as **Alice** and open *Ma famille*. The page has three sections, in this order:
+
+1. **Mon foyer**: the household name (renamable), its members with an *Admin du foyer* badge, the *Nommer admin* / *Retirer l'admin* buttons and the household invitation code.
+2. **Mes familles**: each family with its households and members; badges show *Admin du foyer* and *Admin de la famille*. *Gérer* opens the family (occasions, invitation code, rename, households).
+3. **Les autres foyers**: households of the other families (Charlie, David), with their members.
+
+Checks:
+
+- [ ] The last household admin cannot be demoted (button disabled, API refuses).
+- [ ] As **Alice**, click *Retirer l'admin* on **Bob**. Log in as **Bob**: *Mon foyer* has no admin buttons, *Créer une famille* and *Rejoindre une famille* are replaced by the note *Seul un admin du foyer peut rejoindre ou créer une famille.*
+- [ ] Log back in as **Alice** and click *Nommer admin* on Bob to restore the sample data.
+- [ ] As **Éloïse**, *Les autres foyers* is empty (her family has no other household).
+
+### 3.8 Regression checks
 
 - [ ] **Surprise kept:** log in as **Bob**; his *Console de jeux* and *Roman illustré* do not show who reserved them.
 - [ ] **Access:** log in as **Éloïse**; she cannot see Alice's, Bob's, Charlie's or David's lists.
@@ -127,4 +164,4 @@ docker compose run --rm web npm run lint
 docker compose run --rm web npm run build
 ```
 
-Integration tests add data to the database. Reset with `docker compose down -v` and reseed before manual testing.
+Integration tests add data to the database. Reset with `docker compose down -v` and reseed before manual testing. Run them **without** a port override file: the tests send requests with the `http://localhost:5173` origin.

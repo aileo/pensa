@@ -279,6 +279,59 @@ describe('permissions métier sur l’API', () => {
     const reservation = (await call('alice', '/reservations')).data.find((r: {wish?:{title:string}}) => r.wish?.title === 'Console de jeux');
     expect(reservation).toMatchObject({ wish: { title: 'Console de jeux' }, recipient: { firstName: 'Bob' } });
   });
+  it('guide l’utilisateur avec une liste de démarrage et des actions à faire', async () => {
+    const alice = (await call('alice', '/dashboard')).data;
+    expect(alice.onboarding).toEqual({ hasWishes: true, hasSharedFamily: true, hasNameDay: true, hasReservation: true });
+    const pending = alice.todos.find((t: {type:string}) => t.type === 'pending_requests');
+    expect(pending.count).toBeGreaterThanOrEqual(1);
+    expect(typeof pending.reservation.wishTitle).toBe('string');
+    const aliceId = (await call('alice', '/auth/me')).data.id;
+    expect(alice.todos.some((t: {person?:{id:string}}) => t.person?.id === aliceId)).toBe(false);
+    expect((await call('leap', '/dashboard')).data).toMatchObject({
+      todos: [], onboarding: { hasWishes: false, hasSharedFamily: false, hasNameDay: false, hasReservation: false },
+    });
+  });
+  it('réserve la gestion du foyer et le rattachement aux familles aux admins du foyer', async () => {
+    cookies.owner = cookies.leap;
+    const owner = await call('owner', '/auth/me');
+    expect(owner.data.householdAdmin).toBe(true);
+    const householdId = owner.data.householdId;
+    const invite = await call('owner', `/households/${householdId}/invitations`, 'POST', {});
+    const member = await call('', '/auth/register', 'POST', {
+      firstName: 'Member', lastName: 'Home', email: `member-${Date.now()}@example.test`, password: 'LongSecret2026!',
+      birthDate: '1982-01-01', invitation: invite.data.code,
+    });
+    cookies.member = member.cookie!.split(';')[0];
+    expect(member.data.householdAdmin).toBe(false);
+    const mine = (await call('member', '/households/mine')).data;
+    expect(mine.id).toBe(householdId);
+    expect(mine.members.map((m: {firstName:string;householdAdmin:boolean}) => [m.firstName, m.householdAdmin]))
+      .toEqual([['Leap', true], ['Member', false]]);
+    expect((await call('member', '/families', 'POST', { name: 'Interdit' })).status).toBe(403);
+    const familyA = (await call('alice', '/families')).data.find((f: {name:string}) => f.name === 'Famille A');
+    const familyInvite = await call('alice', `/families/${familyA.id}/invitations`, 'POST', {});
+    expect((await call('member', '/families/join', 'POST', { code: familyInvite.data.code })).status).toBe(403);
+    expect((await call('member', `/households/${householdId}/members/${member.data.id}`, 'PATCH', { admin: true })).status).toBe(403);
+    expect((await call('charlie', `/households/${householdId}/members/${member.data.id}`, 'PATCH', { admin: true })).status).toBe(403);
+    expect((await call('owner', `/households/${householdId}/members/${owner.data.id}`, 'PATCH', { admin: false }, 'en')))
+      .toMatchObject({ status: 409, data: { error: 'A household must retain an administrator' } });
+    expect((await call('owner', `/households/${householdId}/members/${member.data.id}`, 'PATCH', { admin: true })).status).toBe(200);
+    expect((await call('member', '/auth/me')).data.householdAdmin).toBe(true);
+    expect((await call('member', `/households/${householdId}/members/${owner.data.id}`, 'PATCH', { admin: false })).status).toBe(200);
+    expect((await call('owner', '/families', 'POST', { name: 'Refusé' })).status).toBe(403);
+    expect((await call('member', '/families/join', 'POST', { code: familyInvite.data.code })).status).toBe(201);
+    const family = (await call('alice', '/families')).data.find((f: {id:string}) => f.id === familyA.id);
+    const home = family.households.find((h: {id:string}) => h.id === householdId);
+    expect(home.members.map((m: {firstName:string;householdAdmin:boolean;familyAdmin:boolean}) => [m.firstName, m.householdAdmin, m.familyAdmin]))
+      .toEqual([['Leap', false, false], ['Member', true, false]]);
+    const aliceEntry = family.households.flatMap((h: {members:{firstName:string;familyAdmin:boolean}[]}) => h.members)
+      .find((m: {firstName:string}) => m.firstName === 'Alice');
+    expect(aliceEntry.familyAdmin).toBe(true);
+    const visible = (await call('alice', '/households')).data;
+    expect(visible.find((h: {id:string}) => h.id === householdId).members).toHaveLength(2);
+    expect(visible.filter((h: {mine:boolean}) => h.mine)).toHaveLength(1);
+    await call('alice', `/families/${familyA.id}/households/${householdId}`, 'DELETE');
+  });
   it('rend le statut offert irréversible et protège l’historique', async () => {
     const history = await call('alice', '/history');
     expect(history.data.length).toBeGreaterThan(0);
