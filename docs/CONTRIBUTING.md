@@ -39,6 +39,7 @@ docker compose run --rm web npm run build
 docker compose run --rm api npm run lint
 docker compose run --rm api npm run typecheck
 docker compose run --rm api npm test
+docker compose run --rm site npm run build
 ```
 
 CI additionally builds both Docker images, so a change to a `Dockerfile` is
@@ -54,6 +55,10 @@ A few things it cannot check for you:
   a missing English counterpart, but not on an awkward translation.
 - **New colours** — use the existing tokens, or measure the contrast of what
   you add. See [the design system](design-system.md).
+- **Documentation** — a behaviour change belongs in `docs/`, and one a user can
+  see belongs in both [the user guide](user-guide.md) and
+  [its French counterpart](guide-utilisateur.md). The site build catches a dead
+  link, not a page that quietly went out of date.
 
 ## Commits and pull requests
 

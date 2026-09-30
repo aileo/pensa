@@ -48,6 +48,35 @@ docker compose run --rm api npm run seed
 
 The [testing guide](testing-guide.md) details the data and what to check.
 
+## The documentation site
+
+The documentation is also published as a website, built with VitePress and
+deployed to GitHub Pages on every push to `main`. Preview it the same way as
+everything else — no Node.js on your machine:
+
+```sh
+docker compose up site -d
+```
+
+It is on http://localhost:5175, and reloads when a file in `docs/` changes.
+The copies are what VitePress renders, so a watcher brings each change over
+before Vite sees it. It polls rather than waiting for filesystem events, which
+do not survive a bind mount on Docker Desktop.
+
+The site never holds documentation of its own. `site/scripts/collect.mjs` copies
+`docs/`, `AGENT.md` and `CHANGELOG.md` into the VitePress source tree and
+rewrites the links that point outside `docs/`, so the markdown stays readable on
+GitHub and lives in one place only. What `site/` does hold is the home page
+(`site/index.md`), the theme and `.vitepress/config.ts`.
+
+Adding a page means three edits: the file in `docs/`, a row in
+[the index](README.md), and an entry in the sidebar in
+`site/.vitepress/config.ts`. The build fails on a dead internal link:
+
+```sh
+docker compose run --rm site npm run build
+```
+
 ## Commands
 
 | Command | Purpose |
@@ -59,6 +88,7 @@ The [testing guide](testing-guide.md) details the data and what to check.
 | `docker compose run --rm api npm run generate` | generate a migration after a schema change |
 | `docker compose run --rm web npm run lint` | interface lint |
 | `docker compose run --rm web npm run build` | build the interface |
+| `docker compose run --rm site npm run build` | build the documentation site, failing on dead links |
 | `docker compose down` | stop, keep the data |
 | `docker compose down -v` | stop and delete the data |
 
@@ -105,6 +135,7 @@ apps/web/            React + Vite + Tailwind
 compose.yaml         development stack
 compose.prod.yaml    stack using the published images
 docs/                this documentation
+site/                the documentation site (home page, theme, VitePress config)
 ```
 
 ## Why there are no npm workspaces

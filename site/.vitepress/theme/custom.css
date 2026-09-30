@@ -1,0 +1,87 @@
+/* The site wears the same palette as the app. The tokens are copied from
+   apps/web/src/index.css; the contrast ratios that justify each dark step are
+   recorded in docs/design-system.md, so a hue changed here has to be changed
+   there too — and re-measured. */
+:root {
+  --pensa-brand-50: #fdf4f4;
+  --pensa-brand-100: #f9e5e6;
+  --pensa-brand-200: #f0d0d2;
+  --pensa-brand-300: #dba9ad;
+  --pensa-brand-400: #bd7b83;
+  --pensa-brand-500: #a9636c;
+  --pensa-brand-600: #8c4d57;
+  --pensa-brand-700: #6e3b45;
+  --pensa-clay-100: #fae6d8;
+  --pensa-clay-600: #8f522a;
+  --pensa-sage-600: #356450;
+  --pensa-ink-500: #6f6468;
+  --pensa-ink-900: #2e2729;
+  --pensa-surface: #fbf8f6;
+  --pensa-surface-soft: #f5efeb;
+  --pensa-line: #e8ddd8;
+
+  --vp-c-brand-1: var(--pensa-brand-600);
+  --vp-c-brand-2: var(--pensa-brand-500);
+  --vp-c-brand-3: var(--pensa-brand-400);
+  --vp-c-brand-soft: var(--pensa-brand-100);
+
+  --vp-c-bg: var(--pensa-surface);
+  --vp-c-bg-alt: var(--pensa-surface-soft);
+  --vp-c-bg-soft: var(--pensa-surface-soft);
+  --vp-c-divider: var(--pensa-line);
+  --vp-c-text-1: var(--pensa-ink-900);
+  --vp-c-text-2: var(--pensa-ink-500);
+
+  --vp-button-brand-bg: var(--pensa-brand-600);
+  --vp-button-brand-hover-bg: var(--pensa-brand-700);
+  --vp-button-brand-active-bg: var(--pensa-brand-700);
+  --vp-button-alt-bg: var(--pensa-brand-50);
+  --vp-button-alt-text: var(--pensa-brand-700);
+  --vp-button-alt-hover-bg: var(--pensa-brand-100);
+  --vp-button-alt-border: var(--pensa-brand-200);
+  --vp-button-alt-hover-border: var(--pensa-brand-300);
+
+  --vp-custom-block-tip-border: var(--pensa-sage-600);
+  --vp-custom-block-warning-bg: var(--pensa-clay-100);
+  --vp-custom-block-warning-text: var(--pensa-clay-600);
+
+  --vp-home-hero-name-color: var(--pensa-brand-600);
+}
+
+/* Dark mode is not a second palette: the same hues, lightened enough to keep
+   the measured ratios on a dark background. */
+.dark {
+  --vp-c-brand-1: var(--pensa-brand-300);
+  --vp-c-brand-2: var(--pensa-brand-200);
+  --vp-c-brand-3: var(--pensa-brand-400);
+  --vp-c-brand-soft: rgba(140, 77, 87, 0.28);
+
+  --vp-c-bg: #1c1719;
+  --vp-c-bg-alt: #171315;
+  --vp-c-bg-soft: #241e20;
+  --vp-c-divider: #3a3134;
+  --vp-c-text-1: #f3ecea;
+  --vp-c-text-2: #c0b4b7;
+
+  --vp-button-brand-bg: var(--pensa-brand-500);
+  --vp-button-brand-hover-bg: var(--pensa-brand-400);
+  --vp-button-alt-bg: #2c2427;
+  --vp-button-alt-text: var(--pensa-brand-200);
+  --vp-button-alt-border: #3a3134;
+
+  --vp-home-hero-name-color: var(--pensa-brand-300);
+}
+
+/* The app sets its headings in Outfit and its body in DM Sans; the site keeps
+   the system stack for weight but borrows the heading face where it is loaded. */
+.VPHome .name,
+.VPHome .text {
+  letter-spacing: -0.02em;
+}
+
+/* The focus ring is the one accessibility rule the app never relaxes
+   (docs/design-system.md); the site holds the same line. */
+:focus-visible {
+  outline: 3px solid var(--pensa-brand-500);
+  outline-offset: 2px;
+}

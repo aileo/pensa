@@ -6,6 +6,25 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A user guide, in French and English.** The documentation explained how to
+  deploy and how to develop, never how to *use* the app. `docs/user-guide.md`
+  and `docs/guide-utilisateur.md` walk through writing a list, occasions,
+  reserving, the reserved/bought/wrapped/given tracker, off-list gifts,
+  contributions, members without an account, history and the rule underneath
+  all of it. It is the one bilingual document in the repository — the people it
+  is written for are not the ones who read the API reference.
+- **A documentation site**, built with VitePress and published to
+  [aileo.github.io/pensa](https://aileo.github.io/pensa/) on every push to
+  `main`. The home page carries the pitch already written on the landing page,
+  and the rest is the existing markdown: `site/scripts/collect.mjs` copies
+  `docs/`, `AGENT.md` and `CHANGELOG.md` in and repairs the links that point
+  outside `docs/`, so nothing is duplicated and everything stays readable on
+  GitHub. The build fails on a dead internal link, which gives the
+  documentation a check it never had. Preview it with `docker compose up site`
+  on http://localhost:5175.
+
 ## [0.3.0] — 2026-09-30
 
 ### Added

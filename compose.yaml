@@ -46,7 +46,26 @@ services:
       - "5173:5173"
     depends_on:
       - api
+  # The documentation site. Not part of the app — it is here so that previewing
+  # it needs no Node.js on the machine, like everything else.
+  site:
+    build:
+      context: ./site
+      dockerfile: ../Dockerfile.dev
+    working_dir: /app
+    command: npm run dev
+    volumes:
+      - ./site:/app
+      # The site is built from the documentation, which the collect script
+      # reads one level above the site directory — here, the container root.
+      - ./docs:/docs:ro
+      - ./AGENT.md:/AGENT.md:ro
+      - ./CHANGELOG.md:/CHANGELOG.md:ro
+      - site_modules:/app/node_modules
+    ports:
+      - "5175:5173"
 volumes:
   pgdata:
   api_modules:
   web_modules:
+  site_modules:

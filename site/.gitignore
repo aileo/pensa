@@ -1,0 +1,8 @@
+# Collected from docs/, AGENT.md and CHANGELOG.md at build time — never edited here.
+docs/
+agent.md
+changelog.md
+
+# VitePress output and cache.
+.vitepress/dist/
+.vitepress/cache/

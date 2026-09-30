@@ -438,7 +438,36 @@ docker compose -f compose.prod.yaml -f compose.stable.yaml config | grep image
 - [ ] The image name follows the repository name. If the repository is not renamed to `pensa`,
       the images are published under the old name instead.
 
-## 5. Automated checks
+## 5. The documentation site
+
+```sh
+docker compose up site -d
+```
+
+- [ ] http://localhost:5175 shows the home page, in the app's colours — rosewood
+      buttons, warm background, not VitePress's default blue.
+- [ ] The two hero buttons reach the English and the French user guide, and each
+      guide's first line links to the other.
+- [ ] The sidebar lists every document in `docs/`, and each entry opens.
+- [ ] *Working on the repository* and *Changelog* open `AGENT.md` and
+      `CHANGELOG.md` — they live outside `docs/` and are copied in.
+- [ ] A link that crosses documents works: from the changelog, *house rules*
+      reaches the same page as the sidebar entry.
+- [ ] Search (the field at the top) finds a phrase from the user guide.
+- [ ] Editing a file in `docs/` while the server runs updates the page without
+      restarting it.
+- [ ] `docker compose run --rm site npm run build` succeeds. It fails on any
+      dead internal link, which is the only automated check the documentation
+      has — a link renamed in `docs/` but not in `site/.vitepress/config.ts`
+      is caught here and nowhere else.
+- [ ] Nothing under `site/docs/`, `site/agent.md` or `site/changelog.md` is
+      committed: they are copies, regenerated on every build.
+
+After a push to `main`, the *Pages* workflow publishes
+https://aileo.github.io/pensa/. It fails until GitHub Pages is set to deploy
+from *GitHub Actions* in the repository settings — a one-off manual step.
+
+## 6. Automated checks
 
 ```sh
 docker compose run --rm api npm test     # requires the seeded database
@@ -446,10 +475,13 @@ docker compose run --rm api npm run lint
 docker compose run --rm api npm run build
 docker compose run --rm web npm run lint
 docker compose run --rm web npm run build
+docker compose run --rm site npm run build
 ```
 
 Integration tests add data to the database. Reset with `docker compose down -v` and reseed before manual testing. Run them **without** a port override file: the tests send requests with the `http://localhost:5173` origin.
 
 The same checks run in CI on every push and pull request (`.github/workflows/ci.yml`), against a
 Postgres service that is migrated and seeded first. CI also builds both images without pushing,
-so a broken Dockerfile is caught before a release.
+so a broken Dockerfile is caught before a release. The documentation site is built by its own
+workflow (`.github/workflows/pages.yml`), on pull requests too, so a dead link never reaches
+`main`.

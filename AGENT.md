@@ -100,6 +100,16 @@ to the development database: reset and reseed before manual testing.
 - **Documentation lives in `docs/`.** The README answers only *why this app*,
   *how to deploy it* and *how to contribute*; reference material goes in a
   `docs/` file and is linked from [the index](docs/README.md).
+- **The site is built from `docs/`, never written in `site/`.** `site/` holds
+  the home page, the theme and the VitePress configuration; a prebuild script
+  copies the documentation in and repairs the links that point outside `docs/`.
+  Adding a page means adding it to `docs/`, to the index and to the sidebar in
+  `site/.vitepress/config.ts`. The build fails on a dead internal link, which
+  is the only check the documentation has.
+- **The user guide is the one bilingual document.** `docs/user-guide.md` and
+  `docs/guide-utilisateur.md` are written for people who use the app, not for
+  contributors, and a change to one belongs in the same commit as the change to
+  the other. Everything else stays English-only.
 
 ## Where things are
 
@@ -112,5 +122,6 @@ to the development database: reset and reseed before manual testing.
 | `apps/web/src/locale.ts` | FR → EN translations |
 | `apps/web/src/index.css` | theme tokens |
 | `docs/` | the documentation |
+| `site/` | the documentation site: home page, theme, VitePress config |
 
 The full tour is in [the development guide](docs/development.md).
