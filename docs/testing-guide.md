@@ -209,13 +209,17 @@ stays, but every screen names the task it moves forward rather than the emotion.
 
 ### 3.12 Link previews when adding a wish
 
-Paste a product URL in *Mes envies → Ajouter une envie* and check the preview fills the form.
+Paste a product URL in *Mes envies → Ajouter une envie*. There is no button: the preview starts on its own shortly after a valid link is typed or pasted, and *Lecture du lien…* appears under the field while it runs.
 
-- [ ] **Standard site:** a product page (for example a Prusa or Kubii page) fills the name, description, image and, when the site publishes it, the price.
+- [ ] **Automatic preview:** paste a product page (for example a Prusa, Kubii, Domadoo, Fnac or Cdiscount page) without clicking anything — the name, description, image and, when the site publishes it, the price fill themselves in.
+- [ ] **Typing an address:** type a URL character by character; the lookup only runs once you stop typing, not at every keystroke.
+- [ ] **Changing your mind:** paste a first link, then immediately replace it with another — the form shows the second product, never the first.
+- [ ] **Second paste is instant:** clear the field and paste the same link again — the preview appears immediately (it is cached for a day).
 - [ ] **Redirected link:** a URL that redirects (a shortened link, or a domain without `www.`) still resolves to the final page.
 - [ ] **Heavy page:** a very large product page still returns its metadata instead of failing.
-- [ ] **Protected site:** some shops block automated requests (Amazon, Fnac, Domadoo). The form shows an amber message explaining the site refused the preview and inviting you to fill the fields yourself — it does **not** block the form.
-- [ ] **Manual fallback:** with the preview failed, type a name only and save: the wish is created without an image (the image field is marked *facultatif*).
+- [ ] **Protected site:** Amazon rejects anything that is not a real browser (it answers *page not found* even for a valid product). The form shows an amber message **and still fills the name from the link itself** (for example `…/Lego-Architecture-Tour-Eiffel/dp/…` becomes *Lego architecture tour eiffel*). The form is never blocked.
+- [ ] **Manual fallback:** with the preview refused, adjust the name and save: the wish is created without an image (the image field is marked *facultatif*).
+- [ ] **Unknown domain:** a link to a domain that does not exist is refused with *Site introuvable* and fills nothing.
 - [ ] **Rejected addresses:** a URL pointing to a local address (`http://localhost:3000`) is refused with *Adresse non autorisée*.
 - [ ] **No lockout:** after several failed previews you can still sign out and sign back in — previews have their own rate limit.
 

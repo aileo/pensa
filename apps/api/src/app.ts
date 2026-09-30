@@ -35,6 +35,7 @@ const english: Record<string, string> = {
   'Page inaccessible': 'Page not accessible',
   'Page introuvable': 'Page not found',
   'Site injoignable': 'Site unreachable',
+  'Site introuvable': 'Site not found',
   'Le site refuse la prévisualisation': 'The site refused the preview',
   'Trop de redirections': 'Too many redirects',
   'Délai dépassé': 'Request timed out',
@@ -70,7 +71,7 @@ const localized = (req: Request, message: string) =>
     ? english[message] ?? english['Erreur serveur'] : message;
 const previewErrors = new Set([
   'URL invalide', 'URL non autorisée', 'Adresse non autorisée', 'Page inaccessible',
-  'Page introuvable', 'Site injoignable', 'Le site refuse la prévisualisation',
+  'Page introuvable', 'Site injoignable', 'Site introuvable', 'Le site refuse la prévisualisation',
   'Trop de redirections', 'Délai dépassé',
 ]);
 const uuid = z.uuid();

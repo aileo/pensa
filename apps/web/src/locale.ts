@@ -121,10 +121,13 @@ const english = {
   'Déjà un compte ?': 'Already have an account?', 'S’inscrire': 'Sign up',
   'Le mot de passe doit contenir au moins 12 caractères.': 'Your password must be at least 12 characters long.',
   'Connexion impossible.': 'Could not sign in.',
-  'Lien du produit': 'Product link', 'Chargement…': 'Loading…', 'Prévisualiser': 'Preview',
-  'Collez un lien pour préremplir les informations.': 'Paste a link to fill in the details.',
+  'Lien du produit': 'Product link', 'Lecture du lien…': 'Reading the link…',
+  'Collez un lien : les informations se remplissent toutes seules.':
+    'Paste a link: the details fill themselves in.',
   'Vous pouvez remplir les champs à la main : seul le nom est nécessaire.':
     'You can fill the fields in yourself: only the name is required.',
+  'Nous avons repris le nom depuis le lien : vérifiez-le et complétez si besoin.':
+    'We took the name from the link: check it and complete the rest if needed.',
   'Produit trouvé': 'Product found', 'Nom de l’envie': 'Wish name',
   'Description': 'Description',
   'Prix (€)': 'Price (€)', 'Tags': 'Tags', 'livre, déco': 'book, decor',
