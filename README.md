@@ -93,6 +93,7 @@ where the app is confusing.
 | [Design system](docs/design-system.md) | colour tokens, measured contrast, icons |
 | [Testing guide](docs/testing-guide.md) | what to check by hand, and how |
 | [Contributing](docs/CONTRIBUTING.md) | how to propose a change |
+| [Working on the repository](AGENT.md) | the house rules: English, Docker-only, lint before commit |
 
 Built with React, Vite, TypeScript, Tailwind CSS, Express, PostgreSQL and
 Drizzle migrations.

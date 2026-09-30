@@ -3,6 +3,10 @@
 Contributions are welcome — issues, fixes, features, translations, or simply
 telling us where the app is confusing.
 
+The conventions this codebase expects — English everywhere, Docker as the only
+runtime, lint before committing — are in [AGENT.md](../AGENT.md). Read it once
+before your first change.
+
 ## About this project being AI-generated
 
 The code was produced by an AI agent under human direction. That changes

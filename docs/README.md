@@ -9,5 +9,6 @@
 | [Design system](design-system.md) | colour tokens, measured contrast, icons |
 | [Testing guide](testing-guide.md) | what to check by hand, and how |
 | [Contributing](CONTRIBUTING.md) | how to propose a change |
+| [Working on the repository](../AGENT.md) | the house rules: English, Docker-only, lint before commit |
 
 Back to the [project README](../README.md).
