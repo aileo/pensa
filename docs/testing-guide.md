@@ -237,6 +237,41 @@ understand what Giftit is for before creating an account.
 - [ ] **In English:** switch the language from the hero; every section is rewritten English, not a word-for-word translation.
 - [ ] **Headings:** a single *Organisez les cadeaux, l'esprit tranquille* as the page title, one heading per section.
 
+### 3.14 Theme, icons and contrast
+
+The interface uses a warm palette — rosewood, terracotta, sage — declared once in the
+`@theme` block of `apps/web/src/index.css`. No purple remains anywhere.
+
+- [ ] **No purple is left:** browse every screen. Buttons, links, chips, avatars, the active
+      navigation item and the landing hero are all rosewood. If you spot a lilac or violet,
+      it is a leftover.
+- [ ] **The warmth is consistent:** the app background is a very light sand, not a cold
+      off-white. Cards stay white so they lift off the background.
+- [ ] **Terracotta means "act soon":** in the *À faire* list, urgent items get a terracotta
+      row, icon and *Bientôt* badge. Off-list gift sections also use terracotta.
+- [ ] **Sage means "done":** in the reservation tracker, cleared steps and their connector
+      turn sage green. The history screen header is sage too.
+- [ ] **A screen icon per header:** each section title carries a tinted pill on its left,
+      matching its menu entry — heart for *Mes envies*, people for *Ma famille*, gift for
+      *Réservations*, clock for *Historique*, magnifier for *Rechercher*, person for
+      *Mon profil*. It is hidden on very narrow screens.
+- [ ] **Reservation actions are told apart:** in *À faire* and on a reservation, buying shows
+      a cart, wrapping a box, and giving a party popper. They no longer share one gift icon.
+- [ ] **No typographic arrows:** *Voir la famille*, *Retour aux familles* and the wish
+      reorder buttons use drawn arrow icons, aligned with the text, not `→` or `↑` characters.
+
+Accessibility checks, which matter more here because a soft palette loses legibility easily:
+
+- [ ] **Focus is always visible:** tab through a form. Every field, button and link gets a
+      rosewood ring with a white halo, readable on white and on tinted pills alike.
+      A field must never highlight only by changing its border colour.
+- [ ] **Colour is never the only clue** (WCAG 1.4.1): view the reservation tracker in
+      greyscale, or squint. Each step still reads through its number, its check mark and its
+      label. The urgent rows still say *Bientôt*.
+- [ ] **Contrast holds:** body text, buttons and links reach 4.5:1; input borders, the focus
+      ring and progress markers reach 3:1. Measured values are listed in the README. If you
+      change a hue, re-measure before keeping it.
+
 ## 4. Automated checks
 
 ```sh

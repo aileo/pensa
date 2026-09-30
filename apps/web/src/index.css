@@ -1,9 +1,59 @@
 @import "tailwindcss";
 
+/* Palette Giftit — bois de rose, terre cuite, sauge.
+   Les paliers foncés sont retenus sur critère de contraste WCAG AA, pas à l'œil.
+   Les ratios mesurés sont consignés dans le README ; toute retouche de teinte
+   doit être revérifiée avant d'être adoptée. */
+@theme {
+  --color-brand-50: #fdf4f4;
+  --color-brand-100: #f9e5e6;
+  --color-brand-200: #f0d0d2;
+  --color-brand-300: #dba9ad;
+  --color-brand-400: #bd7b83;
+  --color-brand-500: #a9636c;
+  --color-brand-600: #8c4d57;
+  --color-brand-700: #6e3b45;
+
+  --color-clay-50: #fdf5ef;
+  --color-clay-100: #fae6d8;
+  --color-clay-200: #f2cdb2;
+  --color-clay-300: #dfa578;
+  --color-clay-400: #c9804e;
+  --color-clay-500: #ae6636;
+  --color-clay-600: #8f522a;
+  --color-clay-700: #714022;
+
+  --color-sage-50: #eef5f1;
+  --color-sage-100: #dbebe2;
+  --color-sage-200: #b6d5c5;
+  --color-sage-300: #87b8a0;
+  --color-sage-400: #5c977e;
+  --color-sage-500: #437c64;
+  --color-sage-600: #356450;
+  --color-sage-700: #2a4e3f;
+
+  --color-ink-300: #b0a6a9;
+  --color-ink-400: #8d8286;
+  --color-ink-500: #6f6468;
+  --color-ink-600: #584e52;
+  --color-ink-700: #463d41;
+  --color-ink-900: #2e2729;
+
+  --color-surface: #fbf8f6;
+  --color-surface-soft: #f5efeb;
+
+  /* `line` et `line-soft` sont des séparateurs décoratifs : ils n'identifient
+     aucun contrôle et sont donc hors du champ de WCAG 1.4.11. `line-strong`
+     sert aux bordures porteuses de sens (champs de saisie) et tient le 3:1. */
+  --color-line: #e8ddd8;
+  --color-line-soft: #f1e9e5;
+  --color-line-strong: #96888c;
+}
+
 :root {
   font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  color: #322d43;
-  background: #faf9f7;
+  color: var(--color-ink-900);
+  background: var(--color-surface);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -13,20 +63,26 @@ body { margin: 0; min-width: 320px; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .55; }
+
+/* Double anneau : le trait coloré porte l'indication, le liseré blanc garantit
+   qu'elle reste lisible lorsque le focus tombe sur une pastille teintée. */
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-  outline: 3px solid #a38bd6;
+  outline: 3px solid var(--color-brand-500);
   outline-offset: 2px;
+  box-shadow: 0 0 0 2px #fff;
 }
-::selection { background: #e9dff8; }
+::selection { background: var(--color-brand-100); color: var(--color-brand-700); }
 
 @layer components {
-  .card { @apply rounded-[22px] border border-[#ede9ee] bg-white shadow-[0_7px_32px_rgba(60,42,73,0.035)]; }
-  .primary { @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[#7356aa] px-4 py-2.5 font-semibold text-white transition hover:bg-[#634797]; }
-  .secondary { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[#e5dfea] bg-white px-4 py-2.5 font-semibold text-[#635375] transition hover:bg-[#f5f0fa]; }
-  .field { @apply w-full rounded-xl border border-[#e6e1e8] bg-white px-3.5 py-2.5 text-[#322d43] placeholder:text-[#aaa3b1] focus:border-[#9779c2] focus:outline-none; }
-  .label { @apply mb-1.5 block text-sm font-semibold text-[#554b62]; }
-  .eyebrow { @apply text-xs font-bold uppercase tracking-[.16em] text-[#9a84b5]; }
-  .muted { @apply text-sm text-[#8d8794]; }
-  .icon-button { @apply inline-flex size-9 items-center justify-center rounded-xl text-[#766d80] transition hover:bg-[#f3edf8] hover:text-[#7356aa]; }
-  .chip { @apply inline-flex items-center gap-1 rounded-full bg-[#f3edf8] px-2.5 py-1 text-xs font-semibold text-[#755a9a]; }
+  .card { @apply rounded-[22px] border border-line bg-white shadow-[0_7px_32px_rgba(73,60,55,0.05)]; }
+  .primary { @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 font-semibold text-white transition hover:bg-brand-700; }
+  .secondary { @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 font-semibold text-ink-600 transition hover:bg-brand-50; }
+  /* Pas de `focus:outline-none` ici : le champ doit conserver l'anneau global,
+     un simple changement de teinte de bordure ne signale pas assez le focus. */
+  .field { @apply w-full rounded-xl border border-line-strong bg-white px-3.5 py-2.5 text-ink-900 placeholder:text-ink-400 focus:border-brand-500; }
+  .label { @apply mb-1.5 block text-sm font-semibold text-ink-700; }
+  .eyebrow { @apply text-xs font-bold uppercase tracking-[.16em] text-brand-600; }
+  .muted { @apply text-sm text-ink-500; }
+  .icon-button { @apply inline-flex size-9 items-center justify-center rounded-xl text-ink-600 transition hover:bg-brand-50 hover:text-brand-600; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700; }
 }

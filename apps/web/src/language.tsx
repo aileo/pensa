@@ -19,7 +19,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
 export function LanguageControl() {
   const { locale, setLocale } = useTranslation()
-  return <label className="inline-flex items-center gap-2 text-sm font-semibold text-[#635375]">
+  return <label className="inline-flex items-center gap-2 text-sm font-semibold text-ink-600">
     <span>{locale === 'fr' ? 'Langue' : 'Language'}</span>
     <select className="field !w-auto !py-1.5" aria-label={locale === 'fr' ? 'Choisir la langue' : 'Choose language'} value={locale} onChange={event => setLocale(event.target.value as Locale)}>
       <option value="fr">Français</option><option value="en">English</option>
