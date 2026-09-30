@@ -228,6 +228,7 @@ const english = {
   'Voir dans mes réservations': 'See in my reservations', 'Demande envoyée, en attente de réponse.': 'Request sent, awaiting an answer.',
   'Votre demande a été refusée.': 'Your request was declined.', 'Participer': 'Contribute',
   'Hors liste': 'Off-list', 'Visible par la famille': 'Visible to family',
+  '{age} ans': '{age} years old',
 } as const
 
 export type TranslationKey = keyof typeof english
@@ -256,6 +257,15 @@ export function occasionName(name: string | undefined | null, locale: Locale, ki
   if (!name) return ''
   const predefined = Object.prototype.hasOwnProperty.call(predefinedOccasions, name) ? predefinedOccasions[name] : undefined
   return predefined && (!kind || kind === predefined.kind) ? translate(predefined.label, locale) : name
+}
+
+// Birthdays read better as the age reached that year ("41 ans") than as a generic "Anniversaire".
+export function occasionLabel(name: string | undefined | null, locale: Locale, options: { kind?: OccasionKind; year?: number | null; birthDate?: string | null } = {}) {
+  const { kind, year, birthDate } = options
+  const birthday = kind ? kind === 'birthday' : name === 'Anniversaire'
+  const birthYear = birthDate ? Number(birthDate.slice(0, 4)) : NaN
+  const age = year && Number.isInteger(birthYear) ? year - birthYear : NaN
+  return birthday && age > 0 ? translate('{age} ans', locale, { age }) : occasionName(name, locale, kind)
 }
 
 export function formatMoney(amount: number | string | undefined, locale: Locale) {

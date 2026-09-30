@@ -328,6 +328,13 @@ const occasionData = z.object({ name: z.string().trim().min(1).max(100), kind: z
   v.kind === 'fixed' ? !!v.month && !!v.day && !Number.isNaN(new Date(2024, v.month - 1, v.day).getTime()) &&
     new Date(2024, v.month - 1, v.day).getMonth() === v.month - 1 : !v.month && !v.day,
   'Date invalide');
+const occasionMonthDay = (r: { kind: string; month: number | null; day: number | null }, recipient?: Person | null) => {
+  const month = r.kind === 'birthday' ? Number(recipient && birthday(recipient)?.slice(5, 7)) :
+    r.kind === 'name_day' ? Number(recipient?.name_day?.slice(0, 2)) : r.month;
+  const day = r.kind === 'birthday' ? Number(recipient && birthday(recipient)?.slice(8, 10)) :
+    r.kind === 'name_day' ? Number(recipient?.name_day?.slice(3, 5)) : r.day;
+  return { month: month || null, day: day || null };
+};
 const upcoming = async (viewer: Person, recipientId: string) => {
   if (!await visible(viewer.id, recipientId)) fail(403, 'Personne inaccessible');
   const allRows = await query<{ id: string; name: string; kind: string; month: number | null; day: number | null }>(`SELECT DISTINCT o.* FROM occasions o JOIN memberships m ON m.family_id=o.family_id
@@ -343,10 +350,7 @@ const upcoming = async (viewer: Person, recipientId: string) => {
   const recipient = await first<Person>('SELECT * FROM users WHERE id=$1', [recipientId]);
   const now = new Date();
   const results = rows.map(r => {
-    const month = r.kind === 'birthday' ? Number(birthday(recipient).slice(5, 7)) :
-      r.kind === 'name_day' ? Number(recipient.name_day?.slice(0, 2)) : r.month;
-    const day = r.kind === 'birthday' ? Number(birthday(recipient).slice(8, 10)) :
-      r.kind === 'name_day' ? Number(recipient.name_day?.slice(3, 5)) : r.day;
+    const { month, day } = occasionMonthDay(r, recipient);
     if (!month || !day) return { ...r, nextDate: null };
     let year = now.getUTCFullYear();
     let candidate = new Date(Date.UTC(year, month - 1, day));
@@ -486,16 +490,19 @@ const getReservation = async (id: string, viewer: string) => {
 const reservationDetails = async (r: Reservation, viewer: string) => {
   const participantsRows = await query<Person>('SELECT u.* FROM users u JOIN participants p ON p.user_id=u.id WHERE p.reservation_id=$1', [r.id]);
   const creator = await first<Person>('SELECT * FROM users WHERE id=$1', [r.creator_id]);
-  const occasionsRows = await query(`SELECT o.id,o.name,ro.year FROM reservation_occasions ro
-    JOIN occasions o ON o.id=ro.occasion_id WHERE ro.reservation_id=$1 ORDER BY ro.year,o.name`, [r.id]);
+  const occasionsRows = await query<{ id: string; name: string; kind: string; month: number | null; day: number | null; year: number }>(`SELECT o.id,o.name,o.kind,o.month,o.day,ro.year FROM reservation_occasions ro
+    JOIN occasions o ON o.id=ro.occasion_id WHERE ro.reservation_id=$1`, [r.id]);
   const wish = await first<Wish>('SELECT * FROM wishes WHERE id=$1', [r.wish_id]);
   const recipient = await first<Person>('SELECT * FROM users WHERE id=$1', [r.owner_id]);
+  const occasions = occasionsRows.map(o => ({ o, ...occasionMonthDay(o, recipient) }))
+    .sort((a, b) => a.o.year - b.o.year || (a.month ?? 13) - (b.month ?? 13) || (a.day ?? 32) - (b.day ?? 32) || a.o.name.localeCompare(b.o.name))
+    .map(({ o }) => ({ id: o.id, name: o.name, kind: o.kind, year: o.year }));
   return { id: r.id, wishId: r.wish_id, offList: !!wish?.off_list,
     wish: wish && { id: wish.id, title: wish.title, image: wish.image, price: wish.price,
       ...(wish.off_list ? { description: wish.description, url: wish.url } : {}) },
     recipient: publicPerson(recipient), creator: publicPerson(creator), participants: participantsRows.map(publicPerson),
     openToContributions: r.open_to_contributions, status: r.creator_id === viewer || participantsRows.some(p => p.id === viewer) ? r.status : undefined,
-    occasions: occasionsRows, wishDeleted: !!r.deleted_at, cancelled: !!r.cancelled_at };
+    occasions, wishDeleted: !!r.deleted_at, cancelled: !!r.cancelled_at };
 };
 const occasionInput = z.array(z.object({ id: uuid, year: z.number().int().min(2000).max(2200) })).min(1).max(30);
 const setOccasions = async (client: import('pg').PoolClient, reservationId: string, ownerId: string,
@@ -642,7 +649,7 @@ api.patch('/reservations/:id', async (req, res) => {
       const people = (await client.query('SELECT u.id,u.first_name,u.last_name FROM users u JOIN participants p ON p.user_id=u.id WHERE p.reservation_id=$1', [id])).rows;
       const recipient = (await client.query('SELECT id,first_name,last_name,birth_date FROM users WHERE id=$1', [r.owner_id])).rows[0];
       const creator = people.find(p => p.id === r.creator_id);
-      const occ = (await client.query('SELECT o.name,ro.year FROM reservation_occasions ro JOIN occasions o ON o.id=ro.occasion_id WHERE ro.reservation_id=$1', [id])).rows;
+      const occ = (await client.query('SELECT o.name,o.kind,ro.year FROM reservation_occasions ro JOIN occasions o ON o.id=ro.occasion_id WHERE ro.reservation_id=$1 ORDER BY ro.year', [id])).rows;
       await client.query('INSERT INTO history(reservation_id,recipient_id,snapshot) VALUES($1,$2,$3)',
         [id, r.owner_id, JSON.stringify({ ...wish, recipientId: r.owner_id, creatorId: r.creator_id,
           recipient, creator, participants: people, occasions: occ, reservedAt: r.created_at, giftedAt: wish.gifted_at })]);

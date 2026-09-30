@@ -84,6 +84,8 @@ Repeat as **Bob**: no occasion for Bob, no duplicates.
 Log in as **Alice** and open *Réservations*, then click *Gérer* on *Console de jeux*.
 
 - [ ] Each occasion (Anniversaire, Fête, Noël) is listed once per year, never twice.
+- [ ] Occasions are listed **in chronological order**, each with its full date (e.g. *Noël 25 décembre 2026*, *36 ans 18 avril 2027*, *Fête 14 juillet 2027*, *Noël 25 décembre 2027*…), including those already saved on the reservation.
+- [ ] Birthdays are labelled with the **age reached** (*36 ans*, EN *36 years old*) instead of *Anniversaire*: in the forms, on the reservation cards, on the dashboard (upcoming occasions and À faire) and in history.
 - [ ] Occasions already saved on the reservation are checked and not duplicated.
 - [ ] Saving the reservation works.
 

@@ -373,6 +373,14 @@ describe('permissions métier sur l’API', () => {
     expect((await call('alice', `/reservations/${id}`, 'PATCH', {
       occasionIds: [occasions[0], { ...occasions[1], year: occasions[1].year + 1 }],
     })).data.occasions).toHaveLength(2);
+    const dated = (await call('alice', `/occasions?recipientId=${bobId}`)).data
+      .filter((o: {nextDate:string|null}) => o.nextDate) as {id:string;nextDate:string}[];
+    const choices = dated.flatMap(o => [0, 1].map(offset => ({ id: o.id, year: Number(o.nextDate.slice(0, 4)) + offset, date: `${Number(o.nextDate.slice(0, 4)) + offset}${o.nextDate.slice(4)}` })));
+    const ordered = (await call('alice', `/reservations/${id}`, 'PATCH', {
+      occasionIds: [...choices].reverse().map(({ id: occasionId, year }) => ({ id: occasionId, year })),
+    })).data.occasions as {id:string;year:number;kind:string}[];
+    expect(ordered.map(o => `${o.id}-${o.year}`)).toEqual([...choices].sort((a, b) => a.date.localeCompare(b.date)).map(o => `${o.id}-${o.year}`));
+    expect(ordered.every(o => o.kind)).toBe(true);
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { occasionIds: occasions.slice(0, 1) })).data.occasions).toHaveLength(1);
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'gifted' })).status).toBe(409);
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'purchased' })).status).toBe(200);
