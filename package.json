@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "description": "Organisation familiale des cadeaux, sans charge mentale (applications Docker autonomes)",
-  "workspaces": ["apps/api", "apps/web"],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/aileo/pensa.git"
