@@ -42,6 +42,12 @@ minor bump may change behaviour.
   browser reaching an instance that has no TLS in front of it silently refused
   to send it back: the sign-in appeared to succeed and every page then asked for
   a login again. It now follows the scheme the request actually arrived on.
+- **The `arm64` images are published again.** Both images ran their Node build
+  step under emulation, and the web build — Vite and Tailwind, which rely on
+  native binaries — became slow enough that the release job never finished and
+  held every later release behind it. The build stages now run on the builder's
+  own architecture, which they can because they only emit JavaScript and static
+  files, and the release job gives up after thirty minutes instead of hanging.
 
 ## [0.2.0] — 2026-09-30
 

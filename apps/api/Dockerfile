@@ -1,5 +1,6 @@
-# Build stage: full dependency tree, TypeScript emitted to dist/.
-FROM node:22-alpine AS build
+# Build stage: full dependency tree, TypeScript emitted to dist/. The emitted JavaScript does not
+# depend on the architecture, so this runs on the builder's platform rather than under emulation.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

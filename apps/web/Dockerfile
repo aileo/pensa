@@ -1,4 +1,7 @@
-FROM node:22-alpine AS build
+# The bundle is plain static files, identical whatever the target architecture, so the build
+# always runs on the builder's own platform. Emulating it instead makes Vite and Tailwind's
+# native binaries crawl under QEMU, to the point where the arm64 build never finishes.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
