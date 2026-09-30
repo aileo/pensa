@@ -22,7 +22,7 @@ docker compose run --rm api npm run migrate
 docker compose run --rm api npm run seed
 ```
 
-Development accounts: `alice@example.test`, `bob@example.test`, `charlie@example.test`, `david@example.test`, `eloise@example.test`; shared password: **`GiftitDemo2026!`** (development only). Families A and B share Alice and Bob's household; Eloise belongs to a separate family. Alice can access Charlie's and David's lists; Eloise cannot. The seed includes reservations, a pending contribution request and a gifted item.
+Development accounts: `alice@example.test`, `bob@example.test`, `charlie@example.test`, `david@example.test`, `eloise@example.test`; shared password: **`GiftitDemo2026!`** (development only). Families A and B share Alice and Bob's household; Eloise belongs to a separate family. Alice can access Charlie's and David's lists; Eloise cannot. The seed includes reservations, a pending contribution request and a gifted item. The seed is skipped if the sample accounts already exist: to load updated sample data, run `docker compose down -v`, start Compose again, and rerun the seed.
 
 ## Language
 

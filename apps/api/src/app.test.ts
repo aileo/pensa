@@ -240,10 +240,8 @@ describe('permissions métier sur l’API', () => {
     });
     expect(created.status).toBe(201);
     const wishId = created.data.id;
-    const occasions = await call('alice', `/occasions?recipientId=${(await call('bob', '/auth/me')).data.id}`);
-    const familyA = (await call('alice', '/families')).data.find((f: {name:string}) => f.name === 'Famille A');
-    const choices = occasions.data.filter((o: {nextDate:string|null;family_id:string}) =>
-      o.nextDate && o.family_id === familyA.id).slice(0, 2)
+    const occasions = await call('charlie', `/occasions?recipientId=${(await call('bob', '/auth/me')).data.id}`);
+    const choices = occasions.data.filter((o: {nextDate:string|null}) => o.nextDate).slice(0, 2)
       .map((o: {id:string;nextDate:string}) => ({ id: o.id, year: Number(o.nextDate.slice(0, 4)) }));
     expect(choices.length).toBe(2);
     const [one, two] = await Promise.all([
@@ -264,6 +262,22 @@ describe('permissions métier sur l’API', () => {
     expect((await call(loser, '/reservations', 'POST', { wishId, occasionIds: choices })).status).toBe(404);
     expect((await call(winner, `/reservations/${reservation.id}`, 'DELETE')).status).toBe(200);
     expect((await call(loser, `/reservations/${reservation.id}/requests`, 'POST')).status).toBe(409);
+  });
+  it('dédoublonne les occasions identiques et exclut celles de l’utilisateur connecté du dashboard', async () => {
+    const aliceId = (await call('alice', '/auth/me')).data.id;
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const keys = (rows: {name:string;kind:string;month:number|null;day:number|null}[]) => rows.map(o => JSON.stringify([o.name, o.kind, o.month, o.day]));
+    const bobOccasions = keys((await call('alice', `/occasions?recipientId=${bobId}`)).data as never);
+    expect(new Set(bobOccasions).size).toBe(bobOccasions.length);
+    expect(bobOccasions.length).toBeGreaterThan(0);
+    const dashboard = (await call('alice', '/dashboard')).data.occasions as {name:string;kind:string;nextDate:string;person:{id:string}}[];
+    expect(dashboard.some(o => o.person.id === aliceId)).toBe(false);
+    const dashboardKeys = dashboard.map(o => JSON.stringify([o.person.id, o.name, o.kind, o.nextDate]));
+    expect(new Set(dashboardKeys).size).toBe(dashboardKeys.length);
+  });
+  it('expose l’envie et le bénéficiaire dans les réservations', async () => {
+    const reservation = (await call('alice', '/reservations')).data.find((r: {wish?:{title:string}}) => r.wish?.title === 'Console de jeux');
+    expect(reservation).toMatchObject({ wish: { title: 'Console de jeux' }, recipient: { firstName: 'Bob' } });
   });
   it('rend le statut offert irréversible et protège l’historique', async () => {
     const history = await call('alice', '/history');

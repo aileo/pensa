@@ -34,16 +34,16 @@ try {
     const a = await family('Famille A', [homes[0], homes[1]], alice);
     const b = await family('Famille B', [homes[0], homes[2]], bob);
     await family('Famille C', [homes[3]], eloise);
-    const wish = async (owner: string, title: string, price: number, tags: string[], position: number) =>
+    const wish = async (owner: string, title: string, description: string, price: number, tags: string[], position: number) =>
       (await client.query<{id:string}>(`INSERT INTO wishes(owner_id,title,url,image,description,price,tags,position)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, [owner, title, 'https://example.com/', 'https://picsum.photos/seed/gift/400/300',
-        `Un cadeau pour ${title}`, price, tags, position])).rows[0].id;
-    const consoleId = await wish(bob, 'Console de jeux', 350, ['jeux', 'électronique'], 0);
-    const book = await wish(bob, 'Roman illustré', 29, ['livres'], 1);
-    const camera = await wish(alice, 'Appareil photo', 220, ['électronique'], 0);
-    await wish(charlie, 'Lampe de bureau', 49, ['maison'], 0);
-    await wish(david, 'Jeu de société', 39, ['jeux'], 0);
-    await wish(eloise, 'Vélo', 500, ['sport'], 0);
+        description, price, tags, position])).rows[0].id;
+    const consoleId = await wish(bob, 'Console de jeux', 'Une console récente pour jouer en famille le week-end.', 350, ['jeux', 'électronique'], 0);
+    const book = await wish(bob, 'Roman illustré', 'Une belle édition illustrée à lire au coin du feu.', 29, ['livres'], 1);
+    const camera = await wish(alice, 'Appareil photo', 'Un hybride compact pour les photos de voyage.', 220, ['électronique'], 0);
+    await wish(charlie, 'Lampe de bureau', 'Une lampe LED orientable avec lumière chaude.', 49, ['maison'], 0);
+    await wish(david, 'Jeu de société', 'Un jeu coopératif rapide pour 2 à 6 joueurs.', 39, ['jeux'], 0);
+    await wish(eloise, 'Vélo', 'Un vélo de ville léger avec porte-bagages.', 500, ['sport'], 0);
     const reserve = async (wishId: string, creator: string, status: string, open: boolean, people: string[], events: [string, number][]) => {
       const id = (await client.query<{id:string}>('INSERT INTO reservations(wish_id,creator_id,status,open_to_contributions) VALUES($1,$2,$3,$4) RETURNING id',
         [wishId, creator, status, open])).rows[0].id;

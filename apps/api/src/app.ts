@@ -293,10 +293,16 @@ const occasionData = z.object({ name: z.string().trim().min(1).max(100), kind: z
   'Date invalide');
 const upcoming = async (viewer: Person, recipientId: string) => {
   if (!await visible(viewer.id, recipientId)) fail(403, 'Personne inaccessible');
-  const rows = await query<{ id: string; name: string; kind: string; month: number | null; day: number | null }>(`SELECT DISTINCT o.* FROM occasions o JOIN memberships m ON m.family_id=o.family_id
+  const allRows = await query<{ id: string; name: string; kind: string; month: number | null; day: number | null }>(`SELECT DISTINCT o.* FROM occasions o JOIN memberships m ON m.family_id=o.family_id
     JOIN users recipient ON recipient.household_id=m.household_id
     JOIN memberships mine ON mine.family_id=o.family_id AND mine.household_id=$2
-    WHERE recipient.id=$1`, [recipientId, viewer.household_id]);
+    WHERE recipient.id=$1 ORDER BY o.id`, [recipientId, viewer.household_id]);
+  const seen = new Set<string>();
+  const rows = allRows.filter(r => {
+    const key = JSON.stringify([r.name, r.kind, r.month, r.day]);
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  });
   const recipient = await first<Person>('SELECT * FROM users WHERE id=$1', [recipientId]);
   const now = new Date();
   const results = rows.map(r => {
@@ -445,7 +451,10 @@ const reservationDetails = async (r: Reservation, viewer: string) => {
   const creator = await first<Person>('SELECT * FROM users WHERE id=$1', [r.creator_id]);
   const occasionsRows = await query(`SELECT o.id,o.name,ro.year FROM reservation_occasions ro
     JOIN occasions o ON o.id=ro.occasion_id WHERE ro.reservation_id=$1 ORDER BY ro.year,o.name`, [r.id]);
-  return { id: r.id, wishId: r.wish_id, creator: publicPerson(creator), participants: participantsRows.map(publicPerson),
+  const wish = await first<Wish>('SELECT * FROM wishes WHERE id=$1', [r.wish_id]);
+  const recipient = await first<Person>('SELECT * FROM users WHERE id=$1', [r.owner_id]);
+  return { id: r.id, wishId: r.wish_id, wish: wish && { id: wish.id, title: wish.title, image: wish.image, price: wish.price },
+    recipient: publicPerson(recipient), creator: publicPerson(creator), participants: participantsRows.map(publicPerson),
     openToContributions: r.open_to_contributions, status: r.creator_id === viewer || participantsRows.some(p => p.id === viewer) ? r.status : undefined,
     occasions: occasionsRows, wishDeleted: !!r.deleted_at, cancelled: !!r.cancelled_at };
 };
@@ -640,7 +649,7 @@ api.get('/dashboard', async (req, res) => {
         ON theirs.household_id=recipient.household_id AND theirs.family_id=mine.family_id
       WHERE viewer.id=$1)`, [actor.id]);
   const reservations = await Promise.all(reservationsRows.map(r => reservationDetails(r, actor.id)));
-  const occasions = (await Promise.all(people.map(async p => (await upcoming(actor, p.id))
+  const occasions = (await Promise.all(people.filter(p => p.id !== actor.id).map(async p => (await upcoming(actor, p.id))
     .filter(o => o.nextDate).map(o => ({ ...o, person: publicPerson(p) })))))
     .flat().sort((a, b) => (a.nextDate ?? '').localeCompare(b.nextDate ?? '')).slice(0, 12);
   res.json({ people: people.map(publicPerson), reservations: reservations.filter(r => r.creator.id === actor.id),

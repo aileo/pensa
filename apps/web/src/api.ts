@@ -8,7 +8,7 @@ export type OccasionSelection = { id: Id; year: number }
 export type ParticipationRequest = { id: Id; userId?: Id; firstName?: string; lastName?: string; user?: Person; requester?: Person; status?: string }
 export type Reservation = {
   id: Id; wishId?: Id; wish?: Wish; occasionIds?: OccasionSelection[]; occasions?: Occasion[];
-  participantIds?: Id[]; participants?: Person[]; creator?: Person;
+  participantIds?: Id[]; participants?: Person[]; creator?: Person; recipient?: Person;
   openToContributions?: boolean; status?: string; wishDeleted?: boolean; cancelled?: boolean;
 }
 export type Wish = {
