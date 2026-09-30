@@ -110,6 +110,12 @@ to the development database: reset and reseed before manual testing.
   `docs/guide-utilisateur.md` are written for people who use the app, not for
   contributors, and a change to one belongs in the same commit as the change to
   the other. Everything else stays English-only.
+- **The site's home page is French; `site/en.md` is its English copy.** The
+  people the app is for read French, so they land on French. The two pages say
+  the same thing and are edited together; `site/en.md` also carries the pitch
+  from the README. Both mark the AI disclosure with an explicit
+  `{#generated-by-ai}` anchor, because the guides link to it and the heading
+  itself is translated.
 
 ## Where things are
 

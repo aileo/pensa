@@ -1,89 +1,97 @@
 ---
 layout: home
+description: Organisez les cadeaux de la famille sans tout porter dans votre tête.
 hero:
   name: Pensa
-  text: Gifts organized, mind at ease.
-  tagline: Everyone's wishes, the dates coming up and who gives what live in one place — and nobody ever sees what is meant for them.
+  text: Les cadeaux s'organisent, la tête se libère.
+  tagline: Les envies de chacun, les dates qui arrivent et qui offre quoi tiennent au même endroit — et personne ne voit jamais ce qui lui est destiné.
   actions:
     - theme: brand
-      text: User guide
-      link: /docs/user-guide
-    - theme: alt
-      text: Guide utilisateur (FR)
+      text: Guide utilisateur
       link: /docs/guide-utilisateur
     - theme: alt
-      text: Deploy an instance
+      text: Déployer une instance
       link: /docs/deployment
+    - theme: alt
+      text: English version
+      link: /en
 features:
-  - title: Everyone writes their own list
-    details: Paste a link and the name, image and price fill themselves in. An idea noted in March is still there in December.
-  - title: Occasions arrive on their own
-    details: Birthdays, name days and fixed dates come round in order, year after year, with nothing to enter.
-  - title: Reserve without crossing paths
-    details: Reserving a wish tells the others it is taken, and tells the person concerned nothing at all.
-  - title: Follow it through
-    details: Reserved, bought, wrapped, given — each step ticks off, and what is left to do surfaces on your dashboard.
+  - title: Chacun écrit sa propre liste
+    details: Collez un lien, le nom, l'image et le prix se remplissent tout seuls. Une idée notée en mars est encore là en décembre.
+  - title: Les occasions reviennent d'elles-mêmes
+    details: Anniversaires, fêtes et dates fixes se présentent dans l'ordre, année après année, sans rien à ressaisir.
+  - title: Réserver sans se croiser
+    details: Réserver une envie prévient les autres qu'elle est prise, et n'apprend rigoureusement rien à la personne concernée.
+  - title: Suivre jusqu'au bout
+    details: Réservé, acheté, emballé, offert — chaque étape se coche, et ce qu'il reste à faire remonte sur votre tableau de bord.
 ---
 
-## Organizing gifts is invisible work
+*[Read this page in English](/en)*
 
-It is not the buying that costs, it is the remembering, and it always falls on
-the same person.
+## Organiser les cadeaux est un travail invisible
 
-- **Ideas arrive at the wrong moment.** Someone mentions what they would love in
-  March, and by December nobody can recall it.
-- **Dates come back too late.** A birthday surfaces three days before, never
-  three weeks before.
-- **The same gift gets given twice**, because nobody keeps a list of what has
-  already been given.
-- **Coordinating means going behind someone's back** — group chats without the
-  person, messages asking *has anyone already taken that one?*
+Ce n'est pas l'achat qui coûte, c'est de se souvenir, et cela retombe toujours
+sur la même personne.
 
-Pensa holds all of it instead of you. Wishes stay where they were written down,
-occasions come round in order on their own, reserving a gift tells the others
-and tells the beneficiary nothing, and what has already been given stays
-readable.
+- **Les idées arrivent au mauvais moment.** Quelqu'un mentionne ce qui lui
+  ferait plaisir en mars, et en décembre plus personne ne s'en souvient.
+- **Les dates reviennent trop tard.** Un anniversaire se rappelle à vous trois
+  jours avant, jamais trois semaines avant.
+- **Le même cadeau est offert deux fois**, parce que personne ne tient la liste
+  de ce qui a déjà été donné.
+- **Se coordonner oblige à agir dans le dos des gens** — des conversations de
+  groupe sans la personne, des messages pour demander *est-ce que quelqu'un l'a
+  déjà pris ?*
 
-## You never see what is meant for you
+Pensa porte tout cela à votre place. Les envies restent là où elles ont été
+notées, les occasions reviennent seules dans l'ordre, réserver un cadeau
+prévient les autres sans rien dire au bénéficiaire, et ce qui a déjà été offert
+reste consultable.
 
-That is the rule underneath the whole app. It is not a setting: the API does not
-merely hide what is reserved for you, it answers as though it did not exist —
-because being told you are not allowed would itself be a clue.
+## Vous ne voyez jamais ce qui vous est destiné
 
-It is why Pensa can be shared with the whole family without anyone having to be
-careful about what they click.
+C'est la règle qui tient toute l'application. Ce n'est pas un réglage : l'API ne
+se contente pas de masquer ce qui est réservé pour vous, elle répond comme si
+cela n'existait pas — parce que s'entendre dire que l'accès est interdit serait
+déjà un indice.
 
-## Households, families, and people who cannot sign in
+C'est ce qui permet de partager Pensa avec toute la famille sans que personne
+n'ait à faire attention à ce sur quoi il clique.
 
-A **household** is the people who live together. A **family** connects several
-households, and you can belong to more than one without them ever mixing.
-Joining is always by invitation code, never by search.
+## Foyers, familles, et personnes qui ne peuvent pas se connecter
 
-Children — and anyone else who should not have an account — exist as **managed
-members**: a real person with a date of birth, occasions and a wish list kept by
-an administrator of their household. A claim code turns that into an account of
-their own, whenever they are ready for one.
+Un **foyer** rassemble les personnes qui vivent ensemble. Une **famille** relie
+plusieurs foyers, et vous pouvez appartenir à plusieurs d'entre elles sans
+qu'elles se mélangent jamais. On rejoint toujours par code d'invitation, jamais
+par recherche.
 
-[Everything Pensa does, in detail →](/docs/features)
+Les enfants — et toute personne qui ne doit pas avoir de compte — existent comme
+**membres gérés** : une vraie personne, avec une date de naissance, des
+occasions et une liste d'envies tenue par un administrateur de son foyer. Un
+code de rattachement transforme cela en compte à part entière, le jour où elle
+est prête.
 
-## This project was entirely generated by AI
+[Tout ce que fait Pensa, en détail →](/docs/features) *(en anglais)*
 
-Every line of code, every string of copy, every icon and this page were produced
-by an AI agent, directed by a human. That is stated here, on the sign-in page and
-in the app itself, because you should know it before trusting the project with
-anything.
+## Ce projet a été entièrement généré par une IA {#generated-by-ai}
 
-- **No human wrote this code line by line.** It was reviewed and steered, not
-  hand-authored. Judge it on what it does, and read it yourself — that is why it
-  is public.
-- **It is a personal project, not a product.** There is no company behind it, no
-  support, and no guarantee. Only put in data you could afford to lose.
-- **It is MIT licensed.** Read it, fork it, host it yourself.
+Chaque ligne de code, chaque texte, chaque icône et cette page ont été produits
+par un agent IA, dirigé par un humain. C'est écrit ici, sur la page de connexion
+et dans l'application elle-même, parce que vous devez le savoir avant de confier
+quoi que ce soit au projet.
 
-## Run your own
+- **Aucun humain n'a écrit ce code ligne à ligne.** Il a été relu et orienté,
+  pas rédigé à la main. Jugez-le sur ce qu'il fait, et lisez-le vous-même —
+  c'est bien pour cela qu'il est public.
+- **C'est un projet personnel, pas un produit.** Il n'y a pas d'entreprise
+  derrière, pas de support, pas de garantie. N'y mettez que des données que vous
+  pourriez vous permettre de perdre.
+- **Il est sous licence MIT.** Lisez-le, forkez-le, hébergez-le vous-même.
 
-Two images are published for `linux/amd64` and `linux/arm64`. One port to
-expose, no build step, nothing to compile.
+## Héberger la vôtre
+
+Deux images sont publiées pour `linux/amd64` et `linux/arm64`. Un seul port à
+exposer, aucune étape de build, rien à compiler.
 
 ```sh
 curl -O https://raw.githubusercontent.com/aileo/pensa/main/compose.prod.yaml
@@ -93,7 +101,14 @@ sed -i "s|^#POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 16)|" .en
 docker compose -f compose.prod.yaml -f compose.stable.yaml up -d
 ```
 
-[Configuration, first account, reverse proxy, upgrades and backup →](/docs/deployment)
+[Configuration, premier compte, reverse proxy, mises à jour et sauvegarde →](/docs/deployment)
+*(en anglais)*
 
-Issues, fixes, features and translations are all welcome — and so is telling us
-where the app is confusing. [How to contribute →](/docs/CONTRIBUTING)
+Les signalements, correctifs, fonctionnalités et traductions sont les bienvenus
+— dire où l'application est déroutante l'est tout autant.
+[Comment contribuer →](/docs/CONTRIBUTING) *(en anglais)*
+
+::: tip La documentation technique est en anglais
+Le guide utilisateur existe en français et en anglais. Tout le reste —
+déploiement, développement, référence de l'API — n'est rédigé qu'en anglais.
+:::

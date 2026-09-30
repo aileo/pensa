@@ -29,17 +29,18 @@ export default defineConfig({
   ],
   themeConfig: {
     nav: [
-      { text: 'User guide', link: '/docs/user-guide' },
+      { text: 'Guide utilisateur', link: '/docs/guide-utilisateur' },
+      { text: 'User guide (EN)', link: '/docs/user-guide' },
       { text: 'Deploy', link: '/docs/deployment' },
       { text: 'Develop', link: '/docs/development' },
       { text: 'Changelog', link: '/changelog' },
     ],
     sidebar: [
       {
-        text: 'Using Pensa',
+        text: 'Utiliser Pensa / Using Pensa',
         items: [
-          { text: 'User guide (English)', link: '/docs/user-guide' },
           { text: 'Guide utilisateur (français)', link: '/docs/guide-utilisateur' },
+          { text: 'User guide (English)', link: '/docs/user-guide' },
           { text: 'Features', link: '/docs/features' },
         ],
       },
@@ -80,7 +81,7 @@ export default defineConfig({
   // not, and an edit link pointing at a file that does not exist is worse than
   // none.
   transformPageData(pageData) {
-    const renamed = ['agent.md', 'changelog.md', 'docs/index.md', 'index.md'];
+    const renamed = ['agent.md', 'changelog.md', 'docs/index.md', 'index.md', 'en.md'];
     if (renamed.includes(pageData.relativePath)) {
       pageData.frontmatter.editLink = false;
     }

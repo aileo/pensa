@@ -16,10 +16,21 @@ const BLOB = 'https://github.com/aileo/pensa/blob/main';
 const fromDocs = [
   [/\.\.\/AGENT\.md/g, '../agent.md'],
   [/\.\.\/CHANGELOG\.md/g, '../changelog.md'],
-  [/\.\.\/README\.md/g, '../index.md'],
+  // The README is the English pitch, and so is /en — the site's own home page
+  // is the French one. The anchor is explicit on both, so it survives the
+  // translation of the heading it points at.
+  [/\.\.\/README\.md#this-project-was-entirely-generated-by-ai/g, '../en.md#generated-by-ai'],
+  [/\.\.\/README\.md/g, '../en.md'],
   [/\.\.\/LICENSE/g, `${BLOB}/LICENSE`],
   // The folder index is renamed on the way in, so links to it must follow.
   [/\]\(README\.md/g, '](index.md'],
+];
+
+// The French guide is the one page that should land on the French home rather
+// than on the English README it has to point at while it lives on GitHub.
+const fromFrenchDocs = [
+  [/\.\.\/README\.md#this-project-was-entirely-generated-by-ai/g, '../index.md#generated-by-ai'],
+  ...fromDocs,
 ];
 
 // AGENT.md and CHANGELOG.md sit at the root of the repository and of the site
@@ -27,7 +38,7 @@ const fromDocs = [
 const fromRoot = [
   [/docs\/README\.md/g, 'docs/index.md'],
   [/\]\(AGENT\.md\)/g, '](agent.md)'],
-  [/\]\(README\.md\)/g, '](index.md)'],
+  [/\]\(README\.md\)/g, '](en.md)'],
   [/\]\(LICENSE\)/g, `](${BLOB}/LICENSE)`],
 ];
 
@@ -46,7 +57,11 @@ const collect = async () => {
     // README.md is the index for whoever browses the folder on GitHub; on the
     // site it becomes the landing page of the documentation section.
     const target = name === 'README.md' ? 'index.md' : name;
-    await copy(join(repo, 'docs', name), join(site, 'docs', target), fromDocs);
+    await copy(
+      join(repo, 'docs', name),
+      join(site, 'docs', target),
+      name === 'guide-utilisateur.md' ? fromFrenchDocs : fromDocs,
+    );
     written.add(target);
   }
 

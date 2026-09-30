@@ -66,8 +66,20 @@ do not survive a bind mount on Docker Desktop.
 The site never holds documentation of its own. `site/scripts/collect.mjs` copies
 `docs/`, `AGENT.md` and `CHANGELOG.md` into the VitePress source tree and
 rewrites the links that point outside `docs/`, so the markdown stays readable on
-GitHub and lives in one place only. What `site/` does hold is the home page
-(`site/index.md`), the theme and `.vitepress/config.ts`.
+GitHub and lives in one place only. What `site/` does hold is the two home pages
+(`site/index.md` in French, `site/en.md` in English), the theme and
+`.vitepress/config.ts`.
+
+The home page is French because the people the app is for read French; the
+documentation behind it is English, apart from the user guide. That is also why
+the link rewriting is not quite uniform: a link to the project README resolves
+to `en.md`, since the README is the English pitch, but the French guide is
+given its own rule so its link to the AI disclosure lands on the French home
+instead.
+
+Beware that the rewriting is a plain search and replace over the whole file,
+code spans included — which is why this paragraph describes those paths rather
+than spelling them out.
 
 Adding a page means three edits: the file in `docs/`, a row in
 [the index](README.md), and an entry in the sidebar in

@@ -17,13 +17,14 @@ minor bump may change behaviour.
   is written for are not the ones who read the API reference.
 - **A documentation site**, built with VitePress and published to
   [aileo.github.io/pensa](https://aileo.github.io/pensa/) on every push to
-  `main`. The home page carries the pitch already written on the landing page,
-  and the rest is the existing markdown: `site/scripts/collect.mjs` copies
-  `docs/`, `AGENT.md` and `CHANGELOG.md` in and repairs the links that point
-  outside `docs/`, so nothing is duplicated and everything stays readable on
-  GitHub. The build fails on a dead internal link, which gives the
-  documentation a check it never had. Preview it with `docker compose up site`
-  on http://localhost:5175.
+  `main`. The home page is in French — the people the app is for read French —
+  and carries the pitch already written on the landing page; `site/en.md` is
+  the same page in English. The rest is the existing markdown:
+  `site/scripts/collect.mjs` copies `docs/`, `AGENT.md` and `CHANGELOG.md` in
+  and repairs the links that point outside `docs/`, so nothing is duplicated
+  and everything stays readable on GitHub. The build fails on a dead internal
+  link, which gives the documentation a check it never had. Preview it with
+  `docker compose up site` on http://localhost:5175.
 
 ## [0.3.0] — 2026-09-30
 

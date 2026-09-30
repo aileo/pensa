@@ -444,10 +444,14 @@ docker compose -f compose.prod.yaml -f compose.stable.yaml config | grep image
 docker compose up site -d
 ```
 
-- [ ] http://localhost:5175 shows the home page, in the app's colours — rosewood
-      buttons, warm background, not VitePress's default blue.
-- [ ] The two hero buttons reach the English and the French user guide, and each
-      guide's first line links to the other.
+- [ ] http://localhost:5175 shows the home page **in French**, in the app's
+      colours — rosewood buttons, warm background, not VitePress's default blue.
+- [ ] *English version* opens the same page in English at `/en`, and *Lire cette
+      page en français* comes back.
+- [ ] The first hero button reaches the French user guide, the nav reaches the
+      English one, and each guide's first line links to the other.
+- [ ] In each guide, the link to the AI disclosure lands on the home page in the
+      guide's own language, scrolled to that heading.
 - [ ] The sidebar lists every document in `docs/`, and each entry opens.
 - [ ] *Working on the repository* and *Changelog* open `AGENT.md` and
       `CHANGELOG.md` — they live outside `docs/` and are copied in.
