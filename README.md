@@ -94,6 +94,7 @@ where the app is confusing.
 | [Testing guide](docs/testing-guide.md) | what to check by hand, and how |
 | [Contributing](docs/CONTRIBUTING.md) | how to propose a change |
 | [Working on the repository](AGENT.md) | the house rules: English, Docker-only, lint before commit |
+| [Changelog](CHANGELOG.md) | what changed, release by release |
 
 Built with React, Vite, TypeScript, Tailwind CSS, Express, PostgreSQL and
 Drizzle migrations.

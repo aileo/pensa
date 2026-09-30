@@ -10,5 +10,6 @@
 | [Testing guide](testing-guide.md) | what to check by hand, and how |
 | [Contributing](CONTRIBUTING.md) | how to propose a change |
 | [Working on the repository](../AGENT.md) | the house rules: English, Docker-only, lint before commit |
+| [Changelog](../CHANGELOG.md) | what changed, release by release |
 
 Back to the [project README](../README.md).

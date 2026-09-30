@@ -83,7 +83,18 @@ pulling a newer image. Migrations only ever add to the schema; still, take a
 backup first — see below.
 
 Images are tagged `latest`, the short commit SHA, and `x.y` / `x.y.z` for
-version tags. Pin a SHA or a version if you would rather decide when to move.
+version tags. Pin a SHA or a version if you would rather decide when to move:
+
+```yaml
+services:
+  api:
+    image: ghcr.io/aileo/pensa-api:0.1.0
+  web:
+    image: ghcr.io/aileo/pensa-web:0.1.0
+```
+
+Read the [changelog](../CHANGELOG.md) before moving between minor versions —
+below `1.0`, a minor bump may change behaviour.
 
 ## Backup
 

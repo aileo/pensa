@@ -1,6 +1,6 @@
 {
   "name": "pensa",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Organisation familiale des cadeaux, sans charge mentale (applications Docker autonomes)",
   "repository": {
