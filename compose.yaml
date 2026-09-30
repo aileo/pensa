@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: giftit
+      POSTGRES_PASSWORD: giftit
+      POSTGRES_DB: giftit
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U giftit"]
+      interval: 5s
+      retries: 10
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: ../../Dockerfile.dev
+    working_dir: /app
+    command: sh -c "npm run migrate && npm run dev"
+    volumes:
+      - ./apps/api:/app
+      - api_modules:/app/node_modules
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://giftit:giftit@db:5432/giftit}
+      PORT: 3000
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: ../../Dockerfile.dev
+    working_dir: /app
+    command: npm run dev -- --host 0.0.0.0
+    volumes:
+      - ./apps/web:/app
+      - web_modules:/app/node_modules
+    environment:
+      VITE_API_PROXY_TARGET: http://api:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+volumes:
+  pgdata:
+  api_modules:
+  web_modules:
