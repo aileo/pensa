@@ -14,6 +14,7 @@ const english: Record<string, string> = {
   'Accès refusé à cette famille': 'Access to this family denied',
   'Origine interdite': 'Origin not allowed',
   'Invitation invalide ou expirée': 'Invalid or expired invitation',
+  'Inscription sur invitation uniquement': 'Registration is by invitation only',
   'Identifiants invalides': 'Invalid credentials',
   'Connexion requise': 'Authentication required',
   'Date de fête invalide': 'Invalid name day',
@@ -102,19 +103,63 @@ const sessionCookie = (res: Response, value: string) => res.cookie('session', va
   httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 14 * 86400_000,
 });
 const person = (req: Request) => (req as AuthRequest).person!;
+// Everything the app knows about living behind a reverse proxy.
+//
+// The interface calls /api on its own origin, so a legitimate write is always same-origin.
+// That is the real check: does Origin match the URL this request actually arrived at? Deriving
+// it from the forwarded headers means nothing to configure, however many proxies are in front.
+//
+// Trusting X-Forwarded-Host here is safe against CSRF: a malicious page cannot set it. It is
+// not a CORS-safelisted header, so the browser sends a preflight first, and the preflight answer
+// below only allows Content-Type and Accept-Language. A non-browser client can forge any header,
+// but it has no victim's cookie to ride on — there is no CSRF to commit.
+//
+// WEB_ORIGIN stays as an explicit allowlist for anyone who would rather pin it, and now accepts
+// several origins separated by commas.
+const allowedOrigins = (process.env.WEB_ORIGIN ?? 'http://localhost:5173')
+  .split(',').map(value => value.trim().replace(/\/$/, '')).filter(Boolean);
+const forwarded = (req: Request, header: string) =>
+  req.headers[header]?.toString().split(',')[0]?.trim() || undefined;
+const requestOrigin = (req: Request) => {
+  const host = forwarded(req, 'x-forwarded-host') ?? req.headers.host;
+  if (!host) return undefined;
+  return `${forwarded(req, 'x-forwarded-proto') ?? (req.secure ? 'https' : 'http')}://${host}`;
+};
+// Left blank in a .env file this arrives as an empty string, which express would reject as an
+// invalid IP range and take the whole API down with it — so blank means "unset".
+const trustProxy = (value: string | undefined) =>
+  !value ? 1 : /^\d+$/.test(value) ? Number(value)
+    : value === 'true' ? true : value === 'false' ? false : value;
+// Invitation-only unless told otherwise. An instance that anyone who finds the URL can sign up
+// to is not a family's gift list any more. Read on each call rather than at import, so the
+// tests can exercise both settings against one running server.
+const openRegistration = () => /^(1|true|yes|on)$/i.test(process.env.OPEN_REGISTRATION ?? '');
+// An empty database is the exception: someone has to be able to create the first account.
+const openRegistrationAllowed = async () =>
+  openRegistration() || !(await first('SELECT 1 FROM users LIMIT 1'));
 const app = express();
 app.disable('x-powered-by');
+// Rate limits are counted per IP, and behind a proxy every request carries the proxy's address.
+// Without this, one visitor fumbling their password spends the login budget of everyone else.
+// The default counts a single hop — the web container — which stays correct when a further
+// proxy sits in front of it, since each one appends to X-Forwarded-For.
+app.set('trust proxy', trustProxy(process.env.TRUST_PROXY));
 app.use(express.json({ limit: '32kb' }));
 app.use((req, res, next) => {
-  const origin = process.env.WEB_ORIGIN ?? 'http://localhost:5173';
-  res.setHeader('Access-Control-Allow-Origin', origin);
+  const own = requestOrigin(req);
+  res.setHeader('Access-Control-Allow-Origin', own ?? allowedOrigins[0] ?? '');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept-Language');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.setHeader('Vary', 'Origin');
   if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
-  if (!['GET', 'HEAD'].includes(req.method) && req.headers.origin && req.headers.origin !== origin)
-    { next(new HttpError(403, 'Origine interdite')); return; }
+  const origin = req.headers.origin?.replace(/\/$/, '');
+  if (!['GET', 'HEAD'].includes(req.method) && origin && origin !== own && !allowedOrigins.includes(origin)) {
+    // Logged because the response cannot say it: knowing which origin the server expected is
+    // exactly what turns an evening of guessing into a one-line fix.
+    console.warn(`Origine refusée : reçue ${origin}, attendue ${own ?? '(hôte inconnu)'} ou ${allowedOrigins.join(', ') || '(aucune)'}`);
+    next(new HttpError(403, 'Origine interdite')); return;
+  }
   next();
 });
 const api = express.Router();
@@ -127,6 +172,12 @@ app.get('/api/health', async (_req, res) => {
   } catch {
     res.status(503).json({ status: 'unavailable' });
   }
+});
+// Public, and registered before the /api router so the session middleware never sees it: the
+// interface reads this before anyone can log in, to know whether an invitation code is required
+// rather than letting someone fill in a form that was never going to be accepted.
+app.get('/api/config', async (_req, res) => {
+  res.json({ openRegistration: await openRegistrationAllowed() });
 });
 app.use('/api', api);
 const rateLimitError = (_req: Request, _res: Response, next: NextFunction) => next(new HttpError(429, 'Trop de requêtes'));
@@ -143,16 +194,38 @@ api.post('/auth/register', strictLimit, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    let householdId: string;
+    let householdId: string | undefined;
+    let familyId: string | undefined;
     if (data.invitation) {
-      const invite = (await client.query<{household_id: string}>(`UPDATE invitations SET used_at=now()
+      // Either kind of code is accepted, because the person holding one has no way of telling
+      // which they were given. A household code puts them in an existing home; a family code
+      // gives them a home of their own, already attached to the family.
+      const household = (await client.query<{household_id: string}>(`UPDATE invitations SET used_at=now()
         WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() AND (email IS NULL OR email=$2)
         RETURNING household_id`, [digest(data.invitation), data.email])).rows[0];
-      if (!invite) fail(403, 'Invitation invalide ou expirée');
-      householdId = invite.household_id;
-    } else householdId = (await client.query<{id:string}>('INSERT INTO households(name) VALUES($1) RETURNING id', [`Foyer de ${data.firstName}`])).rows[0].id;
+      if (household) householdId = household.household_id;
+      else {
+        const family = (await client.query<{family_id: string}>(`UPDATE family_invitations SET used_at=now()
+          WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() RETURNING family_id`,
+        [digest(data.invitation)])).rows[0];
+        if (!family) fail(403, 'Invitation invalide ou expirée');
+        familyId = family.family_id;
+      }
+    } else {
+      // The very first account of a fresh install can always be created, otherwise a closed
+      // instance would have no way in at all. The lock makes that check trustworthy: without it
+      // two simultaneous sign-ups would both find the table empty and both become an admin.
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['pensa:open-registration']);
+      if (!openRegistration() && (await client.query('SELECT 1 FROM users LIMIT 1')).rowCount)
+        fail(403, 'Inscription sur invitation uniquement');
+    }
+    if (!householdId)
+      householdId = (await client.query<{id:string}>('INSERT INTO households(name) VALUES($1) RETURNING id', [`Foyer de ${data.firstName}`])).rows[0].id;
     const result = await client.query<Person>(`INSERT INTO users(household_id,first_name,last_name,email,password_hash,birth_date,household_admin)
-      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [householdId, data.firstName, data.lastName, data.email, await hash(data.password, 12), data.birthDate, !data.invitation]);
+      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`, [householdId, data.firstName, data.lastName, data.email, await hash(data.password, 12), data.birthDate, !data.invitation || !!familyId]);
+    // Same transaction as the account and the household: a failure here must not leave someone
+    // holding a spent family code and a home that is attached to nothing.
+    if (familyId) await client.query('INSERT INTO memberships VALUES($1,$2)', [familyId, householdId]);
     const value = token();
     await client.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval \'14 days\')',
       [digest(value), result.rows[0].id]);

@@ -336,6 +336,18 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
 function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'register'; setMode: (mode: 'login' | 'register') => void; onAuth: (person: Person) => void; error: string; setError: (message: string) => void }) {
   const { locale, t } = useTranslation()
   const [busy, setBusy] = useState(false)
+  // Whether an invitation is required is the server's decision, and the form has to know it
+  // before it is submitted: asking someone to fill in six fields only to be told they were
+  // never allowed to is the kind of small cruelty that makes people give up. Assumed open
+  // until told otherwise, so a failed read never blocks the first account of a new install.
+  const [openRegistration, setOpenRegistration] = useState(true)
+  useEffect(() => {
+    let active = true
+    api<{ openRegistration: boolean }>('/config')
+      .then(config => { if (active) setOpenRegistration(config.openRegistration) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('')
     const data = new FormData(event.currentTarget)
@@ -390,7 +402,7 @@ function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'reg
         </>}
         <div><label className="label" htmlFor="email">{t('Adresse e-mail')}</label><input className="field" id="email" name="email" type="email" autoComplete="email" placeholder={t('vous@exemple.fr')} required/></div>
         <div><label className="label" htmlFor="password">{t('Mot de passe')}</label><input className="field" id="password" name="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'register' ? 12 : undefined} required/></div>
-        {mode === 'register' && <div><label className="label" htmlFor="invitation">{t('Code d’invitation')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id="invitation" name="invitation" type="text" autoComplete="off" placeholder={t('Votre code d’invitation')}/><p className="muted mt-1.5">{t('Un proche vous a invité dans son foyer ? Saisissez son code ici.')}</p></div>}
+        {mode === 'register' && <div><label className="label" htmlFor="invitation">{t('Code d’invitation')} <span className="font-normal">{openRegistration ? t('(facultatif)') : t('(requis)')}</span></label><input className="field" id="invitation" name="invitation" type="text" autoComplete="off" placeholder={t('Votre code d’invitation')} required={!openRegistration}/><p className="muted mt-1.5">{openRegistration ? t('Un proche vous a invité dans son foyer ou dans sa famille ? Saisissez son code ici.') : t('Cet espace est sur invitation. Demandez son code à la personne qui vous a invité, dans son foyer ou dans sa famille.')}</p></div>}
         <button disabled={busy} className="primary !mt-6 w-full">{busy ? t('Veuillez patienter…') : mode === 'login' ? t('Se connecter') : t('Créer mon compte')} <Icon name="arrow" size={17}/></button>
       </form>
       <p className="mt-7 text-center text-sm text-ink-500">{mode === 'login' ? t('Pas encore de compte ?') : t('Déjà un compte ?')} <button className="font-bold text-brand-600 hover:underline" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? t('S’inscrire') : t('Se connecter')}</button></p>

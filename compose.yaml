@@ -24,6 +24,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgres://pensa:pensa@db:5432/pensa}
       PORT: 3000
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+      # Local development is a sandbox: sign up freely, without inventing an invitation first.
+      OPEN_REGISTRATION: ${OPEN_REGISTRATION:-true}
     depends_on:
       db:
         condition: service_healthy

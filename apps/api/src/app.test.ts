@@ -444,4 +444,42 @@ describe('permissions métier sur l’API', () => {
     expect((await call('alice', `/users/${bobId}/off-list`)).data.some((g: {id:string}) => g.id === hidden.data.id)).toBe(false);
     expect((await call('alice', `/reservations/${open.data.id}`, 'DELETE')).status).toBe(200);
   });
+  it('accepte l’origine reconstituée derrière un proxy et refuse les autres', async () => {
+    // Exactly what nginx sends when the site is served over HTTPS on its own domain: the
+    // browser's Origin is the public address, which the API never had configured anywhere.
+    const proxied = async (origin: string, forwardedHost: string) => (await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin,
+        'x-forwarded-proto': 'https, http', 'x-forwarded-host': forwardedHost },
+      body: JSON.stringify({ email: 'alice@example.test', password: 'wrong' }),
+    })).status;
+    expect(await proxied('https://pensa.example.test', 'pensa.example.test')).toBe(401);
+    expect(await proxied('https://attaquant.example.test', 'pensa.example.test')).toBe(403);
+    // Without forwarded headers the Host header is the fallback, and WEB_ORIGIN still works.
+    expect((await call('', '/auth/login', 'POST', { email: 'alice@example.test', password: 'wrong' })).status).toBe(401);
+  });
+  it('n’ouvre l’inscription libre que si la configuration l’autorise', async () => {
+    expect(await (await fetch(`${base}/api/config`)).json()).toEqual({ openRegistration: true });
+    const signUp = (invitation?: string) => call('', '/auth/register', 'POST', {
+      firstName: 'Closed', lastName: 'Door', email: `closed-${Date.now()}-${Math.random()}@example.test`,
+      password: 'LongSecret2026!', birthDate: '1990-03-04', ...(invitation ? { invitation } : {}),
+    }, 'en');
+    const familyA = (await call('alice', '/families')).data.find((f: {name:string}) => f.name === 'Famille A');
+    const invite = await call('alice', `/families/${familyA.id}/invitations`, 'POST', {});
+    process.env.OPEN_REGISTRATION = 'false';
+    try {
+      // The seeded database is not empty, so the bootstrap exception does not apply.
+      expect(await (await fetch(`${base}/api/config`)).json()).toEqual({ openRegistration: false });
+      expect(await signUp()).toMatchObject({ status: 403, data: { error: 'Registration is by invitation only' } });
+      expect(await signUp('code-inexistant')).toMatchObject({ status: 403, data: { error: 'Invalid or expired invitation' } });
+      // A family code still gets someone in, with a household of their own attached to the family.
+      const joined = await signUp(invite.data.code);
+      expect(joined.status).toBe(201);
+      expect(joined.data).toMatchObject({ householdAdmin: true });
+      cookies.familyGuest = joined.cookie!.split(';')[0];
+      expect((await call('familyGuest', '/families')).data.some((f: {id:string}) => f.id === familyA.id)).toBe(true);
+      expect((await call('familyGuest', '/households/mine')).data.name).toBe('Foyer de Closed');
+      await call('alice', `/families/${familyA.id}/households/${joined.data.householdId}`, 'DELETE');
+    } finally { process.env.OPEN_REGISTRATION = 'true'; }
+  });
 });

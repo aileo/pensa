@@ -4,6 +4,39 @@ All notable changes are recorded here. This project follows
 [semantic versioning](https://semver.org/): while the major version is `0`, a
 minor bump may change behaviour.
 
+## [0.2.0] — 2026-10-01
+
+**Registration is now invitation-only by default.** If you are upgrading an
+instance that people were signing up to freely, set `OPEN_REGISTRATION=true` to
+keep the previous behaviour. The first account of an empty database is always
+allowed, so a new instance can still be set up.
+
+### Fixed
+
+- **Account creation behind a reverse proxy no longer fails with a 403**
+  *Origine interdite*. The API now recognises the address a request was actually
+  made to, from the headers the proxy already sends, instead of requiring
+  `WEB_ORIGIN` to be set to the exact public URL. `WEB_ORIGIN` remains available
+  as an optional allowlist, and now accepts several origins separated by commas.
+  When an origin is refused, the API logs the one it received next to the one it
+  expected.
+- **Rate limits count each visitor again.** Behind a proxy they were counted per
+  proxy, which meant one person fumbling their password consumed the login
+  budget of everyone else. The new `TRUST_PROXY` variable, `1` by default, says
+  how many proxies sit in front of the API.
+- The web image no longer overwrites `X-Forwarded-Proto`, which made an HTTPS
+  site look like plain HTTP to the API.
+
+### Added
+
+- `OPEN_REGISTRATION` opens sign-up to anyone without an invitation code.
+- **An invitation code at registration can now be a family code**, not only a
+  household one. The newcomer gets a household of their own, already attached to
+  the family. Previously a family code could only be used by someone who already
+  had an account, which would have made a closed instance impossible to grow.
+- `GET /api/config` reports whether registration is open, so the sign-in page
+  asks for a code instead of refusing a filled-in form.
+
 ## [0.1.0] — 2026-09-30
 
 First public release. The app is usable end to end and the images are published,

@@ -272,6 +272,38 @@ Accessibility checks, which matter more here because a soft palette loses legibi
       ring and progress markers reach 3:1. Measured values are listed in
       [the design system](design-system.md). If you change a hue, re-measure before keeping it.
 
+### 3.15 Registration and reverse proxy
+
+The development stack sets `OPEN_REGISTRATION=true`, so section 3 above behaves as
+before. This section checks the deployed behaviour, which is different on purpose.
+
+Run the published stack on an empty database:
+
+```bash
+docker compose -f compose.prod.yaml up -d
+```
+
+- [ ] **The first account gets in:** open the app, register without a code. It succeeds and
+      you are an administrator of your own household.
+- [ ] **The door then closes:** register a second account without a code. It is refused with
+      *Inscription sur invitation uniquement*. Reload the sign-up form: the invitation field
+      now reads *(requis)* and the browser will not submit it empty.
+- [ ] **A household code still works:** from *Ma famille → Mon foyer*, copy the household
+      code and register with it. The new person lands in your household, without admin
+      rights.
+- [ ] **A family code works too:** create a family, copy its invitation code and register a
+      third account with it. That person gets a household of their own, named *Foyer de
+      <prénom>*, already listed in the family, and is an admin of it.
+- [ ] **Reopening:** set `OPEN_REGISTRATION=true`, restart the API, reload the form. The
+      field reads *(facultatif)* again and registering without a code works.
+
+Behind your own reverse proxy, on a real domain over HTTPS:
+
+- [ ] **Sign-up works** without setting `WEB_ORIGIN` to anything. This is the bug that made
+      every form submission fail with *Origine interdite*.
+- [ ] **A refusal is diagnosable:** `docker compose logs api` prints the origin received and
+      the one expected, on one line.
+
 ## 4. The name, the AI disclosure and the published images
 
 ### 4.1 The old name is gone

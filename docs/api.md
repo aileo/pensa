@@ -12,6 +12,7 @@ and their text follows `Accept-Language`, French or English.
 | Domain | Routes |
 | --- | --- |
 | Health | `GET /health` |
+| Configuration | `GET /config` |
 | Authentication | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
 | Profile, people | `GET/PATCH /profile`, `GET /users`, `GET /users/:id/wishes` |
 | Households, invitations | `GET /households`, `PATCH /households/:id`, `POST /households/:id/invitations` |
@@ -23,8 +24,38 @@ and their text follows `Accept-Language`, French or English.
 | Overview | `GET /dashboard`, `GET /history`, `GET /search?q=…` |
 
 Rate limiting applies to `/api`: 300 requests per 15 minutes, and 20 on
-sensitive authentication routes. `GET /api/health` is registered before the
-limiter so that container probes never consume the budget.
+sensitive authentication routes. Limits are counted per visitor, which behind a
+reverse proxy requires `TRUST_PROXY` to match the number of proxies in front of
+the API. `GET /api/health` and `GET /api/config` are registered before the
+limiter so that container probes and the sign-in page never consume the budget.
+
+`GET /api/config` is public and answers `{"openRegistration": true|false}`. The
+interface reads it to know whether the invitation field is required; the server
+enforces the rule regardless.
+
+## Origins
+
+Writes must carry an `Origin` matching the address the request was actually made
+to, which the API reconstructs from `X-Forwarded-Proto` and `X-Forwarded-Host`
+(falling back to `Host`). A reverse proxy therefore needs no configuration.
+`WEB_ORIGIN` adds an optional comma-separated allowlist on top of that. A
+refusal answers `403` and logs both the received and the expected origin.
+
+## Registration
+
+Without `OPEN_REGISTRATION=true`, `POST /auth/register` requires an invitation
+code — except when the `users` table is empty, so the first account of a new
+instance can always be created. That check runs inside the transaction behind an
+advisory lock, so two simultaneous first sign-ups cannot both become admins.
+
+The `invitation` field accepts **either** kind of code, since the person holding
+one cannot tell which they were given:
+
+| Code | Household | Household admin | Family |
+| --- | --- | --- | --- |
+| household | the invitation's | no | unchanged |
+| family | created automatically | yes | joined |
+| none | created automatically | yes | none |
 
 ## Reservations
 
@@ -49,7 +80,9 @@ administrator of the invited household** confirms it with
 grants access.
 
 Household invitation codes are a different thing: they are used during
-registration, to join an existing household.
+registration, to join an existing household. A family code can also be used at
+registration, by someone who has no account yet — they get a household of their
+own, already attached to the family, without needing anyone to confirm it.
 
 A household taking part in active reservations cannot be removed from a family.
 

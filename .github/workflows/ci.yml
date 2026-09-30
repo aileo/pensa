@@ -54,6 +54,8 @@ jobs:
       DATABASE_URL: postgres://pensa:pensa@localhost:5432/pensa
       # The test suite sends this exact origin on write requests.
       WEB_ORIGIN: http://localhost:5173
+      # The suite signs accounts up without an invitation; one test closes it back down.
+      OPEN_REGISTRATION: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -20,8 +20,15 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgres://pensa:pensa@db:5432/pensa}
       PORT: 3000
-      # The browser's origin is the web container, not the API.
+      # Usually nothing to set: the API accepts writes coming from the address the request was
+      # actually made to, whatever your reverse proxy calls it. Set this to a comma-separated
+      # list of origins only if you want to pin it explicitly.
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+      # Number of proxies in front of the API, counted so rate limits see the real visitor.
+      # 1 is the web container; it stays right when your own proxy sits in front of it.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # Invitation-only by default. The very first account can always be created.
+      OPEN_REGISTRATION: ${OPEN_REGISTRATION:-false}
     depends_on:
       db:
         condition: service_healthy
