@@ -6,6 +6,8 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-30
+
 ### Added
 
 - **A name day for members without an account.** The field existed on your own
@@ -198,6 +200,7 @@ which would already be a hint.
 This release was written by an AI agent under human direction. The
 [README](README.md) says so in full, and says what it means for you.
 
+[0.5.0]: https://github.com/aileo/pensa/releases/tag/v0.5.0
 [0.4.0]: https://github.com/aileo/pensa/releases/tag/v0.4.0
 [0.3.0]: https://github.com/aileo/pensa/releases/tag/v0.3.0
 [0.2.0]: https://github.com/aileo/pensa/releases/tag/v0.2.0

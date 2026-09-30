@@ -217,7 +217,7 @@ backup first — see below.
 
 | Tag | Moves when | Good for |
 | --- | --- | --- |
-| `0.4.0` | never | production. This is what `compose.stable.yaml` names |
+| `0.5.0` | never | production. This is what `compose.stable.yaml` names |
 | `0.4` | on patch releases | production, accepting fixes without re-reading the file |
 | `latest` | anything lands on `main` | trying out what is coming, knowing it is unreleased |
 
@@ -238,8 +238,8 @@ two lines of this file instead, so upgrading always starts with a diff.
 To pin a version yourself instead, set the image variables in your `.env`:
 
 ```sh
-API_IMAGE=ghcr.io/aileo/pensa-api:0.4.0
-WEB_IMAGE=ghcr.io/aileo/pensa-web:0.4.0
+API_IMAGE=ghcr.io/aileo/pensa-api:0.5.0
+WEB_IMAGE=ghcr.io/aileo/pensa-web:0.5.0
 ```
 
 Read the [changelog](../CHANGELOG.md) before moving between minor versions —
