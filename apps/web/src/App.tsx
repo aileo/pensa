@@ -383,20 +383,26 @@ function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'reg
 }
 
 function WishForm({ busy, perform, handleError }: { busy: boolean; perform: (action: () => Promise<unknown>, success: string) => Promise<boolean>; handleError: (error: unknown) => void }) {
-  const { t } = useTranslation()
+  const { locale, t } = useTranslation()
   const [url, setUrl] = useState('')
   const [preview, setPreview] = useState<Partial<Wish> | null>(null)
   const [loading, setLoading] = useState(false)
+  const [notice, setNotice] = useState('')
   async function fetchPreview() {
     setLoading(true)
+    setNotice('')
     try { setPreview(await api<Partial<Wish>>('/wishes/preview', json('POST', { url }))) }
-    catch (problem) { handleError(problem) }
+    catch (problem) {
+      if (problem instanceof ApiError && problem.status === 400) setNotice(problem.message)
+      else handleError(problem)
+    }
     finally { setLoading(false) }
   }
   return <form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void perform(() => api('/wishes', json('POST', { url, title: data.get('title'), image: data.get('image') || '', description: data.get('description') || undefined, price: data.get('price') ? Number(data.get('price')) : undefined, tags: String(data.get('tags') || '').split(',').map(tag => tag.trim()).filter(Boolean) })), t('Envie ajoutée à votre liste.')) }}>
-    <label className="label" htmlFor="product-url">{t('Lien du produit')}</label><div className="flex gap-2"><input className="field min-w-0" id="product-url" type="url" placeholder="https://example.com/product" value={url} onChange={event => { setUrl(event.target.value); setPreview(null) }} required/><button type="button" disabled={!url || loading} className="secondary shrink-0 !px-3 text-sm" onClick={fetchPreview}>{loading ? t('Chargement…') : t('Prévisualiser')}</button></div><p className="muted mt-1.5">{t('Collez un lien pour préremplir les informations.')}</p>
+    <label className="label" htmlFor="product-url">{t('Lien du produit')}</label><div className="flex gap-2"><input className="field min-w-0" id="product-url" type="url" placeholder="https://example.com/product" value={url} onChange={event => { setUrl(event.target.value); setPreview(null); setNotice('') }} required/><button type="button" disabled={!url || loading} className="secondary shrink-0 !px-3 text-sm" onClick={fetchPreview}>{loading ? t('Chargement…') : t('Prévisualiser')}</button></div><p className="muted mt-1.5">{t('Collez un lien pour préremplir les informations.')}</p>
+    {notice && <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"><span className="font-semibold">{localizeMessage(notice, locale)}.</span> {t('Vous pouvez remplir les champs à la main : seul le nom est nécessaire.')}</p>}
     {preview && <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#f5f0f9] p-3">{preview.image && <img src={preview.image} alt="" className="size-14 rounded-lg object-cover"/>}<span className="text-sm font-semibold">{preview.title || t('Produit trouvé')}</span></div>}
-    <div className="mt-5 space-y-4" key={preview?.url || preview?.title || 'empty'}><div><label className="label" htmlFor="product-title">{t('Nom de l’envie')}</label><input className="field" id="product-title" name="title" defaultValue={preview?.title || ''} required/></div><div><label className="label" htmlFor="product-image">{t('URL de l’image (obligatoire)')}</label><input className="field" id="product-image" name="image" type="url" defaultValue={preview?.image || ''} placeholder="https://…" required/></div><div><label className="label" htmlFor="product-description">{t('Description')} <span className="font-normal">{t('(facultatif)')}</span></label><textarea className="field min-h-20" id="product-description" name="description" defaultValue={preview?.description || ''}/></div><div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor="product-price">{t('Prix (€)')}</label><input className="field" id="product-price" name="price" type="number" min="0" step="0.01" defaultValue={preview?.price ?? ''}/></div><div><label className="label" htmlFor="product-tags">{t('Tags')}</label><input className="field" id="product-tags" name="tags" defaultValue={preview?.tags?.join(', ') || ''} placeholder={t('livre, déco')}/></div></div></div><button disabled={busy} className="primary mt-6 w-full"><Icon name="plus" size={17}/> {t('Ajouter à ma liste')}</button>
+    <div className="mt-5 space-y-4" key={preview?.url || preview?.title || 'empty'}><div><label className="label" htmlFor="product-title">{t('Nom de l’envie')}</label><input className="field" id="product-title" name="title" defaultValue={preview?.title || ''} required/></div><div><label className="label" htmlFor="product-image">{t('URL de l’image')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id="product-image" name="image" type="url" defaultValue={preview?.image || ''} placeholder="https://…"/></div><div><label className="label" htmlFor="product-description">{t('Description')} <span className="font-normal">{t('(facultatif)')}</span></label><textarea className="field min-h-20" id="product-description" name="description" defaultValue={preview?.description || ''}/></div><div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor="product-price">{t('Prix (€)')}</label><input className="field" id="product-price" name="price" type="number" min="0" step="0.01" defaultValue={preview?.price ?? ''}/></div><div><label className="label" htmlFor="product-tags">{t('Tags')}</label><input className="field" id="product-tags" name="tags" defaultValue={preview?.tags?.join(', ') || ''} placeholder={t('livre, déco')}/></div></div></div><button disabled={busy} className="primary mt-6 w-full"><Icon name="plus" size={17}/> {t('Ajouter à ma liste')}</button>
   </form>
 }
 

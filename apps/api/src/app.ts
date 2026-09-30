@@ -33,7 +33,10 @@ const english: Record<string, string> = {
   'URL non autorisée': 'URL not allowed',
   'Adresse non autorisée': 'Address not allowed',
   'Page inaccessible': 'Page not accessible',
-  'Page trop volumineuse': 'Page too large',
+  'Page introuvable': 'Page not found',
+  'Site injoignable': 'Site unreachable',
+  'Le site refuse la prévisualisation': 'The site refused the preview',
+  'Trop de redirections': 'Too many redirects',
   'Délai dépassé': 'Request timed out',
   'URL HTTP(S) requise': 'HTTP(S) URL required',
   'Ordre invalide': 'Invalid order',
@@ -67,7 +70,8 @@ const localized = (req: Request, message: string) =>
     ? english[message] ?? english['Erreur serveur'] : message;
 const previewErrors = new Set([
   'URL invalide', 'URL non autorisée', 'Adresse non autorisée', 'Page inaccessible',
-  'Page trop volumineuse', 'Délai dépassé',
+  'Page introuvable', 'Site injoignable', 'Le site refuse la prévisualisation',
+  'Trop de redirections', 'Délai dépassé',
 ]);
 const uuid = z.uuid();
 const tags = z.array(z.string().trim().min(1).max(40)).max(20);
@@ -117,6 +121,8 @@ app.use('/api', api);
 const rateLimitError = (_req: Request, _res: Response, next: NextFunction) => next(new HttpError(429, 'Trop de requêtes'));
 api.use(rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError }));
 const strictLimit = rateLimit({ windowMs: 15 * 60_000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError });
+// Previews get their own budget so retrying a stubborn link never locks anyone out of signing in.
+const previewLimit = rateLimit({ windowMs: 15 * 60_000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError });
 api.post('/auth/register', strictLimit, async (req, res) => {
   const data = z.object({
     firstName: z.string().trim().min(1).max(100), lastName: z.string().trim().min(1).max(100),
@@ -437,7 +443,7 @@ api.get('/wishes/:id', async (req, res) => {
   if (wish.deleted_at || wish.gifted_at) fail(404, 'Souhait introuvable');
   res.json(await reservationView(wish, person(req).id));
 });
-api.post('/wishes/preview', strictLimit, async (req, res) => {
+api.post('/wishes/preview', previewLimit, async (req, res) => {
   const { url } = z.object({ url: z.url().max(2048) }).parse(req.body);
   try { res.json(await preview(url)); } catch (e) {
     if (e instanceof Error) fail(400, previewErrors.has(e.message) ? e.message : 'Page inaccessible');
@@ -445,13 +451,13 @@ api.post('/wishes/preview', strictLimit, async (req, res) => {
   }
 });
 api.post('/wishes', async (req, res) => {
-  const d = z.object({ title: z.string().trim().min(1).max(200), image: z.url().max(2048),
+  const d = z.object({ title: z.string().trim().min(1).max(200), image: httpUrl.or(z.literal('')).nullish(),
     url: z.url().max(2048), description: z.string().max(5000).nullish(),
     price: z.coerce.number().min(0).max(99999999).nullable().optional(), tags: tags.default([]) }).parse(req.body);
-  if (!/^https?:\/\//.test(d.url) || !/^https?:\/\//.test(d.image)) fail(400, 'URL HTTP(S) requise');
+  if (!/^https?:\/\//.test(d.url)) fail(400, 'URL HTTP(S) requise');
   const row = await first<Wish>(`INSERT INTO wishes(owner_id,title,image,url,description,price,tags,position)
     VALUES($1,$2,$3,$4,$5,$6,$7,(SELECT count(*) FROM wishes WHERE owner_id=$1 AND NOT off_list)) RETURNING *`,
-    [person(req).id, d.title, d.image, d.url, d.description ?? null, d.price ?? null, d.tags]);
+    [person(req).id, d.title, d.image || null, d.url, d.description ?? null, d.price ?? null, d.tags]);
   res.status(201).json(await reservationView(row, person(req).id));
 });
 api.patch('/wishes/order', async (req, res) => {

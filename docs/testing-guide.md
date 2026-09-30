@@ -207,6 +207,18 @@ stays, but every screen names the task it moves forward rather than the emotion.
 - [ ] **History:** log in as **Alice**; *Historique* shows *Appareil photo* (Noël 2025).
 - [ ] **Custom occasion:** as a family admin, add an occasion in *Ma famille*; it appears in the reservation form for that family's members.
 
+### 3.12 Link previews when adding a wish
+
+Paste a product URL in *Mes envies → Ajouter une envie* and check the preview fills the form.
+
+- [ ] **Standard site:** a product page (for example a Prusa or Kubii page) fills the name, description, image and, when the site publishes it, the price.
+- [ ] **Redirected link:** a URL that redirects (a shortened link, or a domain without `www.`) still resolves to the final page.
+- [ ] **Heavy page:** a very large product page still returns its metadata instead of failing.
+- [ ] **Protected site:** some shops block automated requests (Amazon, Fnac, Domadoo). The form shows an amber message explaining the site refused the preview and inviting you to fill the fields yourself — it does **not** block the form.
+- [ ] **Manual fallback:** with the preview failed, type a name only and save: the wish is created without an image (the image field is marked *facultatif*).
+- [ ] **Rejected addresses:** a URL pointing to a local address (`http://localhost:3000`) is refused with *Adresse non autorisée*.
+- [ ] **No lockout:** after several failed previews you can still sign out and sign back in — previews have their own rate limit.
+
 ## 4. Automated checks
 
 ```sh

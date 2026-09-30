@@ -69,4 +69,4 @@ To connect a household to a family, a family administrator creates a temporary i
 
 Birthday occasions use the profile's date of birth. Name-day occasions use the optional `nameDay` profile field in `MM-DD` format (`PATCH /profile`) and have no upcoming occurrence until it is set. Fixed-date occasions use `month` and `day`.
 
-External HTML metadata previews block private addresses and redirects, pin the verified DNS address, and enforce time and size limits. Users can correct metadata before creating a wish. Afterwards only its tags are editable; deletion is logical.
+External HTML metadata previews block private addresses, follow a bounded number of redirects while revalidating and pinning the verified DNS address on every hop, and enforce time and size limits. Sites that refuse automated requests return an explanatory error: the image stays optional, so a wish can always be completed by hand. Users can correct metadata before creating a wish. Afterwards only its tags are editable; deletion is logical.

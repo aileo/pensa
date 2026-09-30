@@ -123,8 +123,10 @@ const english = {
   'Connexion impossible.': 'Could not sign in.',
   'Lien du produit': 'Product link', 'Chargement…': 'Loading…', 'Prévisualiser': 'Preview',
   'Collez un lien pour préremplir les informations.': 'Paste a link to fill in the details.',
+  'Vous pouvez remplir les champs à la main : seul le nom est nécessaire.':
+    'You can fill the fields in yourself: only the name is required.',
   'Produit trouvé': 'Product found', 'Nom de l’envie': 'Wish name',
-  'URL de l’image (obligatoire)': 'Image URL (required)', 'Description': 'Description',
+  'Description': 'Description',
   'Prix (€)': 'Price (€)', 'Tags': 'Tags', 'livre, déco': 'book, decor',
   'Ajouter à ma liste': 'Add to my list', 'Envie ajoutée à votre liste.': 'Wish added to your list.',
   'Nom de l’occasion': 'Occasion name', 'Ex. : Noël': 'E.g. Christmas',

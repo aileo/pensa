@@ -225,7 +225,10 @@ describe('permissions métier sur l’API', () => {
     expect((await register(`replay-${Date.now()}@example.test`)).status).toBe(403);
   });
   it('refuse les modifications principales et les souhaits incomplets', async () => {
-    expect((await call('bob', '/wishes', 'POST', { title: 'Sans image', url: 'https://example.com' })).status).toBe(400);
+    const withoutImage = await call('bob', '/wishes', 'POST', { title: 'Sans image', url: 'https://example.com' });
+    expect(withoutImage.status).toBe(201);
+    expect(withoutImage.data).toMatchObject({ title: 'Sans image', image: null });
+    expect((await call('bob', '/wishes', 'POST', { title: 'Image invalide', url: 'https://example.com', image: 'ftp://example.com/i.png' })).status).toBe(400);
     expect((await call('bob', '/wishes/preview', 'POST', { url: 'http://127.0.0.1/' })).status).toBe(400);
     expect((await call('bob', '/wishes/preview', 'POST', { url: 'not-an-url' })).status).toBe(400);
     const wishes = await call('bob', '/wishes');
