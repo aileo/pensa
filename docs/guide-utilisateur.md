@@ -99,6 +99,9 @@ bien que *Noël 2026* et *Noël 2027* sont deux cibles distinctes.
 Si vous appartenez à deux familles, une occasion présente dans les deux
 n'apparaît qu'une fois.
 
+Sur le tableau de bord, chaque occasion à venir est cliquable : elle ouvre
+directement la liste de la personne concernée.
+
 ## Offrir : lire une liste et réserver
 
 Ouvrez la liste de quelqu'un et vous voyez ses envies. Vous pouvez la réduire
@@ -165,6 +168,18 @@ l'extérieur, rien ne change : le reste de la famille voit une liste ordinaire e
 y réserve sans jamais apprendre qui l'a écrite. Votre tableau de bord vous
 rappelle qu'une liste gérée est encore vide, pour qu'un anniversaire n'arrive pas
 sans rien dessus.
+
+À la création, *Ma famille → Mon foyer → Ajouter un membre sans compte* demande
+un prénom, un nom, une date de naissance et, facultativement, une **date de
+fête**. Sans elle, l'occasion *Fête* n'est jamais annoncée pour cette personne.
+Si vous l'avez oubliée, ou si une date est fausse, *Modifier la fiche* à côté de
+son nom rouvre toute la fiche — nom, date de naissance et date de fête — et
+l'enregistre sur place.
+
+**Arriver vite sur sa liste.** Inutile de passer par l'écran famille : les
+listes que tient votre foyer apparaissent sur votre tableau de bord, et une
+rangée de raccourcis est posée en haut de *Mes envies*. Un clic passe de votre
+liste à la sienne, et inversement.
 
 Personne ne reste géré pour toujours. Deux sorties :
 

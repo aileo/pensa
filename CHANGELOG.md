@@ -6,6 +6,26 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A name day for members without an account.** The field existed on your own
+  profile but nowhere for the people your household keeps a list for, so their
+  *Fête* occasion could never be announced. *Ajouter un membre sans compte* now
+  asks for it, and a new *Modifier la fiche* form reopens the whole record —
+  first name, last name, date of birth and name day — so a forgotten date no
+  longer means recreating the person. Household member listings carry `nameDay`
+  for the caller's own household only, which is what lets the form prefill
+  itself; the family listing still omits it.
+- **Shortcuts to the lists your household keeps.** Reaching a child's list meant
+  walking through *Ma famille*, finding them and opening their page. The
+  dashboard now has a *Les listes que je tiens* section, and a row of shortcuts
+  sits at the top of *Mes envies* and of any managed list, so one click switches
+  between your own list and theirs.
+- **Upcoming occasions open the list they concern.** Each occasion on the
+  dashboard is now a button leading straight to the wish list of the person
+  whose date is approaching, instead of a line of text you then had to go and
+  look up by hand.
+
 ## [0.4.0] — 2026-09-30
 
 ### Added

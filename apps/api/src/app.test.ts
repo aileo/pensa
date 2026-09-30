@@ -494,7 +494,17 @@ describe('permissions métier sur l’API', () => {
       { firstName: ninaName, lastName: 'Martin', birthDate: '2015-02-09', nameDay: '01-21' });
     expect(created.status).toBe(201);
     const nina = created.data.members.find((m: {firstName:string}) => m.firstName === ninaName);
-    expect(nina).toMatchObject({ managed: true, householdAdmin: false });
+    expect(nina).toMatchObject({ managed: true, householdAdmin: false, nameDay: '01-21' });
+    // A name day stays inside the household: relatives reading the family never receive it.
+    const charlieView = (await call('charlie', '/families')).data
+      .flatMap((f: {households?:{members:{id:string;nameDay?:string}[]}[]}) => f.households ?? [])
+      .flatMap((h: {members:{id:string;nameDay?:string}[]}) => h.members)
+      .find((m: {id:string}) => m.id === nina.id);
+    expect(charlieView).toBeTruthy();
+    expect(charlieView).not.toHaveProperty('nameDay');
+    expect((await call('charlie', '/households')).data
+      .flatMap((h: {mine:boolean;members:{id:string}[]}) => h.mine ? [] : h.members)
+      .find((m: {id:string}) => m.id === nina.id)).not.toHaveProperty('nameDay');
     // Both parents curate the list; nobody outside the household can.
     const wish = await call('bob', `/users/${nina.id}/wishes`, 'POST',
       { title: 'Patins à roulettes', url: 'https://example.com/patins', price: 55, tags: ['sport'] });
@@ -519,6 +529,15 @@ describe('permissions métier sur l’API', () => {
       .toBe('A managed member cannot administrate');
     // Profile edits are reserved for managed members.
     expect((await call('alice', `/households/${mine.id}/members/${nina.id}`, 'PATCH', { firstName: `${ninaName}lle` })).status).toBe(200);
+    // The whole record, name day included, stays editable afterwards.
+    expect((await call('alice', `/households/${mine.id}/members/${nina.id}`, 'PATCH', { nameDay: '99-99' })).status).toBe(400);
+    const edited = await call('alice', `/households/${mine.id}/members/${nina.id}`, 'PATCH',
+      { birthDate: '2015-03-08', nameDay: '05-30' });
+    expect(edited.data.members.find((m: {id:string}) => m.id === nina.id))
+      .toMatchObject({ birthDate: '2015-03-08', nameDay: '05-30' });
+    expect((await call('alice', '/households/mine')).data.members.find((m: {id:string}) => m.id === nina.id).nameDay).toBe('05-30');
+    expect((await call('alice', `/households/${mine.id}/members/${nina.id}`, 'PATCH', { nameDay: null })).data
+      .members.find((m: {id:string}) => m.id === nina.id).nameDay).toBeNull();
     const bobId = (await call('alice', '/households/mine')).data.members.find((m: {firstName:string}) => m.firstName === 'Bob').id;
     expect((await call('alice', `/households/${mine.id}/members/${bobId}`, 'PATCH', { firstName: 'Bobby' }, 'en')).data.error)
       .toBe('This member manages their own account');

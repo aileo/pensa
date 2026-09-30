@@ -79,6 +79,7 @@ Log in as **Alice** and open *Tableau de bord*.
 - [ ] *Les prochaines occasions* shows **no occasion for Alice herself**.
 - [ ] No row appears twice (same person, same occasion, same date). Bob's *Noël* appears once, although Bob is in families A and B.
 - [ ] Occasions are sorted by date, nearest first.
+- [ ] Clicking an occasion opens the wish list of the person it concerns — *Noël · Bob Martin* lands on *Les envies de Bob Martin*.
 
 Repeat as **Bob**: no occasion for Bob, no duplicates.
 
@@ -321,7 +322,20 @@ Log in as `alice@example.test` (admin of the *Alice & Bob* household).
 - [ ] **Others see an ordinary list:** log in as `charlie@example.test`, open Lucie's page.
       No banner, no edit buttons — her wishes can be reserved like anyone else's.
 - [ ] **She cannot sign in:** there is no email to try. Creating a new member through
-      *Ajouter un membre sans compte* asks only for a name and a date of birth.
+      *Ajouter un membre sans compte* asks for a name, a date of birth and, optionally,
+      a *date de fête*.
+- [ ] **Name day on creation:** add a member with a day and a month. A *Fête* occasion
+      appears for them on the dashboard on that date. Choosing only a day, or only a
+      month, is refused with *Choisissez le jour et le mois de sa fête.*
+- [ ] **Editing the record:** *Modifier la fiche* next to Lucie prefills her first name,
+      last name, date of birth and her name day (13 December). Change the name day, save,
+      and reopen the form: the new value is there, and her *Fête* occasion moved with it.
+      Emptying both fields removes the occasion.
+- [ ] **Reaching her list quickly:** the dashboard has a *Les listes que je tiens* section
+      with Lucie in it, and *Mes envies* shows a row of shortcuts — *Mes envies* plus one
+      per managed member. Clicking Lucie opens her list; the row is still there, so one
+      click comes back to yours. Log in as `charlie@example.test`: neither the section nor
+      the row appears.
 - [ ] **Claim code:** as Alice, generate one for your new member, log out, click *J'ai un
       code de rattachement* on the sign-in screen and use it with an email and a password of
       at least 12 characters. You land in the app, in the same household, with the wishes the

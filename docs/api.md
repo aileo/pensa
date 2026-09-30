@@ -76,6 +76,12 @@ Administrators of their own household write their lists through
 `PATCH/DELETE /wishes/:id`. `GET /dashboard` adds a `managed_list_empty` todo
 while such a list is still empty.
 
+`PATCH …/members/:userId` corrects the whole record — `firstName`, `lastName`,
+`birthDate` and `nameDay` — so a name day can be added after the fact. To let
+the edit form prefill itself, household member listings carry `nameDay` for
+members of the caller's own household only; the family listing keeps the public
+projection, which omits it.
+
 Two routes turn a managed member into an independent account:
 
 | Route | Who finishes it | Result |

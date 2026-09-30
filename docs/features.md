@@ -60,8 +60,15 @@ list, edits their tags and removes what no longer fits. From the outside nothing
 changes — the rest of the family sees an ordinary list and reserves gifts on it
 without ever learning who wrote it.
 
+Their record — first name, last name, date of birth and name day — is set when
+they are created and can be corrected afterwards, so a missing name day does not
+mean creating the person again.
+
 The dashboard reminds the household when a managed list is still empty, so a
-child's birthday does not arrive with nothing on their list.
+child's birthday does not arrive with nothing on their list. It also lists the
+managed lists the household keeps, and the same shortcuts sit at the top of *my
+wishes*, so switching from your own list to a child's takes one click instead of
+a detour through the family screen.
 
 Nobody stays managed forever:
 
@@ -87,7 +94,9 @@ Three kinds:
 
 Occasions belong to a family, so someone who belongs to two families has the
 same occasion stored twice. The interface deduplicates them, and orders them
-chronologically from today rather than alphabetically.
+chronologically from today rather than alphabetically. Each upcoming occasion on
+the dashboard opens the wish list of the person concerned, so an approaching
+date leads straight to what they would like.
 
 ## Reservations
 

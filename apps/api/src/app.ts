@@ -134,9 +134,12 @@ const curates = async (actor: Person, ownerId: string) => !!await first(
   `SELECT 1 FROM users owner JOIN users actor ON actor.id=$1 AND actor.household_admin
    WHERE owner.id=$2 AND owner.password_hash IS NULL AND owner.household_id=actor.household_id`,
   [actor.id, ownerId]);
-const householdMembers = async (householdId: string) =>
+// A name day is only shown to the household itself: administrators need it to fill in the
+// record of a member who cannot do it themselves. Relatives in the shared families keep the
+// public projection, which leaves it out.
+const householdMembers = async (householdId: string, withNameDay = false) =>
   (await query<Person>('SELECT * FROM users WHERE household_id=$1 ORDER BY first_name', [householdId]))
-    .map(p => ({ ...publicPerson(p), householdAdmin: !!p.household_admin }));
+    .map(p => ({ ...publicPerson(p), householdAdmin: !!p.household_admin, ...(withNameDay ? { nameDay: p.name_day } : {}) }));
 // Secure follows the scheme the request actually arrived on, not NODE_ENV. A production image
 // reached over plain http — a first run on a bare server, before TLS is in front — would
 // otherwise set a cookie the browser refuses to send back, and login would appear to succeed
@@ -347,11 +350,14 @@ api.get('/households', async (req, res) => {
   const rows = await query<{id:string;name:string}>(`SELECT DISTINCT h.id,h.name FROM households h LEFT JOIN memberships m ON m.household_id=h.id
     LEFT JOIN memberships mine ON mine.family_id=m.family_id AND mine.household_id=$1
     WHERE h.id=$1 OR mine.household_id IS NOT NULL ORDER BY h.name`, [person(req).household_id]);
-  res.json(await Promise.all(rows.map(async h => ({ ...h, mine: h.id === person(req).household_id, members: await householdMembers(h.id) }))));
+  res.json(await Promise.all(rows.map(async h => {
+    const mine = h.id === person(req).household_id;
+    return { ...h, mine, members: await householdMembers(h.id, mine) };
+  })));
 });
 api.get('/households/mine', async (req, res) => {
   const h = await first<{id:string;name:string}>('SELECT id,name FROM households WHERE id=$1', [person(req).household_id]);
-  res.json({ ...h, members: await householdMembers(h.id) });
+  res.json({ ...h, members: await householdMembers(h.id, true) });
 });
 // Members of a household who have no account of their own: children, mostly. They are real
 // people in the database — they receive gifts, they appear in families, they can take part in
@@ -366,7 +372,7 @@ api.post('/households/:id/members', async (req, res) => {
   }).parse(req.body);
   await query('INSERT INTO users(household_id,first_name,last_name,birth_date,name_day,avatar) VALUES($1,$2,$3,$4,$5,$6)',
     [id, data.firstName, data.lastName, data.birthDate, data.nameDay ?? null, data.avatar ?? null]);
-  res.status(201).json({ members: await householdMembers(id) });
+  res.status(201).json({ members: await householdMembers(id, true) });
 });
 api.patch('/households/:id/members/:userId', async (req, res) => {
   const id = uuid.parse(req.params.id), userId = uuid.parse(req.params.userId);
@@ -403,7 +409,7 @@ api.patch('/households/:id/members/:userId', async (req, res) => {
       await client.query('COMMIT');
     } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
   }
-  res.json({ members: await householdMembers(id) });
+  res.json({ members: await householdMembers(id, true) });
 });
 // Hard delete, because a person kept around as a tombstone would still show up in every family
 // listing. It is refused as soon as any gift — past, present or cancelled — points at them, so
@@ -426,7 +432,7 @@ api.delete('/households/:id/members/:userId', async (req, res) => {
     await client.query('DELETE FROM users WHERE id=$1', [userId]);
     await client.query('COMMIT');
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
-  res.json({ members: await householdMembers(id) });
+  res.json({ members: await householdMembers(id, true) });
 });
 // Two ways to turn a managed member into an independent account. A code lets the person choose
 // their own password without an administrator ever knowing it; direct entry covers the case
@@ -446,7 +452,7 @@ api.post('/households/:id/members/:userId/account', async (req, res) => {
   const data = z.object({ email: z.email().toLowerCase(), password: z.string().min(12).max(128) }).parse(req.body);
   await managedMember(id, userId);
   await query('UPDATE users SET email=$2,password_hash=$3 WHERE id=$1', [userId, data.email, await hash(data.password, 12)]);
-  res.json({ members: await householdMembers(id) });
+  res.json({ members: await householdMembers(id, true) });
 });
 // Leaving home. The new household joins every family the old one belongs to, so the person stays
 // reachable by the relatives who already knew them instead of having to be invited back in.

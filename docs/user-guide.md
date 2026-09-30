@@ -93,6 +93,9 @@ are two different targets.
 
 If you belong to two families, an occasion that exists in both is shown once.
 
+On the dashboard, every upcoming occasion is clickable: it opens the wish list
+of the person it concerns.
+
 ## Giving: reading a list and reserving
 
 Open someone's list and you see their wishes. You can narrow it down by tag, by
@@ -157,6 +160,18 @@ the outside, nothing looks different — the rest of the family sees an ordinary
 list and reserves on it without ever learning who wrote it. Your dashboard will
 remind you when a managed list is still empty, so a birthday does not arrive
 with nothing on it.
+
+When you add them, *Ma famille → Mon foyer → Ajouter un membre sans compte* asks
+for a first name, a last name, a date of birth and, optionally, a **name day**.
+Without a name day, the *Fête* occasion is simply never announced for them. If
+you left it out, or got a date wrong, *Modifier la fiche* next to their name
+reopens the whole record — name, date of birth and name day — and saves it in
+place.
+
+**Getting to their list quickly.** You do not have to walk through the family
+screen: the lists your household keeps appear on your dashboard, and a row of
+shortcuts sits at the top of *Mes envies*. One click switches between your own
+list and theirs, and back.
 
 Nobody stays managed forever. Two ways out:
 
