@@ -1,8 +1,8 @@
 ﻿# Deploying Pensa
 
 Two images are published to the GitHub Container Registry, for `linux/amd64`
-and `linux/arm64`: `latest` on every push to `main`, and `stable` plus the
-version numbers on every release.
+and `linux/arm64`: `latest` on every push to `main`, and the version numbers on
+every release.
 
 | Image | Contains | Port |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ stack.
 
 ## Run it
 
-Three files: the stack, the overlay that follows releases, and the settings.
+Three files: the stack, the overlay naming the latest release, and the settings.
 
 ```sh
 curl -O https://raw.githubusercontent.com/aileo/pensa/main/compose.prod.yaml
@@ -200,7 +200,11 @@ endpoint for an external monitor or a Kubernetes probe.
 
 ## Upgrading
 
+Upgrading is deliberate: `compose.stable.yaml` names an exact version, so
+download it again before pulling and you can read what you are about to run.
+
 ```sh
+curl -O https://raw.githubusercontent.com/aileo/pensa/main/compose.stable.yaml
 docker compose -f compose.prod.yaml -f compose.stable.yaml pull
 docker compose -f compose.prod.yaml -f compose.stable.yaml up -d
 ```
@@ -213,28 +217,29 @@ backup first — see below.
 
 | Tag | Moves when | Good for |
 | --- | --- | --- |
-| `stable` | a version is released | production. This is what `compose.stable.yaml` uses |
+| `0.3.0` | never | production. This is what `compose.stable.yaml` names |
+| `0.3` | on patch releases | production, accepting fixes without re-reading the file |
 | `latest` | anything lands on `main` | trying out what is coming, knowing it is unreleased |
-| `0.2.0`, `0.2` | never / on patch releases | pinning, when you want to decide yourself |
 
 `compose.prod.yaml` alone uses `latest`, which tracks the `main` branch and
 therefore carries code that has not been released. `compose.stable.yaml` is a
-two-line overlay that swaps both images for `stable`; it is always used
-*alongside* the main file, never on its own:
+two-line overlay naming the latest release; it is always used *alongside* the
+main file, never on its own:
 
 ```sh
 docker compose -f compose.prod.yaml -f compose.stable.yaml up -d
 ```
 
-> The `stable` tag is published by the release workflow, so it appears with the
-> first release made after this file was written. Until then, follow `latest`
-> or pin a version.
+There is no moving `stable` tag on purpose. A pointer that changes under you
+means an unplanned `pull` can bring in a behaviour change you never read about
+— and below `1.0`, a minor bump may do exactly that. Every release updates the
+two lines of this file instead, so upgrading always starts with a diff.
 
-To pin a version instead, set the image variables in your `.env`:
+To pin a version yourself instead, set the image variables in your `.env`:
 
 ```sh
-API_IMAGE=ghcr.io/aileo/pensa-api:0.2.0
-WEB_IMAGE=ghcr.io/aileo/pensa-web:0.2.0
+API_IMAGE=ghcr.io/aileo/pensa-api:0.3.0
+WEB_IMAGE=ghcr.io/aileo/pensa-web:0.3.0
 ```
 
 Read the [changelog](../CHANGELOG.md) before moving between minor versions —

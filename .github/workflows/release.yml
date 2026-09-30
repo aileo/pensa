@@ -47,12 +47,11 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
+            # `latest` follows main, so it carries code that was never released. Deployments
+            # follow a version instead: compose.stable.yaml names one explicitly, and every
+            # release updates it.
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            # `latest` follows main, so it carries code that was never released. `stable` is
-            # the pointer deployments should follow: it only moves when a version tag is
-            # pushed. compose.stable.yaml uses it.
-            type=raw,value=stable,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - uses: docker/build-push-action@v6
         with:

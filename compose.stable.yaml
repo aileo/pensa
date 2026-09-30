@@ -1,13 +1,14 @@
-# Overlay pinning both images to the latest published release instead of `latest`, which
+# Overlay pinning both images to the latest published release, instead of `latest`, which
 # follows the main branch and therefore carries unreleased code. It only overrides two image
 # names — it is not a stack on its own, and is always used alongside compose.prod.yaml:
 #
 #   docker compose -f compose.prod.yaml -f compose.stable.yaml up -d
 #
-# Keeping it this short is deliberate: a full copy of compose.prod.yaml would drift from it,
-# and the drift would only show up in production.
+# The version is written out rather than hidden behind a moving tag: what you are about to
+# run is readable here, and upgrading is a deliberate act — download this file again, read
+# the diff, then pull. Every release updates these two lines.
 services:
   api:
-    image: ghcr.io/aileo/pensa-api:stable
+    image: ghcr.io/aileo/pensa-api:0.3.0
   web:
-    image: ghcr.io/aileo/pensa-web:stable
+    image: ghcr.io/aileo/pensa-web:0.3.0

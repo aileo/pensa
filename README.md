@@ -55,7 +55,7 @@ Two images are published for `linux/amd64` and `linux/arm64`. One port to
 expose, no build step, nothing to compile. On a fresh server:
 
 ```sh
-# 1. The stack, the overlay that follows releases, and the settings
+# 1. The stack, the overlay naming the latest release, and the settings
 curl -O https://raw.githubusercontent.com/aileo/pensa/main/compose.prod.yaml
 curl -O https://raw.githubusercontent.com/aileo/pensa/main/compose.stable.yaml
 curl -o .env https://raw.githubusercontent.com/aileo/pensa/main/.env.example

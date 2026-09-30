@@ -6,6 +6,8 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-30
+
 ### Added
 
 - **Members without an account, managed by the household.** A child now exists
@@ -22,10 +24,12 @@ minor bump may change behaviour.
   moment the instance answers — no sign-up form to fill in, so an instance can
   be deployed from a script. It only ever runs on an empty database, so
   restarting or upgrading never touches a live instance.
-- **`compose.stable.yaml`**, a two-line overlay pinning both images to `stable`,
-  a new tag that only moves when a version is released. `latest` follows the
-  `main` branch and therefore carries unreleased code; production should follow
-  `stable`. Used together with the main file:
+- **`compose.stable.yaml`**, a two-line overlay naming the latest published
+  release. `latest` follows the `main` branch and therefore carries unreleased
+  code, so production should not use it. The version is written out rather than
+  hidden behind a moving tag: upgrading starts by downloading the file again
+  and reading the diff, and every release updates those two lines. Used
+  together with the main file:
   `docker compose -f compose.prod.yaml -f compose.stable.yaml up -d`.
 
 ### Changed
@@ -152,4 +156,6 @@ which would already be a hint.
 This release was written by an AI agent under human direction. The
 [README](README.md) says so in full, and says what it means for you.
 
+[0.3.0]: https://github.com/aileo/pensa/releases/tag/v0.3.0
+[0.2.0]: https://github.com/aileo/pensa/releases/tag/v0.2.0
 [0.1.0]: https://github.com/aileo/pensa/releases/tag/v0.1.0

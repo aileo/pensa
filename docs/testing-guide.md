@@ -420,11 +420,14 @@ BOOTSTRAP_FAMILY="Famille Durand" API_IMAGE=pensa-api:local WEB_IMAGE=pensa-web:
 docker compose -f compose.prod.yaml -f compose.stable.yaml config | grep image
 ```
 
-- [ ] Both images read `:stable`. The overlay only replaces the two image names; everything
-      else — ports, variables, volumes — must still come from `compose.prod.yaml`.
-- [ ] `docker compose -f compose.prod.yaml -f compose.stable.yaml pull` succeeds. The `stable`
-      tag is published by the release workflow, so this only works once a release has been made
-      after the tag was introduced.
+- [ ] Both images read the version of the latest release — the same number as the newest
+      heading in the changelog, never a moving tag. The overlay only replaces the two image
+      names; everything else — ports, variables, volumes — must still come from
+      `compose.prod.yaml`.
+- [ ] `docker compose -f compose.prod.yaml -f compose.stable.yaml pull` succeeds, which means
+      the release workflow published that exact version for your architecture.
+- [ ] After a release, the two lines name the new version. This file is updated by hand at
+      release time, so a forgotten bump leaves deployments one version behind.
 
 ### 4.4 After the first publication to GHCR
 
