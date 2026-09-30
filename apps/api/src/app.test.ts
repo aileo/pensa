@@ -6,9 +6,10 @@ import { pool } from './db.js';
 let server: Server;
 let base: string;
 const cookies: Record<string, string> = {};
-const call = async (as: string, path: string, method = 'GET', body?: unknown) => {
+const call = async (as: string, path: string, method = 'GET', body?: unknown, language?: string) => {
   const response = await fetch(`${base}/api${path}`, {
-    method, headers: { 'content-type': 'application/json', cookie: cookies[as] ?? '', origin: 'http://localhost:5173' },
+    method, headers: { 'content-type': 'application/json', cookie: cookies[as] ?? '', origin: 'http://localhost:5173',
+      ...(language ? { 'accept-language': language } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: response.status, data: await response.json() as Record<string, any>, cookie: response.headers.get('set-cookie') };
@@ -29,6 +30,42 @@ afterAll(async () => {
   await pool.end();
 });
 describe('permissions métier sur l’API', () => {
+  it('localise les erreurs d’authentification et de validation selon Accept-Language', async () => {
+    expect(await call('', '/auth/me', 'GET', undefined, 'en-US,en;q=0.9,fr;q=0.5'))
+      .toMatchObject({ status: 401, data: { error: 'Authentication required' } });
+    expect(await call('', '/auth/me'))
+      .toMatchObject({ status: 401, data: { error: 'Connexion requise' } });
+    expect(await call('', '/auth/me', 'GET', undefined, 'de,es;q=0.8'))
+      .toMatchObject({ status: 401, data: { error: 'Connexion requise' } });
+    expect(await call('', '/auth/me', 'GET', undefined, 'fr-CA, en;q=0.4'))
+      .toMatchObject({ status: 401, data: { error: 'Connexion requise' } });
+    expect(await call('', '/auth/me', 'GET', undefined, 'fr;q=0.2,en-GB;q=0.9'))
+      .toMatchObject({ status: 401, data: { error: 'Authentication required' } });
+    expect(await call('', '/auth/login', 'POST', { email: 'alice@example.test', password: 'wrong' }, 'en'))
+      .toMatchObject({ status: 401, data: { error: 'Invalid credentials' } });
+    expect(await call('', '/auth/register', 'POST', { email: 'bad' }, 'en'))
+      .toMatchObject({ status: 400, data: { error: 'Invalid data' } });
+    expect(await call('', '/auth/register', 'POST', {
+      firstName: 'Duplicate', lastName: 'User', email: 'alice@example.test',
+      password: 'LongSecret2026!', birthDate: '2000-01-02',
+    }, 'en')).toMatchObject({ status: 409, data: { error: 'Conflict' } });
+    const malformed = await fetch(`${base}/api/auth/login`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'accept-language': 'en',
+        origin: 'http://localhost:5173' }, body: '{broken',
+    });
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toEqual({ error: 'Invalid data' });
+  });
+  it('localise les refus SSRF, les URL invalides et les ressources inconnues en JSON', async () => {
+    expect(await call('bob', '/wishes/preview', 'POST', { url: 'http://127.0.0.1/' }, 'en'))
+      .toMatchObject({ status: 400, data: { error: 'Address not allowed' } });
+    expect(await call('bob', '/wishes/preview', 'POST', { url: 'http://127.0.0.1/' }))
+      .toMatchObject({ status: 400, data: { error: 'Adresse non autorisée' } });
+    expect(await call('bob', '/wishes/preview', 'POST', { url: 'not-an-url' }, 'en'))
+      .toMatchObject({ status: 400, data: { error: 'Invalid data' } });
+    expect(await call('bob', '/no-such-route', 'GET', undefined, 'en'))
+      .toMatchObject({ status: 404, data: { error: 'Resource not found' } });
+  });
   it('renvoie 400 pour un JSON malformé', async () => {
     const response = await fetch(`${base}/api/auth/login`, {
       method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://localhost:5173' },

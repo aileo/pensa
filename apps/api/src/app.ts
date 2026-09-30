@@ -10,6 +10,61 @@ type Person = { id: string; household_id: string; first_name: string; last_name:
 type AuthRequest = Request & { person?: Person };
 class HttpError extends Error { constructor(public code: number, message: string) { super(message); } }
 const fail = (code: number, message: string): never => { throw new HttpError(code, message); };
+const english: Record<string, string> = {
+  'Accès refusé à cette famille': 'Access to this family denied',
+  'Origine interdite': 'Origin not allowed',
+  'Invitation invalide ou expirée': 'Invalid or expired invitation',
+  'Identifiants invalides': 'Invalid credentials',
+  'Connexion requise': 'Authentication required',
+  'Date de fête invalide': 'Invalid name day',
+  'Administration du foyer requise': 'Household administrator access required',
+  'Foyer déjà membre': 'Household is already a member',
+  'Une famille doit conserver un foyer': 'A family must retain at least one household',
+  'Terminer les réservations avant de retirer ce foyer': 'Complete reservations before removing this household',
+  'Une famille doit conserver un administrateur': 'A family must retain an administrator',
+  'Utilisateur hors famille': 'User is not in this family',
+  'Personne inaccessible': 'Person not accessible',
+  'Occasion introuvable': 'Occasion not found',
+  'Occasion utilisée dans une réservation': 'Occasion is used in a reservation',
+  'Souhait introuvable': 'Wish not found',
+  'URL invalide': 'Invalid URL',
+  'URL non autorisée': 'URL not allowed',
+  'Adresse non autorisée': 'Address not allowed',
+  'Page inaccessible': 'Page not accessible',
+  'Page trop volumineuse': 'Page too large',
+  'Délai dépassé': 'Request timed out',
+  'URL HTTP(S) requise': 'HTTP(S) URL required',
+  'Ordre invalide': 'Invalid order',
+  'Liste incomplète': 'Incomplete list',
+  'Réservation introuvable': 'Reservation not found',
+  'Occasion hors des familles communes': 'Occasion is outside shared families',
+  'Le bénéficiaire ne peut pas participer': 'The recipient cannot participate',
+  'Participant hors des familles du bénéficiaire': 'Participant is not in a family shared with the recipient',
+  'Souhait indisponible': 'Wish unavailable',
+  'Impossible de réserver son propre souhait': 'Cannot reserve your own wish',
+  'Souhait déjà réservé': 'Wish already reserved',
+  'Créateur requis': 'Reservation creator access required',
+  'Réservation terminée': 'Reservation completed',
+  'Souhait supprimé': 'Wish deleted',
+  'Transition de statut interdite': 'Status transition not allowed',
+  'Participation fermée': 'Participation closed',
+  'Déjà participant': 'Already a participant',
+  'Demande introuvable': 'Request not found',
+  'Ressource introuvable': 'Resource not found',
+  'Données invalides': 'Invalid data',
+  'Conflit': 'Conflict',
+  'Corps trop volumineux': 'Request body too large',
+  'Erreur serveur': 'Server error',
+  'Trop de requêtes': 'Too many requests',
+};
+const localized = (req: Request, message: string) =>
+  req.headers['accept-language']?.split(',').some(part => /^\s*en(?:-|;|$)/i.test(part)) &&
+    req.acceptsLanguages('en', 'fr') === 'en'
+    ? english[message] ?? english['Erreur serveur'] : message;
+const previewErrors = new Set([
+  'URL invalide', 'URL non autorisée', 'Adresse non autorisée', 'Page inaccessible',
+  'Page trop volumineuse', 'Délai dépassé',
+]);
 const uuid = z.uuid();
 const tags = z.array(z.string().trim().min(1).max(40)).max(20);
 const token = () => randomBytes(32).toString('hex');
@@ -38,7 +93,7 @@ app.use((req, res, next) => {
   const origin = process.env.WEB_ORIGIN ?? 'http://localhost:5173';
   res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept-Language');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.setHeader('Vary', 'Origin');
   if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
@@ -48,8 +103,9 @@ app.use((req, res, next) => {
 });
 const api = express.Router();
 app.use('/api', api);
-api.use(rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false }));
-const strictLimit = rateLimit({ windowMs: 15 * 60_000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false });
+const rateLimitError = (_req: Request, _res: Response, next: NextFunction) => next(new HttpError(429, 'Trop de requêtes'));
+api.use(rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError }));
+const strictLimit = rateLimit({ windowMs: 15 * 60_000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError });
 api.post('/auth/register', strictLimit, async (req, res) => {
   const data = z.object({
     firstName: z.string().trim().min(1).max(100), lastName: z.string().trim().min(1).max(100),
@@ -337,7 +393,7 @@ api.get('/wishes/:id', async (req, res) => {
 api.post('/wishes/preview', strictLimit, async (req, res) => {
   const { url } = z.object({ url: z.url().max(2048) }).parse(req.body);
   try { res.json(await preview(url)); } catch (e) {
-    if (e instanceof Error) fail(400, e.message);
+    if (e instanceof Error) fail(400, previewErrors.has(e.message) ? e.message : 'Page inaccessible');
     throw e;
   }
 });
@@ -590,16 +646,19 @@ api.get('/dashboard', async (req, res) => {
   res.json({ people: people.map(publicPerson), reservations: reservations.filter(r => r.creator.id === actor.id),
     participating: reservations.filter(r => r.creator.id !== actor.id), occasions });
 });
-app.use('/api', (_req, res) => res.status(404).json({ error: 'Ressource introuvable' }));
-app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  void _next;
+app.use('/api', (req, res) => res.vary('Accept-Language').status(404).json({ error: localized(req, 'Ressource introuvable') }));
+app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
+  if (res.headersSent) { _next(error); return; }
   const pg = error as { code?: string; status?: number };
   const status = error instanceof HttpError ? error.code : error instanceof ZodError ? 400 :
     pg.status === 400 ? 400 : pg.status === 413 ? 413 :
       pg.code === '23505' ? 409 : pg.code === '23503' ? 400 : 500;
   if (status === 500) console.error(error);
-  res.status(status).json({ error: error instanceof HttpError ? error.message :
+  const message = error instanceof HttpError ? error.message :
     error instanceof ZodError || status === 400 ? 'Données invalides' :
-      status === 409 ? 'Conflit' : status === 413 ? 'Corps trop volumineux' : 'Erreur serveur' });
+      status === 409 ? 'Conflit' : status === 413 ? 'Corps trop volumineux' :
+        status === 429 ? 'Trop de requêtes' : 'Erreur serveur';
+  res.vary('Accept-Language');
+  res.status(status).json({ error: localized(req, message) });
 });
 export { app };

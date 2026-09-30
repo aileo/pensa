@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError, dateOf, initials, json, list, money, nameOf, type Family, type Id, type Occasion, type OccasionSelection, type ParticipationRequest, type Person, type Reservation, type Wish } from './api'
+import { LanguageControl } from './language'
+import { useTranslation } from './language-context'
+import { localizeMessage, occasionName, type TranslationKey } from './locale'
 import './index.css'
 
 type Page = 'dashboard' | 'wishes' | 'families' | 'reservations' | 'history' | 'search' | 'profile'
@@ -42,26 +45,27 @@ function SectionTitle({ kicker, title, action }: { kicker?: string; title: strin
   return <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div>{kicker && <p className="eyebrow mb-1">{kicker}</p>}<h2 className="font-['Outfit'] text-2xl font-semibold tracking-tight text-[#302939]">{title}</h2></div>{action}</div>
 }
 function WishCard({ wish, mine, onReserve, onTags, onDelete }: { wish: Wish; mine: boolean; onReserve: () => void; onTags?: () => void; onDelete?: () => void }) {
+  const { t } = useTranslation()
   return <article className="card group flex h-full flex-col overflow-hidden">
     <div className="relative flex h-44 items-center justify-center bg-[#f4f0eb]">
       {wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover" loading="lazy" onError={event => { event.currentTarget.style.display = 'none' }} /> : <Icon name="gift" size={45} className="text-[#c6b9ce]" />}
-      {wish.reservation && !mine && <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-[#765c9b]">Réservé</span>}
+      {wish.reservation && !mine && <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-[#765c9b]">{t('Réservé')}</span>}
     </div>
     <div className="flex flex-1 flex-col p-4">
       <div className="flex items-start justify-between gap-2"><h3 className="font-['Outfit'] text-base font-semibold leading-snug">{wish.title}</h3>{wish.price !== undefined && wish.price !== null && <span className="shrink-0 text-sm font-bold text-[#795ca7]">{money(wish.price)}</span>}</div>
       {wish.description && <p className="mt-2 line-clamp-2 text-sm text-[#847b8d]">{wish.description}</p>}
       {!!wish.tags?.length && <div className="mt-3 flex flex-wrap gap-1.5">{wish.tags.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div>}
-      {!mine && wish.reservation && <p className="mt-3 text-xs text-[#807687]">Réservé par {nameOf(wish.reservation.creator)}{wish.reservation.openToContributions ? ' · Participation possible' : ''}</p>}
+      {!mine && wish.reservation && <p className="mt-3 text-xs text-[#807687]">{t('Réservé par {name}', { name: nameOf(wish.reservation.creator) })}{wish.reservation.openToContributions ? ` · ${t('Participation possible')}` : ''}</p>}
       <div className="mt-auto flex items-center gap-1 border-t border-[#f0edf1] pt-3" style={{ marginTop: 'auto', paddingTop: 12 }}>
-        {wish.url && <a className="icon-button" href={wish.url} target="_blank" rel="noopener noreferrer" aria-label={`Voir ${wish.title} sur le site marchand`}><Icon name="external" size={17} /></a>}
-        {mine ? <div className="ml-auto flex gap-1"><button className="icon-button" onClick={onTags} aria-label={`Modifier les tags de ${wish.title}`}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={onDelete} aria-label={`Supprimer ${wish.title}`}><Icon name="trash" size={17}/></button></div>
-          : <button className="secondary ml-auto !px-3 !py-1.5 text-xs" onClick={onReserve}>{wish.reservation ? 'Voir la réservation' : 'Réserver'} <Icon name="arrow" size={14}/></button>}
+        {wish.url && <a className="icon-button" href={wish.url} target="_blank" rel="noopener noreferrer" aria-label={t('Voir {title} sur le site marchand', { title: wish.title })}><Icon name="external" size={17} /></a>}
+        {mine ? <div className="ml-auto flex gap-1"><button className="icon-button" onClick={onTags} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={onDelete} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button></div>
+          : <button className="secondary ml-auto !px-3 !py-1.5 text-xs" onClick={onReserve}>{wish.reservation ? t('Voir la réservation') : t('Réserver')} <Icon name="arrow" size={14}/></button>}
       </div>
     </div>
   </article>
 }
 
-const nav: { page: Page; label: string; icon: IconName }[] = [
+const nav: { page: Page; label: TranslationKey; icon: IconName }[] = [
   { page: 'dashboard', label: 'Tableau de bord', icon: 'home' },
   { page: 'wishes', label: 'Mes envies', icon: 'heart' },
   { page: 'families', label: 'Ma famille', icon: 'users' },
@@ -69,7 +73,7 @@ const nav: { page: Page; label: string; icon: IconName }[] = [
   { page: 'history', label: 'Historique', icon: 'clock' },
   { page: 'search', label: 'Rechercher', icon: 'search' },
 ]
-const titleByPage: Record<Page, string> = {
+const titleByPage: Record<Page, TranslationKey> = {
   dashboard: 'Tableau de bord', wishes: 'Mes envies', families: 'Ma famille',
   reservations: 'Réservations', history: 'Historique', search: 'Rechercher', profile: 'Mon profil',
 }
@@ -77,6 +81,7 @@ type WishFilters = { tag: string; availability: string; minPrice: string; maxPri
 const emptyWishFilters: WishFilters = { tag: '', availability: '', minPrice: '', maxPrice: '' }
 
 function App() {
+  const { t } = useTranslation()
   const [account, setAccount] = useState<{ person: Person; session: number } | null>(null)
   const session = useRef(0)
   const [authChecked, setAuthChecked] = useState(false)
@@ -87,17 +92,18 @@ function App() {
   useEffect(() => {
     let active = true
     api<Person>('/auth/me').then(person => { if (active) onAuth(person) }).catch(problem => {
-      if (active && !(problem instanceof ApiError && problem.status === 401)) setError(problem instanceof Error ? problem.message : 'Une erreur inattendue est survenue.')
+      if (active && !(problem instanceof ApiError && problem.status === 401)) setError(problem instanceof Error ? problem.message : t('Une erreur inattendue est survenue.'))
     }).finally(() => { if (active) setAuthChecked(true) })
     return () => { active = false }
-  }, [])
+  }, [t])
 
-  if (!authChecked) return <div className="flex min-h-screen items-center justify-center text-[#795ca7]" role="status">Chargement de Giftit…</div>
+  if (!authChecked) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-[#795ca7]"><LanguageControl/><p role="status">{t('Chargement de Giftit…')}</p></div>
   if (!account) return <Auth mode={authMode} setMode={setAuthMode} onAuth={onAuth} error={error} setError={setError} />
   return <AuthenticatedApp key={account.session} me={account.person} onLogout={() => setAccount(null)} />
 }
 
 function AuthenticatedApp({ me, onLogout }: { me: Person; onLogout: () => void }) {
+  const { locale, t } = useTranslation()
   const [page, setPage] = useState<Page>('dashboard')
   const [mobileNav, setMobileNav] = useState(false)
   const [families, setFamilies] = useState<Family[]>([])
@@ -123,7 +129,7 @@ function AuthenticatedApp({ me, onLogout }: { me: Person; onLogout: () => void }
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
-  const handleError = (problem: unknown) => setError(problem instanceof Error ? problem.message : 'Une erreur inattendue est survenue.')
+  const handleError = useCallback((problem: unknown) => setError(problem instanceof Error ? problem.message : t('Une erreur inattendue est survenue.')), [t])
 
   useEffect(() => {
     let active = true
@@ -142,13 +148,13 @@ function AuthenticatedApp({ me, onLogout }: { me: Person; onLogout: () => void }
         })
     }).catch(problem => { if (active) handleError(problem) }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [me, revision])
+  }, [me, revision, handleError])
   useEffect(() => {
     if (page !== 'history') return
     let active = true
     api<unknown[]>('/history').then(data => { if (active) setHistory(list(data)) }).catch(problem => { if (active) handleError(problem) })
     return () => { active = false }
-  }, [me, page, revision])
+  }, [me, page, revision, handleError])
   useEffect(() => {
     if (page !== 'search') return
     let active = true
@@ -158,7 +164,7 @@ function AuthenticatedApp({ me, onLogout }: { me: Person; onLogout: () => void }
       }).catch(problem => { if (active) handleError(problem) })
     }, 300)
     return () => { active = false; window.clearTimeout(timer) }
-  }, [me, page, searchText, revision])
+  }, [me, page, searchText, revision, handleError])
   useEffect(() => {
     if (!selectedPerson) return
     let active = true
@@ -170,7 +176,7 @@ function AuthenticatedApp({ me, onLogout }: { me: Person; onLogout: () => void }
     const suffix = query.size ? `?${query}` : ''
     api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes${suffix}`).then(data => { if (active) setPersonWishes(list(data)) }).catch(problem => { if (active) handleError(problem) })
     return () => { active = false }
-  }, [selectedPerson, me?.id, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision])
+  }, [selectedPerson, me?.id, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision, handleError])
 
   async function perform(action: () => Promise<unknown>, success: string, close = true) {
     setBusy(true); setError('')
@@ -189,7 +195,7 @@ function AuthenticatedApp({ me, onLogout }: { me: Person; onLogout: () => void }
   }
   function openOccasion(family: Family) { setSelectedFamily(family); setModal('occasion'); setError('') }
   async function removeWish(wish: Wish) {
-    if (window.confirm(`Supprimer « ${wish.title} » de votre liste ?`)) await perform(() => api(`/wishes/${wish.id}`, { method: 'DELETE' }), 'Envie supprimée.')
+    if (window.confirm(t('Supprimer « {title} » de votre liste ?', { title: wish.title }))) await perform(() => api(`/wishes/${wish.id}`, { method: 'DELETE' }), t('Envie supprimée.'))
   }
   async function reorder(from: number, to: number) {
     if (from === to || to < 0 || to >= myWishes.length) return
@@ -198,7 +204,7 @@ function AuthenticatedApp({ me, onLogout }: { me: Person; onLogout: () => void }
     reordered.splice(to, 0, item)
     const previous = wishes
     setWishes([...reordered, ...wishes.filter(wish => String(wish.ownerId) !== String(me?.id))])
-    const ok = await perform(() => api('/wishes/order', json('PATCH', { ids: reordered.map(wish => wish.id) })), 'Ordre enregistré.', false)
+    const ok = await perform(() => api('/wishes/order', json('PATCH', { ids: reordered.map(wish => wish.id) })), t('Ordre enregistré.'), false)
     if (!ok) setWishes(previous)
   }
   const myWishes = wishes.filter(wish => String(wish.ownerId) === String(me?.id) || wish.ownerId == null)
@@ -213,74 +219,76 @@ function AuthenticatedApp({ me, onLogout }: { me: Person; onLogout: () => void }
   }
 
   return <div className="min-h-screen bg-[#faf9f7] lg:flex">
-    {mobileNav && <button className="fixed inset-0 z-30 bg-[#241a35]/40 lg:hidden" aria-label="Fermer le menu" onClick={() => setMobileNav(false)} />}
+    {mobileNav && <button className="fixed inset-0 z-30 bg-[#241a35]/40 lg:hidden" aria-label={t('Fermer le menu')} onClick={() => setMobileNav(false)} />}
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[#eee9ef] bg-white px-4 py-7 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${mobileNav ? 'translate-x-0' : '-translate-x-full'}`}>
-      <button className="mb-11 flex items-center gap-2.5 px-3 text-left" onClick={() => go('dashboard')} aria-label="Giftit, accueil"><span className="flex size-10 items-center justify-center rounded-2xl bg-[#795ca7] text-white"><Icon name="gift" size={23}/></span><span className="font-['Outfit'] text-[27px] font-extrabold tracking-[-.06em] text-[#382d49]">giftit<span className="text-[#b5a0d3]">.</span></span></button>
-      <span className="eyebrow mb-3 px-3">Menu principal</span>
-      <nav aria-label="Navigation principale" className="space-y-1">
-        {nav.map(item => <button key={item.page} onClick={() => go(item.page)} aria-current={page === item.page ? 'page' : undefined} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${page === item.page ? 'bg-[#f1eafa] text-[#7555a2]' : 'text-[#807789] hover:bg-[#faf7fc] hover:text-[#7555a2]'}`}><Icon name={item.icon} size={19}/>{item.label}</button>)}
+      <button className="mb-11 flex items-center gap-2.5 px-3 text-left" onClick={() => go('dashboard')} aria-label={t('Giftit, accueil')}><span className="flex size-10 items-center justify-center rounded-2xl bg-[#795ca7] text-white"><Icon name="gift" size={23}/></span><span className="font-['Outfit'] text-[27px] font-extrabold tracking-[-.06em] text-[#382d49]">giftit<span className="text-[#b5a0d3]">.</span></span></button>
+      <span className="eyebrow mb-3 px-3">{t('Menu principal')}</span>
+      <nav aria-label={t('Navigation principale')} className="space-y-1">
+        {nav.map(item => <button key={item.page} onClick={() => go(item.page)} aria-current={page === item.page ? 'page' : undefined} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${page === item.page ? 'bg-[#f1eafa] text-[#7555a2]' : 'text-[#807789] hover:bg-[#faf7fc] hover:text-[#7555a2]'}`}><Icon name={item.icon} size={19}/>{t(item.label)}</button>)}
       </nav>
       <div className="mt-auto px-2">
-        <div className="mb-5 rounded-2xl bg-[#f5f0f9] p-4"><Icon name="spark" size={20} className="mb-2 text-[#8566ae]"/><p className="font-['Outfit'] text-sm font-bold">La joie de faire plaisir</p><p className="mt-1 text-xs leading-relaxed text-[#84788d]">Partagez vos envies avec ceux qui comptent.</p></div>
-        <button onClick={() => go('profile')} className={`flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left hover:bg-[#faf7fc] ${page === 'profile' ? 'bg-[#f1eafa]' : ''}`}><Avatar person={me}/><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{nameOf(me)}</span><span className="block truncate text-xs text-[#9b91a1]">Mon profil</span></span><Icon name="chevron" size={16}/></button>
+        <div className="mb-5 rounded-2xl bg-[#f5f0f9] p-4"><Icon name="spark" size={20} className="mb-2 text-[#8566ae]"/><p className="font-['Outfit'] text-sm font-bold">{t('La joie de faire plaisir')}</p><p className="mt-1 text-xs leading-relaxed text-[#84788d]">{t('Partagez vos envies avec ceux qui comptent.')}</p></div>
+        <button onClick={() => go('profile')} className={`flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left hover:bg-[#faf7fc] ${page === 'profile' ? 'bg-[#f1eafa]' : ''}`}><Avatar person={me}/><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{nameOf(me)}</span><span className="block truncate text-xs text-[#9b91a1]">{t('Mon profil')}</span></span><Icon name="chevron" size={16}/></button>
+        <div className="mt-3 px-1"><LanguageControl/></div>
       </div>
     </aside>
     <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-20 flex h-[74px] items-center justify-between border-b border-[#eee9ef] bg-white/95 px-5 backdrop-blur md:px-9">
-        <div className="flex items-center gap-3"><button className="icon-button lg:hidden" aria-label="Ouvrir le menu" onClick={() => setMobileNav(true)}><Icon name="menu"/></button><p className="font-['Outfit'] text-lg font-semibold">{selectedPerson ? nameOf(selectedPerson) : selectedFamily ? selectedFamily.name : titleByPage[page]}</p></div>
-        <div className="flex items-center gap-3"><button className="icon-button" aria-label="Rechercher" onClick={() => go('search')}><Icon name="search"/></button><span className="hidden h-7 w-px bg-[#eee9ef] sm:block"/><button onClick={() => go('profile')} aria-label="Mon profil"><Avatar person={me} size="sm"/></button></div>
+        <div className="flex items-center gap-3"><button className="icon-button lg:hidden" aria-label={t('Ouvrir le menu')} onClick={() => setMobileNav(true)}><Icon name="menu"/></button><p className="font-['Outfit'] text-lg font-semibold">{selectedPerson ? nameOf(selectedPerson) : selectedFamily ? selectedFamily.name : t(titleByPage[page])}</p></div>
+        <div className="flex items-center gap-3"><button className="icon-button" aria-label={t('Rechercher')} onClick={() => go('search')}><Icon name="search"/></button><span className="hidden h-7 w-px bg-[#eee9ef] sm:block"/><button onClick={() => go('profile')} aria-label={t('Mon profil')}><Avatar person={me} size="sm"/></button></div>
       </header>
       <main className="mx-auto max-w-[1300px] px-5 pb-16 pt-8 md:px-9 md:pt-10">
-        {error && <div role="alert" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}<button aria-label="Masquer l'erreur" onClick={() => setError('')}><Icon name="close" size={16}/></button></div>}
-        {notice && <div role="status" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{notice}<button aria-label="Masquer la notification" onClick={() => setNotice('')}><Icon name="close" size={16}/></button></div>}
-        {loading && <p role="status" className="muted mb-3">Actualisation des données…</p>}
-        {page === 'dashboard' && <><div className="relative mb-8 overflow-hidden rounded-[26px] bg-[#eee6f6] px-7 py-9 sm:px-10 sm:py-11"><div className="relative z-10 max-w-[580px]"><p className="eyebrow mb-3">LE BONHEUR SE PARTAGE</p><h1 className="font-['Outfit'] text-3xl font-bold leading-tight tracking-tight text-[#3e2e54] sm:text-[42px]">Bonjour {me.firstName || 'vous'} <span aria-hidden="true">👋</span></h1><p className="mt-3 max-w-md text-sm leading-relaxed text-[#766782] sm:text-base">Les plus beaux cadeaux sont ceux qu’on choisit ensemble. Retrouvez les envies de vos proches et partagez les vôtres.</p><button className="primary mt-6" onClick={() => { setModal('wish'); setError('') }}><Icon name="plus" size={18}/> Ajouter une envie</button></div><div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 size-72 rounded-full border-[38px] border-white/20 sm:right-0"/><div aria-hidden="true" className="pointer-events-none absolute -bottom-36 right-20 size-72 rounded-full bg-white/25"/></div>
+        {error && <div role="alert" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{localizeMessage(error, locale)}<button aria-label={t('Masquer l’erreur')} onClick={() => setError('')}><Icon name="close" size={16}/></button></div>}
+        {notice && <div role="status" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{localizeMessage(notice, locale)}<button aria-label={t('Masquer la notification')} onClick={() => setNotice('')}><Icon name="close" size={16}/></button></div>}
+        {loading && <p role="status" className="muted mb-3">{t('Actualisation des données…')}</p>}
+        {page === 'dashboard' && <><div className="relative mb-8 overflow-hidden rounded-[26px] bg-[#eee6f6] px-7 py-9 sm:px-10 sm:py-11"><div className="relative z-10 max-w-[580px]"><p className="eyebrow mb-3">{t('LE BONHEUR SE PARTAGE')}</p><h1 className="font-['Outfit'] text-3xl font-bold leading-tight tracking-tight text-[#3e2e54] sm:text-[42px]">{t('Bonjour {name}', { name: me.firstName || t('vous') })} <span aria-hidden="true">👋</span></h1><p className="mt-3 max-w-md text-sm leading-relaxed text-[#766782] sm:text-base">{t('Les plus beaux cadeaux sont ceux qu’on choisit ensemble. Retrouvez les envies de vos proches et partagez les vôtres.')}</p><button className="primary mt-6" onClick={() => { setModal('wish'); setError('') }}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div><div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 size-72 rounded-full border-[38px] border-white/20 sm:right-0"/><div aria-hidden="true" className="pointer-events-none absolute -bottom-36 right-20 size-72 rounded-full bg-white/25"/></div>
           <div className="mb-9 grid gap-4 sm:grid-cols-3">{[
-            { label: 'Mes envies', count: myWishes.length, icon: 'heart' as IconName, color: 'bg-[#f2eafa] text-[#805fb0]', target: 'wishes' as Page },
-            { label: 'Mes familles', count: families.length, icon: 'users' as IconName, color: 'bg-[#fceee7] text-[#d18a65]', target: 'families' as Page },
-            { label: 'Réservations', count: reservations.length, icon: 'gift' as IconName, color: 'bg-[#eaf4f0] text-[#6d9e87]', target: 'reservations' as Page },
-          ].map(stat => <button key={stat.label} onClick={() => go(stat.target)} className="card flex items-center gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-md"><span className={`rounded-2xl p-3 ${stat.color}`}><Icon name={stat.icon} size={23}/></span><span><strong className="block font-['Outfit'] text-2xl">{stat.count}</strong><span className="muted">{stat.label}</span></span><Icon name="chevron" size={17} className="ml-auto text-[#c4b8c9]"/></button>)}</div>
+            { label: t('Mes envies'), count: myWishes.length, icon: 'heart' as IconName, color: 'bg-[#f2eafa] text-[#805fb0]', target: 'wishes' as Page },
+            { label: t('Mes familles'), count: families.length, icon: 'users' as IconName, color: 'bg-[#fceee7] text-[#d18a65]', target: 'families' as Page },
+            { label: t('Réservations'), count: reservations.length, icon: 'gift' as IconName, color: 'bg-[#eaf4f0] text-[#6d9e87]', target: 'reservations' as Page },
+          ].map(stat => <button key={stat.target} onClick={() => go(stat.target)} className="card flex items-center gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-md"><span className={`rounded-2xl p-3 ${stat.color}`}><Icon name={stat.icon} size={23}/></span><span><strong className="block font-['Outfit'] text-2xl">{stat.count}</strong><span className="muted">{stat.label}</span></span><Icon name="chevron" size={17} className="ml-auto text-[#c4b8c9]"/></button>)}</div>
           <div className="mb-9 grid gap-5 lg:grid-cols-2">
-            <div><SectionTitle kicker="À VENIR" title="Les prochaines occasions"/>{dashboardOccasions.length ? <div className="card divide-y divide-[#f0edf1]">{dashboardOccasions.slice(0, 4).map(occasion => <div key={`${occasion.id}-${occasion.person?.id}`} className="flex items-center gap-3 p-4"><span className="rounded-xl bg-[#f2eafa] p-2 text-[#795ca7]"><Icon name="calendar" size={19}/></span><div className="min-w-0 flex-1"><p className="truncate font-semibold">{occasion.name} · {nameOf(occasion.person)}</p><p className="muted">{dateOf(occasion.nextDate || undefined)}</p></div></div>)}</div> : <Empty icon="calendar" title="Aucune date à venir" text="Les occasions de vos proches apparaîtront ici."/>}</div>
-            <div><SectionTitle kicker="EN PRÉPARATION" title="Les cadeaux partagés"/>{dashboardReservations.length || dashboardParticipating.length ? <div className="card p-6"><p className="text-lg font-semibold">{dashboardReservations.length} réservation(s) organisées</p><p className="muted mt-2">{dashboardParticipating.length} cadeau(x) auxquels vous participez</p><button className="secondary mt-5" onClick={() => go('reservations')}>Voir les réservations <Icon name="arrow" size={16}/></button></div> : <Empty icon="gift" title="Encore rien à préparer" text="Réservez une envie pour organiser un cadeau."/>}</div>
+            <div><SectionTitle kicker={t('À VENIR')} title={t('Les prochaines occasions')}/>{dashboardOccasions.length ? <div className="card divide-y divide-[#f0edf1]">{dashboardOccasions.slice(0, 4).map(occasion => <div key={`${occasion.id}-${occasion.person?.id}`} className="flex items-center gap-3 p-4"><span className="rounded-xl bg-[#f2eafa] p-2 text-[#795ca7]"><Icon name="calendar" size={19}/></span><div className="min-w-0 flex-1"><p className="truncate font-semibold">{occasionName(occasion.name, locale, occasion.kind)} · {nameOf(occasion.person)}</p><p className="muted">{dateOf(occasion.nextDate)}</p></div></div>)}</div> : <Empty icon="calendar" title={t('Aucune date à venir')} text={t('Les occasions de vos proches apparaîtront ici.')}/>}</div>
+            <div><SectionTitle kicker={t('EN PRÉPARATION')} title={t('Les cadeaux partagés')}/>{dashboardReservations.length || dashboardParticipating.length ? <div className="card p-6"><p className="text-lg font-semibold">{t(dashboardReservations.length === 1 ? '{count} réservation organisée' : '{count} réservations organisées', { count: dashboardReservations.length })}</p><p className="muted mt-2">{t(dashboardParticipating.length === 1 ? '{count} cadeau auquel vous participez' : '{count} cadeaux auxquels vous participez', { count: dashboardParticipating.length })}</p><button className="secondary mt-5" onClick={() => go('reservations')}>{t('Voir les réservations')} <Icon name="arrow" size={16}/></button></div> : <Empty icon="gift" title={t('Encore rien à préparer')} text={t('Réservez une envie pour organiser un cadeau.')}/>}</div>
           </div>
-          <SectionTitle kicker="POUR VOUS" title="Les envies de vos proches" action={<button className="text-sm font-semibold text-[#795ca7] hover:underline" onClick={() => go('families')}>Voir la famille →</button>}/>
-          {sharedWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{sharedWishes.slice(0, 4).map(wish => <WishCard key={wish.id} wish={wish} mine={false} onReserve={() => openReserve(wish)}/>)}</div> : <Empty icon="users" title="À découvrir bientôt" text="Les envies de vos proches apparaîtront ici dès qu’ils les partageront." action={<button className="secondary" onClick={() => go('families')}>Voir ma famille</button>}/>}
+          <SectionTitle kicker={t('POUR VOUS')} title={t('Les envies de vos proches')} action={<button className="text-sm font-semibold text-[#795ca7] hover:underline" onClick={() => go('families')}>{t('Voir la famille →')}</button>}/>
+          {sharedWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{sharedWishes.slice(0, 4).map(wish => <WishCard key={wish.id} wish={wish} mine={false} onReserve={() => openReserve(wish)}/>)}</div> : <Empty icon="users" title={t('À découvrir bientôt')} text={t('Les envies de vos proches apparaîtront ici dès qu’ils les partageront.')} action={<button className="secondary" onClick={() => go('families')}>{t('Voir ma famille')}</button>}/>}
         </>}
-        {page === 'wishes' && <><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-2">VOTRE LISTE PERSONNELLE</p><h1 className="font-['Outfit'] text-3xl font-bold">Mes envies <span className="text-[#ad98ca]">({myWishes.length})</span></h1><p className="muted mt-2">Vos idées cadeaux, toujours à portée de main.</p></div><button className="primary" onClick={() => { setModal('wish'); setError('') }}><Icon name="plus" size={18}/> Ajouter une envie</button></div>{myWishes.length ? <><p className="muted mb-4">Glissez les envies ou utilisez les flèches pour changer leur priorité.</p><div className="space-y-3">{myWishes.map((wish, index) => <div key={wish.id} draggable onDragStart={event => event.dataTransfer.setData('text/plain', String(index))} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) void reorder(from, index) }} className="card flex items-center gap-3 p-3 sm:gap-5 sm:p-4"><span className="hidden cursor-grab text-[#afa5b6] sm:block"><Icon name="grip"/></span><div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f3eff1] sm:size-20">{wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" className="text-[#b9a9c8]"/>}</div><div className="min-w-0 flex-1"><h2 className="truncate font-['Outfit'] font-semibold">{wish.title}</h2><p className="muted mt-1 truncate">{wish.description || wish.url || 'Une belle idée cadeau'}</p><div className="mt-1 flex flex-wrap gap-1">{wish.tags?.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div></div><strong className="hidden text-sm text-[#795ca7] sm:block">{money(wish.price)}</strong><div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row"><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => reorder(index, index - 1)} aria-label={`Monter ${wish.title}`}>↑</button><button className="icon-button !size-7" disabled={index === myWishes.length - 1 || busy} onClick={() => reorder(index, index + 1)} aria-label={`Descendre ${wish.title}`}>↓</button><button className="icon-button" onClick={() => { setSelectedWish(wish); setModal('tags') }} aria-label={`Modifier les tags de ${wish.title}`}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={() => removeWish(wish)} aria-label={`Supprimer ${wish.title}`}><Icon name="trash" size={17}/></button></div></div>)}</div></> : <Empty icon="heart" title="Votre liste attend ses premières envies" text="Collez le lien d’un produit et nous vous aiderons à l’ajouter." action={<button className="primary" onClick={() => setModal('wish')}><Icon name="plus" size={18}/> Ajouter une envie</button>}/>}</>}
-        {page === 'families' && <><SectionTitle kicker="CEUX QUI COMPTENT" title={selectedPerson ? `Les envies de ${nameOf(selectedPerson)}` : selectedFamily ? selectedFamily.name : 'Ma famille'} action={selectedPerson || selectedFamily ? <button className="secondary" onClick={() => { setSelectedPerson(null); setSelectedFamily(null) }}>← Retour aux familles</button> : <button className="primary" onClick={() => setModal('family')}><Icon name="plus" size={18}/> Créer une famille</button>}/>
+        {page === 'wishes' && <><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-2">{t('VOTRE LISTE PERSONNELLE')}</p><h1 className="font-['Outfit'] text-3xl font-bold">{t('Mes envies')} <span className="text-[#ad98ca]">({myWishes.length})</span></h1><p className="muted mt-2">{t('Vos idées cadeaux, toujours à portée de main.')}</p></div><button className="primary" onClick={() => { setModal('wish'); setError('') }}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div>{myWishes.length ? <><p className="muted mb-4">{t('Glissez les envies ou utilisez les flèches pour changer leur priorité.')}</p><div className="space-y-3">{myWishes.map((wish, index) => <div key={wish.id} draggable onDragStart={event => event.dataTransfer.setData('text/plain', String(index))} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) void reorder(from, index) }} className="card flex items-center gap-3 p-3 sm:gap-5 sm:p-4"><span className="hidden cursor-grab text-[#afa5b6] sm:block"><Icon name="grip"/></span><div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f3eff1] sm:size-20">{wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" className="text-[#b9a9c8]"/>}</div><div className="min-w-0 flex-1"><h2 className="truncate font-['Outfit'] font-semibold">{wish.title}</h2><p className="muted mt-1 truncate">{wish.description || wish.url || t('Une belle idée cadeau')}</p><div className="mt-1 flex flex-wrap gap-1">{wish.tags?.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div></div><strong className="hidden text-sm text-[#795ca7] sm:block">{money(wish.price)}</strong><div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row"><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => reorder(index, index - 1)} aria-label={t('Monter {title}', { title: wish.title })}>↑</button><button className="icon-button !size-7" disabled={index === myWishes.length - 1 || busy} onClick={() => reorder(index, index + 1)} aria-label={t('Descendre {title}', { title: wish.title })}>↓</button><button className="icon-button" onClick={() => { setSelectedWish(wish); setModal('tags') }} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={() => removeWish(wish)} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button></div></div>)}</div></> : <Empty icon="heart" title={t('Votre liste attend ses premières envies')} text={t('Collez le lien d’un produit et nous vous aiderons à l’ajouter.')} action={<button className="primary" onClick={() => setModal('wish')}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button>}/>}</>}
+        {page === 'families' && <><SectionTitle kicker={t('CEUX QUI COMPTENT')} title={selectedPerson ? t('Les envies de {name}', { name: nameOf(selectedPerson) }) : selectedFamily ? selectedFamily.name : t('Ma famille')} action={selectedPerson || selectedFamily ? <button className="secondary" onClick={() => { setSelectedPerson(null); setSelectedFamily(null) }}>{t('← Retour aux familles')}</button> : <button className="primary" onClick={() => setModal('family')}><Icon name="plus" size={18}/> {t('Créer une famille')}</button>}/>
           {selectedPerson ? <>
             <div className="card mb-6 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div><label className="label" htmlFor="filter-tag">Tag</label><input className="field" id="filter-tag" value={personFilters.tag} onChange={event => setPersonFilter('tag', event.target.value)} placeholder="Ex. : livres"/></div>
-              {String(selectedPerson.id) !== String(me.id) && <div><label className="label" htmlFor="filter-availability">Disponibilité</label><select className="field" id="filter-availability" value={personFilters.availability} onChange={event => setPersonFilter('availability', event.target.value)}><option value="">Toutes</option><option value="available">Disponibles</option><option value="reserved">Réservées</option></select></div>}
-              <div><label className="label" htmlFor="filter-min-price">Prix minimum (€)</label><input className="field" id="filter-min-price" type="number" min="0" step="0.01" value={personFilters.minPrice} onChange={event => setPersonFilter('minPrice', event.target.value)} placeholder="0"/></div>
-              <div><label className="label" htmlFor="filter-max-price">Prix maximum (€)</label><input className="field" id="filter-max-price" type="number" min="0" step="0.01" value={personFilters.maxPrice} onChange={event => setPersonFilter('maxPrice', event.target.value)} placeholder="Sans limite"/></div>
+              <div><label className="label" htmlFor="filter-tag">{t('Tag')}</label><input className="field" id="filter-tag" value={personFilters.tag} onChange={event => setPersonFilter('tag', event.target.value)} placeholder={t('Ex. : livres')}/></div>
+              {String(selectedPerson.id) !== String(me.id) && <div><label className="label" htmlFor="filter-availability">{t('Disponibilité')}</label><select className="field" id="filter-availability" value={personFilters.availability} onChange={event => setPersonFilter('availability', event.target.value)}><option value="">{t('Toutes')}</option><option value="available">{t('Disponibles')}</option><option value="reserved">{t('Réservées')}</option></select></div>}
+              <div><label className="label" htmlFor="filter-min-price">{t('Prix minimum (€)')}</label><input className="field" id="filter-min-price" type="number" min="0" step="0.01" value={personFilters.minPrice} onChange={event => setPersonFilter('minPrice', event.target.value)} placeholder="0"/></div>
+              <div><label className="label" htmlFor="filter-max-price">{t('Prix maximum (€)')}</label><input className="field" id="filter-max-price" type="number" min="0" step="0.01" value={personFilters.maxPrice} onChange={event => setPersonFilter('maxPrice', event.target.value)} placeholder={t('Sans limite')}/></div>
             </div>
-            {personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div> : <Empty icon="heart" title="Aucune envie trouvée" text="Modifiez les filtres pour découvrir d’autres envies."/>}
+            {personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div> : <Empty icon="heart" title={t('Aucune envie trouvée')} text={t('Modifiez les filtres pour découvrir d’autres envies.')}/>}
           </>
-            : activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">VOTRE TRIBU</p><p className="muted mt-1">Découvrez les envies des membres de cette famille.</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> Ajouter une occasion</button>}</div>{activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-4 p-5 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title="Aucun membre affiché" text="Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles."/>}{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} me={me} busy={busy} perform={perform} handleError={handleError} onRename={name => setSelectedFamily({ ...activeFamily, name })}/>}</>
-            : families.length ? <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{families.map(family => <article className="card p-6" key={family.id}><div className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-[#f2eafa] text-[#795ca7]"><Icon name="users" size={25}/></div><h3 className="font-['Outfit'] text-xl font-semibold">{family.name}</h3><p className="muted mt-1">{family.admin ? 'Famille administrée' : 'Famille partagée'}</p><div className="mt-5 flex gap-2"><button className="secondary flex-1 !px-2" onClick={() => { setSelectedFamily(family); setSelectedPerson(null) }}>Voir la famille <Icon name="arrow" size={16}/></button>{family.admin && <button className="icon-button" onClick={() => openOccasion(family)} aria-label={`Créer une occasion pour ${family.name}`}><Icon name="calendar" size={19}/></button>}</div></article>)}</div> : <Empty icon="users" title="Créez votre première famille" text="Rassemblez les personnes qui comptent et découvrez leurs envies." action={<button className="primary" onClick={() => setModal('family')}>Créer une famille</button>}/>}
+            : activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">{t('VOTRE TRIBU')}</p><p className="muted mt-1">{t('Découvrez les envies des membres de cette famille.')}</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> {t('Ajouter une occasion')}</button>}</div>{activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-4 p-5 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title={t('Aucun membre affiché')} text={t('Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles.')}/ >}{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} me={me} busy={busy} perform={perform} handleError={handleError} onRename={name => setSelectedFamily({ ...activeFamily, name })}/>}</>
+            : families.length ? <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{families.map(family => <article className="card p-6" key={family.id}><div className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-[#f2eafa] text-[#795ca7]"><Icon name="users" size={25}/></div><h3 className="font-['Outfit'] text-xl font-semibold">{family.name}</h3><p className="muted mt-1">{family.admin ? t('Famille administrée') : t('Famille partagée')}</p><div className="mt-5 flex gap-2"><button className="secondary flex-1 !px-2" onClick={() => { setSelectedFamily(family); setSelectedPerson(null) }}>{t('Voir la famille')} <Icon name="arrow" size={16}/></button>{family.admin && <button className="icon-button" onClick={() => openOccasion(family)} aria-label={t('Créer une occasion pour {name}', { name: family.name })}><Icon name="calendar" size={19}/></button>}</div></article>)}</div> : <Empty icon="users" title={t('Créez votre première famille')} text={t('Rassemblez les personnes qui comptent et découvrez leurs envies.')} action={<button className="primary" onClick={() => setModal('family')}>{t('Créer une famille')}</button>}/>}
           {!selectedPerson && !selectedFamily && me.householdId != null && <JoinFamily busy={busy} perform={perform}/>}
-          {!selectedPerson && !selectedFamily && allPeople.filter(person => String(person.id) !== String(me.id)).length > 0 && <div className="mt-9"><SectionTitle title="Les personnes à découvrir"/><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{allPeople.filter(person => String(person.id) !== String(me.id)).map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-3 p-4 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={16}/></button>)}</div></div>}
+          {!selectedPerson && !selectedFamily && allPeople.filter(person => String(person.id) !== String(me.id)).length > 0 && <div className="mt-9"><SectionTitle title={t('Les personnes à découvrir')}/><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{allPeople.filter(person => String(person.id) !== String(me.id)).map(person => <button key={person.id} onClick={() => { setSelectedPerson(person); setPersonWishes([]) }} className="card flex items-center gap-3 p-4 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={16}/></button>)}</div></div>}
         </>}
-        {page === 'reservations' && <><SectionTitle kicker="CADEAUX EN PRÉPARATION" title="Mes réservations"/>{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform}/>)}</div> : <Empty icon="gift" title="Aucune réservation pour le moment" text="Explorez les listes de vos proches pour leur préparer une surprise." action={<button className="primary" onClick={() => go('families')}>Découvrir les envies <Icon name="arrow" size={17}/></button>}/>}</>}
-        {page === 'history' && <><SectionTitle kicker="SOUVENIRS PARTAGÉS" title="Historique"/>{history.length ? <div className="card divide-y divide-[#f0edf1]">{history.map((entry, index) => { const item = entry as { id?: Id; snapshot?: { title?: string; occasions?: { name: string; year: number }[] }; created_at?: string }; return <div className="flex items-start gap-4 p-5" key={String(item.id ?? index)}><span className="rounded-xl bg-[#f2eafa] p-2.5 text-[#795ca7]"><Icon name="clock" size={19}/></span><div><p className="font-semibold">{item.snapshot?.title || 'Un cadeau offert'}</p><p className="muted mt-1">{item.snapshot?.occasions?.map(occasion => `${occasion.name} ${occasion.year}`).join(', ')} · {dateOf(item.created_at)}</p></div></div> })}</div> : <Empty icon="clock" title="Vos souvenirs commencent ici" text="L’historique de vos cadeaux et occasions s’affichera ici."/>}</>}
-        {page === 'search' && <><SectionTitle kicker="TROUVEZ L’INSPIRATION" title="Rechercher"/><label htmlFor="global-search" className="label">Personnes et envies</label><div className="relative mb-7"><Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#a399ac]"/><input id="global-search" autoComplete="off" className="field !py-3 !pl-12" placeholder="Rechercher une personne, une envie…" value={searchText} onChange={event => setSearchText(event.target.value)}/></div>{searchResults.length ? <div className="space-y-3">{searchResults.map((result, index) => { const item = result as Record<string, unknown>; const person = item as Person; const wish = item as Wish; const isWish = typeof item.title === 'string'; return <div key={String(item.id ?? index)} className="card flex items-center gap-4 p-4">{isWish ? <span className="rounded-xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="heart"/></span> : <Avatar person={person}/>}<div className="min-w-0 flex-1"><p className="truncate font-semibold">{isWish ? wish.title : nameOf(person)}</p><p className="muted">{isWish ? money(wish.price) || 'Envie cadeau' : 'Personne'}</p></div><button className="secondary !px-3 !py-2 text-sm" onClick={() => isWish ? String(wish.ownerId) === String(me.id) ? go('wishes') : openReserve(wish) : (setSelectedPerson(person), setPage('families'))}>Voir <Icon name="arrow" size={15}/></button></div> })}</div> : <Empty icon="search" title={searchText ? 'Aucun résultat' : 'Que recherchez-vous ?'} text={searchText ? 'Essayez d’autres mots-clés.' : 'Retrouvez une personne ou une idée cadeau en quelques lettres.'}/>}</>}
-        {page === 'profile' && <><SectionTitle kicker="VOTRE ESPACE" title="Mon profil"/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-[#eee9ef] pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">Votre compte Giftit</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">ADRESSE E-MAIL</dt><dd>{me.email || 'Non renseignée'}</dd></div><div><dt className="eyebrow mb-1">DATE DE NAISSANCE</dt><dd>{dateOf(me.birthDate) || 'Non renseignée'}</dd></div></dl><button className="secondary" disabled={busy} onClick={async () => { const ok = await perform(() => api('/auth/logout', { method: 'POST' }), 'Déconnexion réussie.'); if (ok) onLogout() }}><Icon name="logout" size={17}/> Se déconnecter</button></div></>}
+        {page === 'reservations' && <><SectionTitle kicker={t('CADEAUX EN PRÉPARATION')} title={t('Mes réservations')}/>{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform}/>)}</div> : <Empty icon="gift" title={t('Aucune réservation pour le moment')} text={t('Explorez les listes de vos proches pour leur préparer une surprise.')} action={<button className="primary" onClick={() => go('families')}>{t('Découvrir les envies')} <Icon name="arrow" size={17}/></button>}/>}</>}
+        {page === 'history' && <><SectionTitle kicker={t('SOUVENIRS PARTAGÉS')} title={t('Historique')}/>{history.length ? <div className="card divide-y divide-[#f0edf1]">{history.map((entry, index) => { const item = entry as { id?: Id; snapshot?: { title?: string; occasions?: { name: string; year: number }[] }; created_at?: string }; return <div className="flex items-start gap-4 p-5" key={String(item.id ?? index)}><span className="rounded-xl bg-[#f2eafa] p-2.5 text-[#795ca7]"><Icon name="clock" size={19}/></span><div><p className="font-semibold">{item.snapshot?.title || t('Un cadeau offert')}</p><p className="muted mt-1">{item.snapshot?.occasions?.map(occasion => `${occasionName(occasion.name, locale)} ${occasion.year}`).join(', ')} · {dateOf(item.created_at)}</p></div></div> })}</div> : <Empty icon="clock" title={t('Vos souvenirs commencent ici')} text={t('L’historique de vos cadeaux et occasions s’affichera ici.')}/>}</>}
+        {page === 'search' && <><SectionTitle kicker={t('TROUVEZ L’INSPIRATION')} title={t('Rechercher')}/><label htmlFor="global-search" className="label">{t('Personnes et envies')}</label><div className="relative mb-7"><Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#a399ac]"/><input id="global-search" autoComplete="off" className="field !py-3 !pl-12" placeholder={t('Rechercher une personne, une envie…')} value={searchText} onChange={event => setSearchText(event.target.value)}/></div>{searchResults.length ? <div className="space-y-3">{searchResults.map((result, index) => { const item = result as Record<string, unknown>; const person = item as Person; const wish = item as Wish; const isWish = typeof item.title === 'string'; return <div key={String(item.id ?? index)} className="card flex items-center gap-4 p-4">{isWish ? <span className="rounded-xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="heart"/></span> : <Avatar person={person}/>}<div className="min-w-0 flex-1"><p className="truncate font-semibold">{isWish ? wish.title : nameOf(person)}</p><p className="muted">{isWish ? money(wish.price) || t('Envie cadeau') : t('Personne')}</p></div><button className="secondary !px-3 !py-2 text-sm" onClick={() => isWish ? String(wish.ownerId) === String(me.id) ? go('wishes') : openReserve(wish) : (setSelectedPerson(person), setPage('families'))}>{t('Voir')} <Icon name="arrow" size={15}/></button></div> })}</div> : <Empty icon="search" title={searchText ? t('Aucun résultat') : t('Que recherchez-vous ?')} text={searchText ? t('Essayez d’autres mots-clés.') : t('Retrouvez une personne ou une idée cadeau en quelques lettres.')}/>}</>}
+        {page === 'profile' && <><SectionTitle kicker={t('VOTRE ESPACE')} title={t('Mon profil')}/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-[#eee9ef] pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">{t('Votre compte Giftit')}</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">{t('ADRESSE E-MAIL')}</dt><dd>{me.email || t('Non renseignée')}</dd></div><div><dt className="eyebrow mb-1">{t('DATE DE NAISSANCE')}</dt><dd>{dateOf(me.birthDate) || t('Non renseignée')}</dd></div></dl><button className="secondary" disabled={busy} onClick={async () => { const ok = await perform(() => api('/auth/logout', { method: 'POST' }), t('Déconnexion réussie.')); if (ok) onLogout() }}><Icon name="logout" size={17}/> {t('Se déconnecter')}</button></div></>}
       </main>
     </div>
-    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241a35]/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-8"><div className="mb-6 flex items-start justify-between gap-3"><div><p className="eyebrow mb-1">GIFTIT</p><h2 id="modal-title" className="font-['Outfit'] text-2xl font-bold">{modal === 'wish' ? 'Ajouter une envie' : modal === 'family' ? 'Créer une famille' : modal === 'occasion' ? 'Nouvelle occasion' : modal === 'tags' ? 'Modifier les tags' : 'Réserver une envie'}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label="Fermer"><Icon name="close"/></button></div>
+    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241a35]/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-8"><div className="mb-6 flex items-start justify-between gap-3"><div><p className="eyebrow mb-1">{t('GIFTIT')}</p><h2 id="modal-title" className="font-['Outfit'] text-2xl font-bold">{t(modal === 'wish' ? 'Ajouter une envie' : modal === 'family' ? 'Créer une famille' : modal === 'occasion' ? 'Nouvelle occasion' : modal === 'tags' ? 'Modifier les tags' : 'Réserver une envie')}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label={t('Fermer')}><Icon name="close"/></button></div>
       {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {modal === 'wish' && <WishForm busy={busy} perform={perform} handleError={handleError}/>}
-      {modal === 'family' && <form onSubmit={event => { event.preventDefault(); const name = String(new FormData(event.currentTarget).get('name')).trim(); if (name) void perform(() => api('/families', json('POST', { name })), 'Famille créée.') }}><label className="label" htmlFor="family-name">Nom de la famille</label><input className="field" id="family-name" name="name" placeholder="Ex. : La famille Martin" required/><button disabled={busy} className="primary mt-5 w-full">Créer la famille</button></form>}
+      {modal === 'family' && <form onSubmit={event => { event.preventDefault(); const name = String(new FormData(event.currentTarget).get('name')).trim(); if (name) void perform(() => api('/families', json('POST', { name })), t('Famille créée.')) }}><label className="label" htmlFor="family-name">{t('Nom de la famille')}</label><input className="field" id="family-name" name="name" placeholder={t('Ex. : La famille Martin')} required/><button disabled={busy} className="primary mt-5 w-full">{t('Créer la famille')}</button></form>}
       {modal === 'occasion' && selectedFamily && <OccasionForm family={selectedFamily} busy={busy} perform={perform}/>}
-      {modal === 'tags' && selectedWish && <form onSubmit={event => { event.preventDefault(); const tags = String(new FormData(event.currentTarget).get('tags')).split(',').map(tag => tag.trim()).filter(Boolean); void perform(() => api(`/wishes/${selectedWish.id}`, json('PATCH', { tags })), 'Tags mis à jour.') }}><label htmlFor="wish-tags" className="label">Tags séparés par des virgules</label><input id="wish-tags" name="tags" className="field" defaultValue={selectedWish.tags?.join(', ')} placeholder="livre, déco, anniversaire"/><button disabled={busy} className="primary mt-5 w-full">Enregistrer les tags</button></form>}
+      {modal === 'tags' && selectedWish && <form onSubmit={event => { event.preventDefault(); const tags = String(new FormData(event.currentTarget).get('tags')).split(',').map(tag => tag.trim()).filter(Boolean); void perform(() => api(`/wishes/${selectedWish.id}`, json('PATCH', { tags })), t('Tags mis à jour.')) }}><label htmlFor="wish-tags" className="label">{t('Tags séparés par des virgules')}</label><input id="wish-tags" name="tags" className="field" defaultValue={selectedWish.tags?.join(', ')} placeholder={t('livre, déco, anniversaire')}/><button disabled={busy} className="primary mt-5 w-full">{t('Enregistrer les tags')}</button></form>}
       {modal === 'reservation' && selectedWish && <ReservationForm wish={selectedWish} reservations={reservations} occasions={occasions} people={allPeople} me={me} busy={busy} perform={perform}/>}
     </div></div>}
   </div>
 }
 
 function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'register'; setMode: (mode: 'login' | 'register') => void; onAuth: (person: Person) => void; error: string; setError: (message: string) => void }) {
+  const { locale, t } = useTranslation()
   const [busy, setBusy] = useState(false)
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('')
@@ -296,51 +304,52 @@ function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'reg
         }
       : { email: data.get('email'), password: data.get('password') }
     if (mode === 'register' && String(data.get('password')).length < 12) {
-      setError('Le mot de passe doit contenir au moins 12 caractères.')
+      setError(t('Le mot de passe doit contenir au moins 12 caractères.'))
       setBusy(false)
       return
     }
     try {
       await api(`/auth/${mode}`, json('POST', fields))
       onAuth(await api<Person>('/auth/me'))
-    } catch (problem) { setError(problem instanceof Error ? problem.message : 'Connexion impossible.') }
+    } catch (problem) { setError(problem instanceof Error ? problem.message : t('Connexion impossible.')) }
     finally { setBusy(false) }
   }
   return <div className="grid min-h-screen lg:grid-cols-2">
     <div className="flex flex-col bg-[#f0e9f7] p-7 sm:p-12">
-      <div className="flex items-center gap-2.5"><span className="flex size-10 items-center justify-center rounded-2xl bg-[#795ca7] text-white"><Icon name="gift"/></span><span className="font-['Outfit'] text-[27px] font-extrabold tracking-tight">giftit.</span></div>
+      <div className="flex items-center justify-between gap-2.5"><div className="flex items-center gap-2.5"><span className="flex size-10 items-center justify-center rounded-2xl bg-[#795ca7] text-white"><Icon name="gift"/></span><span className="font-['Outfit'] text-[27px] font-extrabold tracking-tight">giftit.</span></div><LanguageControl/></div>
       <div className="my-auto max-w-lg py-14">
-        <span className="eyebrow">LES CADEAUX QUI NOUS RAPPROCHENT</span>
-        <h1 className="mt-5 font-['Outfit'] text-4xl font-bold leading-[1.13] tracking-tight text-[#3e2e54] sm:text-6xl">Offrir ensemble, <span className="text-[#9373bc]">sourire longtemps.</span></h1>
-        <p className="mt-6 max-w-md text-lg leading-relaxed text-[#766782]">Partagez vos envies, découvrez celles de vos proches et célébrez chaque occasion avec attention.</p>
-        <div className="mt-10 flex items-center gap-3 rounded-2xl bg-white/65 p-4 text-sm font-semibold text-[#5e5070]"><span className="rounded-xl bg-[#e6d9f3] p-2.5 text-[#795ca7]"><Icon name="heart"/></span> Des petites attentions, de grands souvenirs.</div>
+        <span className="eyebrow">{t('LES CADEAUX QUI NOUS RAPPROCHENT')}</span>
+        <h1 className="mt-5 font-['Outfit'] text-4xl font-bold leading-[1.13] tracking-tight text-[#3e2e54] sm:text-6xl">{t('Offrir ensemble,')} <span className="text-[#9373bc]">{t('sourire longtemps.')}</span></h1>
+        <p className="mt-6 max-w-md text-lg leading-relaxed text-[#766782]">{t('Partagez vos envies, découvrez celles de vos proches et célébrez chaque occasion avec attention.')}</p>
+        <div className="mt-10 flex items-center gap-3 rounded-2xl bg-white/65 p-4 text-sm font-semibold text-[#5e5070]"><span className="rounded-xl bg-[#e6d9f3] p-2.5 text-[#795ca7]"><Icon name="heart"/></span> {t('Des petites attentions, de grands souvenirs.')}</div>
       </div>
-      <p className="text-sm text-[#92849e]">Giftit. Fait pour partager.</p>
+      <p className="text-sm text-[#92849e]">{t('Giftit. Fait pour partager.')}</p>
     </div>
     <div className="flex items-center justify-center px-6 py-12"><div className="w-full max-w-[420px]">
-      <p className="eyebrow mb-3">BIENVENUE SUR GIFTIT</p>
-      <h2 className="font-['Outfit'] text-3xl font-bold">{mode === 'login' ? 'Heureux de vous revoir !' : 'Créons votre compte'}</h2>
-      <p className="muted mb-8 mt-2">{mode === 'login' ? 'Connectez-vous pour retrouver vos proches et vos envies.' : 'Quelques informations suffisent pour commencer.'}</p>
-      {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      <p className="eyebrow mb-3">{t('BIENVENUE SUR GIFTIT')}</p>
+      <h2 className="font-['Outfit'] text-3xl font-bold">{mode === 'login' ? t('Heureux de vous revoir !') : t('Créons votre compte')}</h2>
+      <p className="muted mb-8 mt-2">{mode === 'login' ? t('Connectez-vous pour retrouver vos proches et vos envies.') : t('Quelques informations suffisent pour commencer.')}</p>
+      {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{localizeMessage(error, locale)}</p>}
       <form onSubmit={submit} className="space-y-4">
         {mode === 'register' && <>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="label" htmlFor="firstName">Prénom</label><input className="field" id="firstName" name="firstName" autoComplete="given-name" required/></div>
-            <div><label className="label" htmlFor="lastName">Nom</label><input className="field" id="lastName" name="lastName" autoComplete="family-name" required/></div>
+            <div><label className="label" htmlFor="firstName">{t('Prénom')}</label><input className="field" id="firstName" name="firstName" autoComplete="given-name" required/></div>
+            <div><label className="label" htmlFor="lastName">{t('Nom')}</label><input className="field" id="lastName" name="lastName" autoComplete="family-name" required/></div>
           </div>
-          <div><label className="label" htmlFor="birthDate">Date de naissance</label><input className="field" id="birthDate" name="birthDate" type="date" required/></div>
+          <div><label className="label" htmlFor="birthDate">{t('Date de naissance')}</label><input className="field" id="birthDate" name="birthDate" type="date" required/></div>
         </>}
-        <div><label className="label" htmlFor="email">Adresse e-mail</label><input className="field" id="email" name="email" type="email" autoComplete="email" placeholder="vous@exemple.fr" required/></div>
-        <div><label className="label" htmlFor="password">Mot de passe</label><input className="field" id="password" name="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'register' ? 12 : undefined} required/></div>
-        {mode === 'register' && <div><label className="label" htmlFor="invitation">Code d’invitation <span className="font-normal">(facultatif)</span></label><input className="field" id="invitation" name="invitation" type="text" autoComplete="off" placeholder="Votre code d’invitation"/><p className="muted mt-1.5">Un proche vous a invité dans son foyer ? Saisissez son code ici.</p></div>}
-        <button disabled={busy} className="primary !mt-6 w-full">{busy ? 'Veuillez patienter…' : mode === 'login' ? 'Se connecter' : 'Créer mon compte'} <Icon name="arrow" size={17}/></button>
+        <div><label className="label" htmlFor="email">{t('Adresse e-mail')}</label><input className="field" id="email" name="email" type="email" autoComplete="email" placeholder={t('vous@exemple.fr')} required/></div>
+        <div><label className="label" htmlFor="password">{t('Mot de passe')}</label><input className="field" id="password" name="password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'register' ? 12 : undefined} required/></div>
+        {mode === 'register' && <div><label className="label" htmlFor="invitation">{t('Code d’invitation')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id="invitation" name="invitation" type="text" autoComplete="off" placeholder={t('Votre code d’invitation')}/><p className="muted mt-1.5">{t('Un proche vous a invité dans son foyer ? Saisissez son code ici.')}</p></div>}
+        <button disabled={busy} className="primary !mt-6 w-full">{busy ? t('Veuillez patienter…') : mode === 'login' ? t('Se connecter') : t('Créer mon compte')} <Icon name="arrow" size={17}/></button>
       </form>
-      <p className="mt-7 text-center text-sm text-[#817688]">{mode === 'login' ? 'Pas encore de compte ?' : 'Déjà un compte ?'} <button className="font-bold text-[#795ca7] hover:underline" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? 'S’inscrire' : 'Se connecter'}</button></p>
+      <p className="mt-7 text-center text-sm text-[#817688]">{mode === 'login' ? t('Pas encore de compte ?') : t('Déjà un compte ?')} <button className="font-bold text-[#795ca7] hover:underline" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>{mode === 'login' ? t('S’inscrire') : t('Se connecter')}</button></p>
     </div></div>
   </div>
 }
 
 function WishForm({ busy, perform, handleError }: { busy: boolean; perform: (action: () => Promise<unknown>, success: string) => Promise<boolean>; handleError: (error: unknown) => void }) {
+  const { t } = useTranslation()
   const [url, setUrl] = useState('')
   const [preview, setPreview] = useState<Partial<Wish> | null>(null)
   const [loading, setLoading] = useState(false)
@@ -350,45 +359,47 @@ function WishForm({ busy, perform, handleError }: { busy: boolean; perform: (act
     catch (problem) { handleError(problem) }
     finally { setLoading(false) }
   }
-  return <form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void perform(() => api('/wishes', json('POST', { url, title: data.get('title'), image: data.get('image') || '', description: data.get('description') || undefined, price: data.get('price') ? Number(data.get('price')) : undefined, tags: String(data.get('tags') || '').split(',').map(tag => tag.trim()).filter(Boolean) })), 'Envie ajoutée à votre liste.') }}>
-    <label className="label" htmlFor="product-url">Lien du produit</label><div className="flex gap-2"><input className="field min-w-0" id="product-url" type="url" placeholder="https://boutique.fr/mon-cadeau" value={url} onChange={event => { setUrl(event.target.value); setPreview(null) }} required/><button type="button" disabled={!url || loading} className="secondary shrink-0 !px-3 text-sm" onClick={fetchPreview}>{loading ? 'Chargement…' : 'Prévisualiser'}</button></div><p className="muted mt-1.5">Collez un lien pour préremplir les informations.</p>
-    {preview && <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#f5f0f9] p-3">{preview.image && <img src={preview.image} alt="" className="size-14 rounded-lg object-cover"/>}<span className="text-sm font-semibold">{preview.title || 'Produit trouvé'}</span></div>}
-    <div className="mt-5 space-y-4" key={preview?.url || preview?.title || 'empty'}><div><label className="label" htmlFor="product-title">Nom de l’envie</label><input className="field" id="product-title" name="title" defaultValue={preview?.title || ''} required/></div><div><label className="label" htmlFor="product-image">URL de l’image (obligatoire)</label><input className="field" id="product-image" name="image" type="url" defaultValue={preview?.image || ''} placeholder="https://…" required/></div><div><label className="label" htmlFor="product-description">Description <span className="font-normal">(facultatif)</span></label><textarea className="field min-h-20" id="product-description" name="description" defaultValue={preview?.description || ''}/></div><div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor="product-price">Prix (€)</label><input className="field" id="product-price" name="price" type="number" min="0" step="0.01" defaultValue={preview?.price ?? ''}/></div><div><label className="label" htmlFor="product-tags">Tags</label><input className="field" id="product-tags" name="tags" defaultValue={preview?.tags?.join(', ') || ''} placeholder="livre, déco"/></div></div></div><button disabled={busy} className="primary mt-6 w-full"><Icon name="plus" size={17}/> Ajouter à ma liste</button>
+  return <form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void perform(() => api('/wishes', json('POST', { url, title: data.get('title'), image: data.get('image') || '', description: data.get('description') || undefined, price: data.get('price') ? Number(data.get('price')) : undefined, tags: String(data.get('tags') || '').split(',').map(tag => tag.trim()).filter(Boolean) })), t('Envie ajoutée à votre liste.')) }}>
+    <label className="label" htmlFor="product-url">{t('Lien du produit')}</label><div className="flex gap-2"><input className="field min-w-0" id="product-url" type="url" placeholder="https://example.com/product" value={url} onChange={event => { setUrl(event.target.value); setPreview(null) }} required/><button type="button" disabled={!url || loading} className="secondary shrink-0 !px-3 text-sm" onClick={fetchPreview}>{loading ? t('Chargement…') : t('Prévisualiser')}</button></div><p className="muted mt-1.5">{t('Collez un lien pour préremplir les informations.')}</p>
+    {preview && <div className="mt-4 flex items-center gap-3 rounded-xl bg-[#f5f0f9] p-3">{preview.image && <img src={preview.image} alt="" className="size-14 rounded-lg object-cover"/>}<span className="text-sm font-semibold">{preview.title || t('Produit trouvé')}</span></div>}
+    <div className="mt-5 space-y-4" key={preview?.url || preview?.title || 'empty'}><div><label className="label" htmlFor="product-title">{t('Nom de l’envie')}</label><input className="field" id="product-title" name="title" defaultValue={preview?.title || ''} required/></div><div><label className="label" htmlFor="product-image">{t('URL de l’image (obligatoire)')}</label><input className="field" id="product-image" name="image" type="url" defaultValue={preview?.image || ''} placeholder="https://…" required/></div><div><label className="label" htmlFor="product-description">{t('Description')} <span className="font-normal">{t('(facultatif)')}</span></label><textarea className="field min-h-20" id="product-description" name="description" defaultValue={preview?.description || ''}/></div><div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor="product-price">{t('Prix (€)')}</label><input className="field" id="product-price" name="price" type="number" min="0" step="0.01" defaultValue={preview?.price ?? ''}/></div><div><label className="label" htmlFor="product-tags">{t('Tags')}</label><input className="field" id="product-tags" name="tags" defaultValue={preview?.tags?.join(', ') || ''} placeholder={t('livre, déco')}/></div></div></div><button disabled={busy} className="primary mt-6 w-full"><Icon name="plus" size={17}/> {t('Ajouter à ma liste')}</button>
   </form>
 }
 
 function OccasionForm({ family, busy, perform }: { family: Family; busy: boolean; perform: (action: () => Promise<unknown>, success: string) => Promise<boolean> }) {
+  const { t } = useTranslation()
   const [kind, setKind] = useState<Occasion['kind']>('fixed')
   return <form onSubmit={event => {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
     const body = { name: String(data.get('name')).trim(), kind, ...(kind === 'fixed' ? { month: Number(data.get('month')), day: Number(data.get('day')) } : {}) }
-    void perform(() => api(`/families/${family.id}/occasions`, json('POST', body)), 'Occasion créée.')
+    void perform(() => api(`/families/${family.id}/occasions`, json('POST', body)), t('Occasion créée.'))
   }}>
-    <label className="label" htmlFor="occasion-name">Nom de l’occasion</label>
-    <input className="field mb-4" id="occasion-name" name="name" placeholder="Ex. : Noël" required/>
-    <label className="label" htmlFor="occasion-kind">Type d’occasion</label>
+    <label className="label" htmlFor="occasion-name">{t('Nom de l’occasion')}</label>
+    <input className="field mb-4" id="occasion-name" name="name" placeholder={t('Ex. : Noël')} required/>
+    <label className="label" htmlFor="occasion-kind">{t('Type d’occasion')}</label>
     <select className="field mb-4" id="occasion-kind" value={kind} onChange={event => setKind(event.target.value as Occasion['kind'])}>
-      <option value="fixed">Date fixe</option><option value="birthday">Anniversaire (date de naissance)</option><option value="name_day">Fête du prénom</option>
+      <option value="fixed">{t('Date fixe')}</option><option value="birthday">{t('Anniversaire (date de naissance)')}</option><option value="name_day">{t('Fête du prénom')}</option>
     </select>
-    {kind === 'fixed' && <div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor="occasion-day">Jour</label><input className="field" id="occasion-day" name="day" type="number" min="1" max="31" required/></div><div><label className="label" htmlFor="occasion-month">Mois</label><input className="field" id="occasion-month" name="month" type="number" min="1" max="12" required/></div></div>}
-    {kind !== 'fixed' && <p className="muted">La date est calculée à partir du profil de la personne lorsqu’elle est disponible.</p>}
-    <button disabled={busy} className="primary mt-5 w-full">Créer l’occasion</button>
+    {kind === 'fixed' && <div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor="occasion-day">{t('Jour')}</label><input className="field" id="occasion-day" name="day" type="number" min="1" max="31" required/></div><div><label className="label" htmlFor="occasion-month">{t('Mois')}</label><input className="field" id="occasion-month" name="month" type="number" min="1" max="12" required/></div></div>}
+    {kind !== 'fixed' && <p className="muted">{t('La date est calculée à partir du profil de la personne lorsqu’elle est disponible.')}</p>}
+    <button disabled={busy} className="primary mt-5 w-full">{t('Créer l’occasion')}</button>
   </form>
 }
 
 function JoinFamily({ busy, perform }: { busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
+  const { t } = useTranslation()
   const [code, setCode] = useState('')
   return <section className="card mt-8 p-5 sm:p-6">
-    <h3 className="font-['Outfit'] text-xl font-semibold">Rejoindre une famille</h3>
-    <p className="muted mt-2">Vous administrez un foyer ? Saisissez le code d’invitation à la famille reçu de son administrateur pour y rattacher votre foyer.</p>
+    <h3 className="font-['Outfit'] text-xl font-semibold">{t('Rejoindre une famille')}</h3>
+    <p className="muted mt-2">{t('Vous administrez un foyer ? Saisissez le code d’invitation à la famille reçu de son administrateur pour y rattacher votre foyer.')}</p>
     <form className="mt-4 flex flex-wrap gap-2" onSubmit={event => {
       event.preventDefault()
-      void perform(() => api<{ familyId: Id; householdId: Id }>('/families/join', json('POST', { code: code.trim() })), 'Votre foyer a rejoint la famille.', false).then(ok => { if (ok) setCode('') })
+      void perform(() => api<{ familyId: Id; householdId: Id }>('/families/join', json('POST', { code: code.trim() })), t('Votre foyer a rejoint la famille.'), false).then(ok => { if (ok) setCode('') })
     }}>
-      <label className="sr-only" htmlFor="join-family-code">Code d’invitation à la famille</label>
-      <input className="field min-w-0 flex-1" id="join-family-code" value={code} onChange={event => setCode(event.target.value)} placeholder="Code d’invitation à la famille" required/>
-      <button className="secondary" disabled={busy || !code.trim()}>Rejoindre la famille</button>
+      <label className="sr-only" htmlFor="join-family-code">{t('Code d’invitation à la famille')}</label>
+      <input className="field min-w-0 flex-1" id="join-family-code" value={code} onChange={event => setCode(event.target.value)} placeholder={t('Code d’invitation à la famille')} required/>
+      <button className="secondary" disabled={busy || !code.trim()}>{t('Rejoindre la famille')}</button>
     </form>
   </section>
 }
@@ -398,6 +409,7 @@ function FamilyManagement({ family, me, busy, perform, handleError, onRename }: 
   perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean>;
   handleError: (error: unknown) => void; onRename: (name: string) => void
 }) {
+  const { t } = useTranslation()
   const [householdCode, setHouseholdCode] = useState('')
   const [familyCode, setFamilyCode] = useState('')
   const [generatingHousehold, setGeneratingHousehold] = useState(false)
@@ -419,31 +431,31 @@ function FamilyManagement({ family, me, busy, perform, handleError, onRename }: 
     } catch (problem) { handleError(problem) }
     finally { setGeneratingFamily(false) }
   }
-  return <section className="card mt-8 p-5 sm:p-6" aria-label={`Administration de ${family.name}`}>
-    <h3 className="font-['Outfit'] text-xl font-semibold">Gérer la famille</h3>
+  return <section className="card mt-8 p-5 sm:p-6" aria-label={t('Administration de {name}', { name: family.name })}>
+    <h3 className="font-['Outfit'] text-xl font-semibold">{t('Gérer la famille')}</h3>
     <div className="mt-5 grid gap-6 lg:grid-cols-2">
       <div>
-        <h4 className="label">Foyers rattachés</h4>
-        {family.households?.length ? <ul className="mb-5 space-y-2">{family.households.map(household => <li className="rounded-xl bg-[#f7f3f9] px-3 py-2 text-sm" key={household.id}><strong>{household.name}</strong> <span className="block break-all text-xs text-[#807789]">{household.id}</span></li>)}</ul> : <p className="muted mb-5">Aucun foyer disponible.</p>}
-        <p className="label">Inviter un foyer dans cette famille</p>
-        <p className="muted mb-3">Communiquez ce code à l’administrateur du foyer pour qu’il rejoigne la famille.</p>
-        <button type="button" disabled={generatingFamily} className="secondary" onClick={() => void inviteFamily()}>{generatingFamily ? 'Création…' : 'Créer un code d’invitation à la famille'}</button>
-        {familyCode && <div role="status" className="mt-3 rounded-xl bg-[#f2eafa] p-3"><p className="mb-1 text-sm font-semibold">Code d’invitation à la famille (visible uniquement maintenant)</p><output className="block break-all font-mono text-sm text-[#634797]">{familyCode}</output></div>}
+        <h4 className="label">{t('Foyers rattachés')}</h4>
+        {family.households?.length ? <ul className="mb-5 space-y-2">{family.households.map(household => <li className="rounded-xl bg-[#f7f3f9] px-3 py-2 text-sm" key={household.id}><strong>{household.name}</strong> <span className="block break-all text-xs text-[#807789]">{household.id}</span></li>)}</ul> : <p className="muted mb-5">{t('Aucun foyer disponible.')}</p>}
+        <p className="label">{t('Inviter un foyer dans cette famille')}</p>
+        <p className="muted mb-3">{t('Communiquez ce code à l’administrateur du foyer pour qu’il rejoigne la famille.')}</p>
+        <button type="button" disabled={generatingFamily} className="secondary" onClick={() => void inviteFamily()}>{generatingFamily ? t('Création…') : t('Créer un code d’invitation à la famille')}</button>
+        {familyCode && <div role="status" className="mt-3 rounded-xl bg-[#f2eafa] p-3"><p className="mb-1 text-sm font-semibold">{t('Code d’invitation à la famille (visible uniquement maintenant)')}</p><output className="block break-all font-mono text-sm text-[#634797]">{familyCode}</output></div>}
       </div>
       <div className="space-y-5">
         <form onSubmit={event => {
           event.preventDefault()
           const name = String(new FormData(event.currentTarget).get('name')).trim()
-          void perform(() => api(`/families/${family.id}`, json('PATCH', { name })), 'Famille renommée.', false).then(ok => { if (ok) onRename(name) })
+          void perform(() => api(`/families/${family.id}`, json('PATCH', { name })), t('Famille renommée.'), false).then(ok => { if (ok) onRename(name) })
         }}>
-          <label className="label" htmlFor="rename-family">Renommer la famille</label>
-          <div className="flex flex-wrap gap-2"><input key={family.name} className="field min-w-0 flex-1" id="rename-family" name="name" defaultValue={family.name} required/><button disabled={busy} className="secondary">Renommer</button></div>
+          <label className="label" htmlFor="rename-family">{t('Renommer la famille')}</label>
+          <div className="flex flex-wrap gap-2"><input key={family.name} className="field min-w-0 flex-1" id="rename-family" name="name" defaultValue={family.name} required/><button disabled={busy} className="secondary">{t('Renommer')}</button></div>
         </form>
         <div>
-          <p className="label">Inviter dans mon foyer</p>
-          <p className="muted mb-3">Générez un code valable 7 jours, à communiquer à la personne invitée. L’administration du foyer est requise.</p>
-          <button type="button" disabled={generatingHousehold || !me.householdId} className="secondary" onClick={() => void inviteHousehold()}>{generatingHousehold ? 'Création…' : 'Créer un code d’invitation au foyer'}</button>
-          {householdCode && <div role="status" className="mt-3 rounded-xl bg-[#f2eafa] p-3"><p className="mb-1 text-sm font-semibold">Code d’invitation au foyer pour l’inscription (visible uniquement maintenant)</p><output className="block break-all font-mono text-sm text-[#634797]">{householdCode}</output></div>}
+          <p className="label">{t('Inviter dans mon foyer')}</p>
+          <p className="muted mb-3">{t('Générez un code valable 7 jours, à communiquer à la personne invitée. L’administration du foyer est requise.')}</p>
+          <button type="button" disabled={generatingHousehold || !me.householdId} className="secondary" onClick={() => void inviteHousehold()}>{generatingHousehold ? t('Création…') : t('Créer un code d’invitation au foyer')}</button>
+          {householdCode && <div role="status" className="mt-3 rounded-xl bg-[#f2eafa] p-3"><p className="mb-1 text-sm font-semibold">{t('Code d’invitation au foyer pour l’inscription (visible uniquement maintenant)')}</p><output className="block break-all font-mono text-sm text-[#634797]">{householdCode}</output></div>}
         </div>
       </div>
     </div>
@@ -462,10 +474,12 @@ const occurrences = (occasions: Occasion[]) => occasions.flatMap(occasion => {
     .map(selection => ({ occasion, selection }))
 })
 const sameSelection = (a: OccasionSelection, b: OccasionSelection) => String(a.id) === String(b.id) && a.year === b.year
-const statusLabels: Record<string, string> = { reserved: 'Réservé', purchased: 'Acheté', wrapped: 'Emballé', gifted: 'Offert' }
+const statusLabels: Record<string, TranslationKey> = { reserved: 'Réservé', purchased: 'Acheté', wrapped: 'Emballé', gifted: 'Offert' }
+const requestLabels: Record<string, TranslationKey> = { pending: 'En attente', accepted: 'Acceptée', refused: 'Refusée' }
 const nextStatuses: Record<string, string[]> = { reserved: ['purchased'], purchased: ['reserved', 'wrapped'], wrapped: ['purchased', 'gifted'] }
 
 function ReservationForm({ wish, reservations, occasions, people, me, busy, perform }: { wish: Wish; reservations: Reservation[]; occasions: Occasion[]; people: Person[]; me: Person; busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
+  const { locale, t } = useTranslation()
   const existing = reservations.find(item => String(item.wishId) === String(wish.id) && !item.cancelled && item.status !== 'gifted') || wish.reservation
   const mine = existing && String(existing.creator?.id) === String(me.id)
   const [selectedOccasions, setSelectedOccasions] = useState<OccasionSelection[]>(existing?.occasionIds || existing?.occasions?.map(selectionOf).filter((item): item is OccasionSelection => item !== null) || [])
@@ -480,18 +494,21 @@ function ReservationForm({ wish, reservations, occasions, people, me, busy, perf
       setSelectedOccasions(current => current.length || changedOccasions.current ? current : [first])
     }
   }, [occasions, existing])
-  if (existing && !mine) return <div><p className="mb-4 text-sm text-[#807687]">Cette envie est réservée par <strong>{nameOf(existing.creator)}</strong>.</p>{existing.participants?.length ? <p className="muted mb-4">Participants : {existing.participants.map(nameOf).join(', ')}</p> : null}{existing.participants?.some(person => String(person.id) === String(me.id)) ? <p className="muted">Vous participez déjà à ce cadeau.</p> : existing.openToContributions ? <button disabled={busy} className="primary w-full" onClick={() => { void perform(() => api(`/reservations/${existing.id}/requests`, json('POST', {})), 'Demande de participation envoyée.') }}>Demander à participer</button> : <p className="muted">Cette réservation n’est pas ouverte aux participations.</p>}</div>
+  if (existing && !mine) return <div><p className="mb-4 text-sm text-[#807687]">{t('Cette envie est réservée par')} <strong>{nameOf(existing.creator)}</strong>.</p>{existing.participants?.length ? <p className="muted mb-4">{t('Participants :')} {existing.participants.map(nameOf).join(', ')}</p> : null}{existing.participants?.some(person => String(person.id) === String(me.id)) ? <p className="muted">{t('Vous participez déjà à ce cadeau.')}</p> : existing.openToContributions ? <button disabled={busy} className="primary w-full" onClick={() => { void perform(() => api(`/reservations/${existing.id}/requests`, json('POST', {})), t('Demande de participation envoyée.')) }}>{t('Demander à participer')}</button> : <p className="muted">{t('Cette réservation n’est pas ouverte aux participations.')}</p>}</div>
   const options = [...available, ...(existing?.occasions || []).filter(occasion => !available.some(item => item.occasion.id === occasion.id && item.selection.year === occasion.year)).map(occasion => ({ occasion, selection: selectionOf(occasion) })).filter((item): item is { occasion: Occasion; selection: OccasionSelection } => item.selection !== null)]
-  return <form onSubmit={event => { event.preventDefault(); const body = { occasionIds: selectedOccasions, participantIds: selectedParticipants, openToContributions: open }; void perform(() => existing ? api(`/reservations/${existing.id}`, json('PATCH', body)) : api('/reservations', json('POST', { wishId: wish.id, ...body })), existing ? 'Réservation mise à jour.' : 'Envie réservée !') }}>
-    <p className="muted mb-5">Pour <strong className="text-[#4b3e59]">{wish.title}</strong></p>
-    <fieldset className="mb-5"><legend className="label">Occasions (au moins une)</legend>{options.length ? <div className="max-h-36 space-y-2 overflow-y-auto">{options.map(({ occasion, selection }) => <label key={`${selection.id}-${selection.year}`} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={selectedOccasions.some(value => sameSelection(value, selection))} onChange={() => { changedOccasions.current = true; setSelectedOccasions(values => values.some(value => sameSelection(value, selection)) ? values.filter(value => !sameSelection(value, selection)) : [...values, selection]) }}/>{occasion.name || occasion.title || 'Occasion'} <span className="text-[#9a91a0]">{occasion.nextDate && Number(occasion.nextDate.slice(0, 4)) === selection.year ? dateOf(occasion.nextDate) : `année ${selection.year}`}</span></label>)}</div> : <p className="muted">Aucune occasion datée pour cette personne. Créez une occasion dans une famille commune avant de réserver.</p>}</fieldset>
-    <fieldset className="mb-5"><legend className="label">Inviter des participants</legend><div className="max-h-32 space-y-2 overflow-y-auto">{people.filter(person => String(person.id) !== String(me.id) && String(person.id) !== String(wish.ownerId)).map(person => <label key={person.id} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={selectedParticipants.some(id => String(id) === String(person.id))} onChange={() => togglePerson(person.id)}/>{nameOf(person)}</label>)}</div></fieldset>
-    <label className="mb-5 flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/>Autoriser les demandes de participation</label>
-    <button disabled={busy || selectedOccasions.length === 0} className="primary w-full">{existing ? 'Enregistrer les modifications' : 'Confirmer la réservation'}</button>
+  return <form onSubmit={event => { event.preventDefault(); const body = { occasionIds: selectedOccasions, participantIds: selectedParticipants, openToContributions: open }; void perform(() => existing ? api(`/reservations/${existing.id}`, json('PATCH', body)) : api('/reservations', json('POST', { wishId: wish.id, ...body })), existing ? t('Réservation mise à jour.') : t('Envie réservée !')) }}>
+    <p className="muted mb-5">{t('Pour')} <strong className="text-[#4b3e59]">{wish.title}</strong></p>
+    <fieldset className="mb-5"><legend className="label">{t('Occasions (au moins une)')}</legend>{options.length ? <div className="max-h-36 space-y-2 overflow-y-auto">{options.map(({ occasion, selection }) => <label key={`${selection.id}-${selection.year}`} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={selectedOccasions.some(value => sameSelection(value, selection))} onChange={() => { changedOccasions.current = true; setSelectedOccasions(values => values.some(value => sameSelection(value, selection)) ? values.filter(value => !sameSelection(value, selection)) : [...values, selection]) }}/>{occasionName(occasion.name || occasion.title, locale, occasion.kind) || t('Occasion')} <span className="text-[#9a91a0]">{occasion.nextDate && Number(occasion.nextDate.slice(0, 4)) === selection.year ? dateOf(occasion.nextDate) : t('année {year}', { year: selection.year })}</span></label>)}</div> : <p className="muted">{t('Aucune occasion datée pour cette personne. Créez une occasion dans une famille commune avant de réserver.')}</p>}</fieldset>
+    <fieldset className="mb-5"><legend className="label">{t('Inviter des participants')}</legend><div className="max-h-32 space-y-2 overflow-y-auto">{people.filter(person => String(person.id) !== String(me.id) && String(person.id) !== String(wish.ownerId)).map(person => <label key={person.id} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={selectedParticipants.some(id => String(id) === String(person.id))} onChange={() => togglePerson(person.id)}/>{nameOf(person)}</label>)}</div></fieldset>
+    <label className="mb-5 flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/>{t('Autoriser les demandes de participation')}</label>
+    <button disabled={busy || selectedOccasions.length === 0} className="primary w-full">{existing ? t('Enregistrer les modifications') : t('Confirmer la réservation')}</button>
   </form>
 }
 
 function ReservationRow({ reservation, users, me, busy, perform }: { reservation: Reservation; users: Person[]; me: Person; busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
+  const { locale, t } = useTranslation()
+  const statusText = (value: string) => Object.prototype.hasOwnProperty.call(statusLabels, value) ? t(statusLabels[value]) : localizeMessage(value, locale)
+  const requestText = (value: string) => Object.prototype.hasOwnProperty.call(requestLabels, value) ? t(requestLabels[value]) : localizeMessage(value, locale)
   const creator = reservation.creator?.id === me.id
   const editable = creator && !reservation.cancelled && reservation.status !== 'gifted'
   const [editing, setEditing] = useState(false)
@@ -506,9 +523,9 @@ function ReservationRow({ reservation, users, me, busy, perform }: { reservation
   useEffect(() => {
     if (!creator) return
     let active = true
-    api<ParticipationRequest[]>(`/reservations/${reservation.id}/requests`).then(value => { if (active) setRequests(list(value)) }).catch(problem => { if (active) setLocalError(problem instanceof Error ? problem.message : 'Demandes indisponibles.') })
+    api<ParticipationRequest[]>(`/reservations/${reservation.id}/requests`).then(value => { if (active) setRequests(list(value)) }).catch(problem => { if (active) setLocalError(problem instanceof Error ? problem.message : t('Demandes indisponibles.')) })
     return () => { active = false }
-  }, [creator, reservation])
+  }, [creator, reservation, t])
   async function openEditor() {
     if (editing) { setEditing(false); return }
     setEditing(true); setLocalError('')
@@ -518,7 +535,7 @@ function ReservationRow({ reservation, users, me, busy, perform }: { reservation
       setRecipientId(wish.ownerId)
       if (wish.ownerId) setAvailable(list(await api<Occasion[]>(`/occasions?recipientId=${encodeURIComponent(String(wish.ownerId))}`)))
     } catch (problem) {
-      setLocalError(problem instanceof Error ? problem.message : 'Occasions indisponibles.')
+      setLocalError(problem instanceof Error ? problem.message : t('Occasions indisponibles.'))
     }
   }
   const options = [
@@ -526,15 +543,15 @@ function ReservationRow({ reservation, users, me, busy, perform }: { reservation
     ...occurrences(available).filter(item => !reservation.occasions?.some(saved => sameSelection(item.selection, { id: saved.id, year: saved.year ?? 0 }))),
   ]
   return <article className="card p-5">
-    <div className="flex flex-wrap items-start gap-4"><span className="rounded-2xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="gift" size={23}/></span><div className="min-w-0 flex-1"><h3 className="font-['Outfit'] text-lg font-semibold">Réservation #{String(reservation.id).slice(0, 8)}</h3><p className="muted mt-1">{reservation.occasions?.map(item => `${item.name} ${item.year}`).join(', ') || 'Cadeau en préparation'} · {reservation.cancelled ? 'Annulé' : statusLabels[reservation.status || 'reserved'] || reservation.status}</p><p className="muted mt-1">Organisé par {nameOf(reservation.creator)} · Participants : {reservation.participants?.map(nameOf).join(', ') || 'Aucun'}</p>{reservation.wishDeleted && <p className="muted">L’envie a été supprimée.</p>}</div>{editable && <button className="secondary text-sm" onClick={() => void openEditor()}><Icon name="edit" size={16}/> {editing ? 'Fermer' : 'Gérer'}</button>}</div>
+    <div className="flex flex-wrap items-start gap-4"><span className="rounded-2xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="gift" size={23}/></span><div className="min-w-0 flex-1"><h3 className="font-['Outfit'] text-lg font-semibold">{t('Réservation #{id}', { id: String(reservation.id).slice(0, 8) })}</h3><p className="muted mt-1">{reservation.occasions?.map(item => `${occasionName(item.name, locale)} ${item.year}`).join(', ') || t('Cadeau en préparation')} · {reservation.cancelled ? t('Annulé') : statusText(reservation.status || 'reserved')}</p><p className="muted mt-1">{t('Organisé par')} {nameOf(reservation.creator)} · {t('Participants :')} {reservation.participants?.map(nameOf).join(', ') || t('Aucun')}</p>{reservation.wishDeleted && <p className="muted">{t('L’envie a été supprimée.')}</p>}</div>{editable && <button className="secondary text-sm" onClick={() => void openEditor()}><Icon name="edit" size={16}/> {editing ? t('Fermer') : t('Gérer')}</button>}</div>
     {localError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{localError}</p>}
     {editing && <div className="mt-5 space-y-4 border-t border-[#eee9ef] pt-5">
-      <div className="grid gap-4 sm:grid-cols-2"><div><label className="label" htmlFor={`status-${reservation.id}`}>Statut</label><select className="field" id={`status-${reservation.id}`} value={status} onChange={event => setStatus(event.target.value)}><option value={reservation.status || 'reserved'}>{statusLabels[reservation.status || 'reserved'] || 'Réservé'}</option>{(nextStatuses[reservation.status || 'reserved'] || []).filter(value => value !== 'gifted' || !reservation.wishDeleted).map(value => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></div><label className="flex items-center gap-2 self-end pb-3 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/>Ouvert aux participations</label></div>
-      <fieldset><legend className="label">Occasions (au moins une)</legend><div className="flex flex-wrap gap-3">{options.map(({ occasion, selection }) => <label className="inline-flex items-center gap-2 text-sm" key={`${selection.id}-${selection.year}`}><input type="checkbox" checked={occasionIds.some(value => sameSelection(value, selection))} onChange={() => setOccasionIds(values => values.some(value => sameSelection(value, selection)) ? values.filter(value => !sameSelection(value, selection)) : [...values, selection])}/>{occasion.name || occasion.title} {selection.year}</label>)}</div></fieldset>
-      <fieldset><legend className="label">Participants</legend>{recipientId ? <div className="flex max-h-32 flex-wrap gap-3 overflow-y-auto">{users.filter(person => String(person.id) !== String(me.id) && String(person.id) !== String(recipientId)).map(person => <label className="inline-flex items-center gap-2 text-sm" key={person.id}><input type="checkbox" checked={participantIds.some(id => String(id) === String(person.id))} onChange={() => setParticipantIds(values => values.some(id => String(id) === String(person.id)) ? values.filter(id => String(id) !== String(person.id)) : [...values, person.id])}/>{nameOf(person)}</label>)}</div> : <p className="muted">Participants existants conservés ; détails de l’envie indisponibles.</p>}</fieldset>
-      <div className="flex flex-wrap gap-2"><button className="primary" disabled={busy || occasionIds.length === 0} onClick={() => { void perform(() => api(`/reservations/${reservation.id}`, json('PATCH', { status, occasionIds, participantIds, openToContributions: open })), 'Réservation mise à jour.', false).then(ok => { if (ok) setEditing(false) }) }}>Enregistrer</button><button className="secondary !text-red-600" disabled={busy} onClick={() => { if (window.confirm('Annuler cette réservation ?')) void perform(() => api(`/reservations/${reservation.id}`, { method: 'DELETE' }), 'Réservation annulée.') }}>Annuler la réservation</button></div>
+      <div className="grid gap-4 sm:grid-cols-2"><div><label className="label" htmlFor={`status-${reservation.id}`}>{t('Statut')}</label><select className="field" id={`status-${reservation.id}`} value={status} onChange={event => setStatus(event.target.value)}><option value={reservation.status || 'reserved'}>{statusText(reservation.status || 'reserved')}</option>{(nextStatuses[reservation.status || 'reserved'] || []).filter(value => value !== 'gifted' || !reservation.wishDeleted).map(value => <option key={value} value={value}>{statusText(value)}</option>)}</select></div><label className="flex items-center gap-2 self-end pb-3 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/>{t('Ouvert aux participations')}</label></div>
+      <fieldset><legend className="label">{t('Occasions (au moins une)')}</legend><div className="flex flex-wrap gap-3">{options.map(({ occasion, selection }) => <label className="inline-flex items-center gap-2 text-sm" key={`${selection.id}-${selection.year}`}><input type="checkbox" checked={occasionIds.some(value => sameSelection(value, selection))} onChange={() => setOccasionIds(values => values.some(value => sameSelection(value, selection)) ? values.filter(value => !sameSelection(value, selection)) : [...values, selection])}/>{occasionName(occasion.name || occasion.title, locale, occasion.kind)} {selection.year}</label>)}</div></fieldset>
+      <fieldset><legend className="label">{t('Participants')}</legend>{recipientId ? <div className="flex max-h-32 flex-wrap gap-3 overflow-y-auto">{users.filter(person => String(person.id) !== String(me.id) && String(person.id) !== String(recipientId)).map(person => <label className="inline-flex items-center gap-2 text-sm" key={person.id}><input type="checkbox" checked={participantIds.some(id => String(id) === String(person.id))} onChange={() => setParticipantIds(values => values.some(id => String(id) === String(person.id)) ? values.filter(id => String(id) !== String(person.id)) : [...values, person.id])}/>{nameOf(person)}</label>)}</div> : <p className="muted">{t('Participants existants conservés ; détails de l’envie indisponibles.')}</p>}</fieldset>
+      <div className="flex flex-wrap gap-2"><button className="primary" disabled={busy || occasionIds.length === 0} onClick={() => { void perform(() => api(`/reservations/${reservation.id}`, json('PATCH', { status, occasionIds, participantIds, openToContributions: open })), t('Réservation mise à jour.'), false).then(ok => { if (ok) setEditing(false) }) }}>{t('Enregistrer')}</button><button className="secondary !text-red-600" disabled={busy} onClick={() => { if (window.confirm(t('Annuler cette réservation ?'))) void perform(() => api(`/reservations/${reservation.id}`, { method: 'DELETE' }), t('Réservation annulée.')) }}>{t('Annuler la réservation')}</button></div>
     </div>}
-    {creator && !!requests.length && <div className="mt-4 border-t border-[#eee9ef] pt-4"><h4 className="mb-3 text-sm font-semibold">Demandes de participation</h4><div className="space-y-2">{requests.map(request => <div className="flex flex-wrap items-center gap-2 text-sm" key={request.id}><span className="flex-1">{nameOf(request.user || request.requester || request)} · {request.status || 'En attente'}</span>{editable && request.status === 'pending' && <><button className="secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => { void perform(() => api(`/reservations/${reservation.id}/requests/${request.id}`, json('PATCH', { status: 'accepted' })), 'Demande acceptée.', false).then(ok => { if (ok) setRequests(values => values.map(value => value.id === request.id ? { ...value, status: 'accepted' } : value)) }) }}>Accepter</button><button className="secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => { void perform(() => api(`/reservations/${reservation.id}/requests/${request.id}`, json('PATCH', { status: 'refused' })), 'Demande refusée.', false).then(ok => { if (ok) setRequests(values => values.map(value => value.id === request.id ? { ...value, status: 'refused' } : value)) }) }}>Refuser</button></>}</div>)}</div></div>}
+    {creator && !!requests.length && <div className="mt-4 border-t border-[#eee9ef] pt-4"><h4 className="mb-3 text-sm font-semibold">{t('Demandes de participation')}</h4><div className="space-y-2">{requests.map(request => <div className="flex flex-wrap items-center gap-2 text-sm" key={request.id}><span className="flex-1">{nameOf(request.user || request.requester || request)} · {requestText(request.status || 'pending')}</span>{editable && request.status === 'pending' && <><button className="secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => { void perform(() => api(`/reservations/${reservation.id}/requests/${request.id}`, json('PATCH', { status: 'accepted' })), t('Demande acceptée.'), false).then(ok => { if (ok) setRequests(values => values.map(value => value.id === request.id ? { ...value, status: 'accepted' } : value)) }) }}>{t('Accepter')}</button><button className="secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => { void perform(() => api(`/reservations/${reservation.id}/requests/${request.id}`, json('PATCH', { status: 'refused' })), t('Demande refusée.'), false).then(ok => { if (ok) setRequests(values => values.map(value => value.id === request.id ? { ...value, status: 'refused' } : value)) }) }}>{t('Refuser')}</button></>}</div>)}</div></div>}
   </article>
 }
 
