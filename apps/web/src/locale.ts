@@ -214,6 +214,20 @@ const english = {
   'Masquer le guide de démarrage': 'Hide the getting-started guide', 'terminé': 'done',
   'PROCHAINES ÉTAPES': 'NEXT STEPS', 'À faire': 'To do',
   'Rien d’urgent pour le moment. Profitez-en pour compléter votre liste d’envies !': 'Nothing urgent right now. A good time to complete your wish list!',
+  'HORS LISTE': 'OFF-LIST', 'Cadeaux ouverts aux participations': 'Gifts open to contributions',
+  'SANS PASSER PAR LA LISTE': 'BEYOND THE WISH LIST', 'Cadeaux prévus hors liste': 'Planned off-list gifts',
+  'Prévoir un cadeau hors liste': 'Plan an off-list gift',
+  'Aucun cadeau hors liste partagé pour {name}. Une idée qui n’est pas sur sa liste ? Prévoyez-la ici, sans qu’il ou elle ne le voie.': 'No shared off-list gift for {name} yet. Got an idea that is not on their list? Plan it here, without them ever seeing it.',
+  'Nom du cadeau': 'Gift name', 'Ex. : Un week-end surprise': 'E.g. A surprise weekend', 'Lien': 'Link', 'URL de l’image': 'Image URL',
+  'Cadeau hors liste prévu !': 'Off-list gift planned!',
+  'Un cadeau qui n’est pas sur la liste : le bénéficiaire ne le verra jamais avant qu’il soit offert.': 'A gift that is not on the list: the recipient will never see it before it is given.',
+  'Pour qui ?': 'For whom?', 'Choisir une personne': 'Choose a person', 'Choisissez d’abord une personne.': 'Choose a person first.',
+  'Visible et ouvert aux participations': 'Visible and open to contributions',
+  'Les proches du bénéficiaire le verront et pourront demander à participer. Sinon, seuls vous et les participants invités le voient.': 'The recipient’s relatives will see it and can ask to contribute. Otherwise, only you and invited participants can see it.',
+  'Prévoir ce cadeau': 'Plan this gift', 'Privé': 'Private', 'Voir le lien': 'Open link',
+  'Voir dans mes réservations': 'See in my reservations', 'Demande envoyée, en attente de réponse.': 'Request sent, awaiting an answer.',
+  'Votre demande a été refusée.': 'Your request was declined.', 'Participer': 'Contribute',
+  'Hors liste': 'Off-list', 'Visible par la famille': 'Visible to family',
 } as const
 
 export type TranslationKey = keyof typeof english

@@ -17,9 +17,10 @@ export type Reservation = {
   id: Id; wishId?: Id; wish?: Wish; occasionIds?: OccasionSelection[]; occasions?: Occasion[];
   participantIds?: Id[]; participants?: Person[]; creator?: Person; recipient?: Person;
   openToContributions?: boolean; status?: string; wishDeleted?: boolean; cancelled?: boolean;
+  offList?: boolean; requestStatus?: 'pending' | 'accepted' | 'refused' | null;
 }
 export type Wish = {
-  id: Id; title: string; image?: string; description?: string; url?: string;
+  id: Id; title: string; image?: string | null; description?: string | null; url?: string | null;
   price?: number | string; tags?: string[]; ownerId?: Id; reservation?: Reservation;
 }
 

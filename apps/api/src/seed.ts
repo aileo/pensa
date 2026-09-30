@@ -54,6 +54,11 @@ try {
     const r = await reserve(consoleId, alice, 'reserved', true, [alice, charlie], [[a[1], 2026], [a[0], 2027]]);
     await client.query('INSERT INTO requests(reservation_id,user_id) VALUES($1,$2)', [r, david]);
     await reserve(book, charlie, 'purchased', false, [charlie], [[a[0], 2027]]);
+    const offList = async (owner: string, creator: string, title: string, description: string, price: number) =>
+      (await client.query<{id:string}>(`INSERT INTO wishes(owner_id,title,description,price,off_list,created_by)
+        VALUES($1,$2,$3,$4,true,$5) RETURNING id`, [owner, title, description, price, creator])).rows[0].id;
+    await reserve(await offList(bob, david, 'Week-end spa', 'Un week-end détente à offrir à plusieurs.', 240), david, 'reserved', true, [david], [[b[1], 2026]]);
+    await reserve(await offList(alice, charlie, 'Cours de poterie', 'Une initiation d’une journée dans un atelier.', 80), charlie, 'reserved', false, [charlie], [[a[0], 2026]]);
     const gifted = await reserve(camera, bob, 'gifted', false, [bob, david], [[b[1], 2025]]);
     await client.query('UPDATE wishes SET gifted_at=now() WHERE id=$1', [camera]);
     const snapshot = (await client.query('SELECT * FROM wishes WHERE id=$1', [camera])).rows[0];

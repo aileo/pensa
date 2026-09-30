@@ -388,4 +388,49 @@ describe('permissions métier sur l’API', () => {
     expect((await call('charlie', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(true);
     expect((await call('david', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(false);
   });
+  it('gère les cadeaux hors liste sans les révéler au bénéficiaire', async () => {
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const occasions = (await call('alice', `/occasions?recipientId=${bobId}`)).data
+      .filter((o: {nextDate:string|null}) => o.nextDate).slice(0, 1)
+      .map((o: {id:string;nextDate:string}) => ({ id: o.id, year: Number(o.nextDate.slice(0, 4)) }));
+    expect((await call('alice', '/reservations/off-list', 'POST', { recipientId: bobId, occasionIds: occasions })).status).toBe(400);
+    expect((await call('bob', '/reservations/off-list', 'POST', { recipientId: bobId, title: 'Moi', occasionIds: occasions })).status).toBe(403);
+    expect((await call('eloise', '/reservations/off-list', 'POST', { recipientId: bobId, title: 'X', occasionIds: occasions })).status).toBe(403);
+    const hidden = await call('alice', '/reservations/off-list', 'POST', { recipientId: bobId, title: 'Surprise privée', occasionIds: occasions });
+    expect(hidden.status).toBe(201);
+    expect(hidden.data).toMatchObject({ offList: true, openToContributions: false, wish: { title: 'Surprise privée', url: null, image: null } });
+    const open = await call('alice', '/reservations/off-list', 'POST', {
+      recipientId: bobId, title: 'Cadeau commun', description: 'À plusieurs', price: 120, url: 'https://example.com/gift',
+      occasionIds: occasions, openToContributions: true,
+    });
+    expect(open.status).toBe(201);
+    const wishIds = [hidden.data.wish.id, open.data.wish.id];
+    expect((await call('bob', '/wishes')).data.some((w: {id:string}) => wishIds.includes(w.id))).toBe(false);
+    expect((await call('charlie', `/users/${bobId}/wishes`)).data.some((w: {id:string}) => wishIds.includes(w.id))).toBe(false);
+    expect((await call('bob', `/wishes/${open.data.wish.id}`)).status).toBe(404);
+    expect((await call('charlie', `/wishes/${open.data.wish.id}`)).status).toBe(404);
+    expect((await call('charlie', '/search?q=Cadeau commun')).data.wishes).toHaveLength(0);
+    expect((await call('bob', `/users/${bobId}/off-list`)).data).toEqual([]);
+    expect((await call('bob', `/reservations/${open.data.id}`)).status).toBe(404);
+    expect((await call('bob', `/wishes/${open.data.wish.id}`, 'DELETE')).status).toBe(404);
+    expect((await call('alice', '/reservations', 'POST', { wishId: open.data.wish.id, occasionIds: occasions })).status).toBe(404);
+    const charlieView = (await call('charlie', `/users/${bobId}/off-list`)).data as {id:string;requestStatus:string|null}[];
+    expect(charlieView.some(g => g.id === open.data.id)).toBe(true);
+    expect(charlieView.some(g => g.id === hidden.data.id)).toBe(false);
+    expect((await call('alice', `/users/${bobId}/off-list`)).data.some((g: {id:string}) => g.id === hidden.data.id)).toBe(true);
+    const dashboard = (await call('charlie', '/dashboard')).data.openGifts as {id:string}[];
+    expect(dashboard.some(g => g.id === open.data.id)).toBe(true);
+    expect(dashboard.some(g => g.id === hidden.data.id)).toBe(false);
+    expect((await call('alice', '/dashboard')).data.openGifts.some((g: {id:string}) => g.id === open.data.id)).toBe(false);
+    expect((await call('charlie', `/reservations/${open.data.id}/requests`, 'POST')).status).toBe(201);
+    expect((await call('charlie', `/users/${bobId}/off-list`)).data.find((g: {id:string}) => g.id === open.data.id).requestStatus).toBe('pending');
+    expect((await call('charlie', `/reservations/${hidden.data.id}/requests`, 'POST')).status).toBe(409);
+    const edited = await call('alice', `/reservations/${open.data.id}`, 'PATCH', { gift: { title: 'Cadeau commun XL', price: 150 } });
+    expect(edited.data.wish).toMatchObject({ title: 'Cadeau commun XL', price: '150.00', url: null });
+    const consoleRes = (await call('alice', '/reservations')).data.find((r: {wish?:{title:string}}) => r.wish?.title === 'Console de jeux');
+    expect((await call('alice', `/reservations/${consoleRes.id}`, 'PATCH', { gift: { title: 'Nope' } })).status).toBe(409);
+    expect((await call('alice', `/reservations/${hidden.data.id}`, 'DELETE')).status).toBe(200);
+    expect((await call('alice', `/users/${bobId}/off-list`)).data.some((g: {id:string}) => g.id === hidden.data.id)).toBe(false);
+    expect((await call('alice', `/reservations/${open.data.id}`, 'DELETE')).status).toBe(200);
+  });
 });

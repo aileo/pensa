@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { api, ApiError, dateOf, initials, json, list, money, nameOf, type Family, type Household, type Id, type Occasion, type OccasionSelection, type Onboarding, type ParticipationRequest, type Person, type Reservation, type Todo, type Wish } from './api'
 import { LanguageControl } from './language'
 import { useTranslation } from './language-context'
@@ -6,7 +6,7 @@ import { localizeMessage, occasionName, type TranslationKey } from './locale'
 import './index.css'
 
 type Page = 'dashboard' | 'wishes' | 'families' | 'reservations' | 'history' | 'search' | 'profile'
-type Modal = 'wish' | 'family' | 'occasion' | 'reservation' | 'tags' | null
+type Modal = 'wish' | 'family' | 'occasion' | 'reservation' | 'tags' | 'offList' | null
 type IconName = 'home' | 'heart' | 'users' | 'gift' | 'clock' | 'search' | 'user' | 'plus' | 'arrow' | 'link' | 'calendar' | 'trash' | 'edit' | 'check' | 'close' | 'menu' | 'logout' | 'spark' | 'grip' | 'chevron' | 'external'
 
 const paths: Record<IconName, ReactNode> = {
@@ -130,6 +130,8 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
   const [focusedReservation, setFocusedReservation] = useState<Id | null>(null)
+  const [offListRecipient, setOffListRecipient] = useState<Person | null>(null)
+  const [personGifts, setPersonGifts] = useState<Reservation[]>([])
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
   const handleError = useCallback((problem: unknown) => setError(problem instanceof Error ? problem.message : t('Une erreur inattendue est survenue.')), [t])
 
@@ -179,6 +181,12 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
     api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes${suffix}`).then(data => { if (active) setPersonWishes(list(data)) }).catch(problem => { if (active) handleError(problem) })
     return () => { active = false }
   }, [selectedPerson, me?.id, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision, handleError])
+  useEffect(() => {
+    if (!selectedPerson || String(selectedPerson.id) === String(me.id)) return
+    let active = true
+    api<Reservation[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/off-list`).then(data => { if (active) setPersonGifts(list(data)) }).catch(problem => { if (active) handleError(problem) })
+    return () => { active = false }
+  }, [selectedPerson, me.id, revision, handleError])
 
   async function perform(action: () => Promise<unknown>, success: string, close = true) {
     setBusy(true); setError('')
@@ -201,6 +209,8 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
     api<Occasion[]>(`/occasions?recipientId=${encodeURIComponent(String(wish.ownerId ?? ''))}`).then(data => setOccasions(list(data))).catch(handleError)
   }
   function openOccasion(family: Family) { setSelectedFamily(family); setModal('occasion'); setError('') }
+  function openOffList(person?: Person | null) { setOffListRecipient(person ?? null); setModal('offList'); setError('') }
+  const requestGift = (gift: Reservation) => perform(() => api(`/reservations/${gift.id}/requests`, json('POST', {})), t('Demande de participation envoyée.'), false)
   async function removeWish(wish: Wish) {
     if (window.confirm(t('Supprimer « {title} » de votre liste ?', { title: wish.title }))) await perform(() => api(`/wishes/${wish.id}`, { method: 'DELETE' }), t('Envie supprimée.'))
   }
@@ -221,13 +231,14 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
   const dashboardReservations = list<Reservation>(dashboard.reservations)
   const dashboardParticipating = list<Reservation>(dashboard.participating)
   const dashboardTodos = list<Todo>(dashboard.todos)
+  const dashboardOpenGifts = list<Reservation>(dashboard.openGifts)
   const onboarding = dashboard.onboarding as Onboarding | undefined
   const myHousehold = households.find(household => household.mine)
   const isHouseholdAdmin = myHousehold?.members?.find(member => String(member.id) === String(me.id))?.householdAdmin ?? !!me.householdAdmin
   const otherHouseholds = households.filter(household => !household.mine)
   const openPerson = (person: Person) => {
     if (String(person.id) === String(me.id)) { go('wishes'); return }
-    setPage('families'); setSelectedFamily(null); setSelectedPerson(person); setPersonWishes([]); setError(''); setNotice('')
+    setPage('families'); setSelectedFamily(null); setSelectedPerson(person); setPersonWishes([]); setPersonGifts([]); setError(''); setNotice('')
   }
   const logout = async () => { const ok = await perform(() => api('/auth/logout', { method: 'POST' }), t('Déconnexion réussie.')); if (ok) onLogout() }
   const setPersonFilter = (key: keyof WishFilters, value: string) => {
@@ -263,6 +274,7 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
             { label: t('Réservations'), count: reservations.length, icon: 'gift' as IconName, color: 'bg-[#eaf4f0] text-[#6d9e87]', target: 'reservations' as Page },
           ].map(stat => <button key={stat.target} onClick={() => go(stat.target)} className="card flex items-center gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-md"><span className={`rounded-2xl p-3 ${stat.color}`}><Icon name={stat.icon} size={23}/></span><span><strong className="block font-['Outfit'] text-2xl">{stat.count}</strong><span className="muted">{stat.label}</span></span><Icon name="chevron" size={17} className="ml-auto text-[#c4b8c9]"/></button>)}</div>
           <Guidance me={me} onboarding={onboarding} todos={dashboardTodos} busy={busy} onAddWish={() => { setModal('wish'); setError('') }} onGo={go} onPerson={openPerson} onReservation={openReservation} onStatus={changeStatus}/>
+          {dashboardOpenGifts.length > 0 && <div className="mb-9"><SectionTitle kicker={t('HORS LISTE')} title={t('Cadeaux ouverts aux participations')}/><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{dashboardOpenGifts.map(gift => <OffListGiftCard key={gift.id} gift={gift} me={me} busy={busy} showRecipient onRequest={() => void requestGift(gift)} onOpen={() => openReservation(gift.id)} onRecipient={gift.recipient ? () => openPerson(gift.recipient!) : undefined}/>)}</div></div>}
           <div className="mb-9 grid gap-5 lg:grid-cols-2">
             <div><SectionTitle kicker={t('À VENIR')} title={t('Les prochaines occasions')}/>{dashboardOccasions.length ? <div className="card divide-y divide-[#f0edf1]">{dashboardOccasions.slice(0, 4).map(occasion => <div key={`${occasion.id}-${occasion.person?.id}`} className="flex items-center gap-3 p-4"><span className="rounded-xl bg-[#f2eafa] p-2 text-[#795ca7]"><Icon name="calendar" size={19}/></span><div className="min-w-0 flex-1"><p className="truncate font-semibold">{occasionName(occasion.name, locale, occasion.kind)} · {nameOf(occasion.person)}</p><p className="muted">{dateOf(occasion.nextDate)}</p></div></div>)}</div> : <Empty icon="calendar" title={t('Aucune date à venir')} text={t('Les occasions de vos proches apparaîtront ici.')}/>}</div>
             <div><SectionTitle kicker={t('EN PRÉPARATION')} title={t('Les cadeaux partagés')}/>{dashboardReservations.length || dashboardParticipating.length ? <div className="card p-6"><p className="text-lg font-semibold">{t(dashboardReservations.length === 1 ? '{count} réservation organisée' : '{count} réservations organisées', { count: dashboardReservations.length })}</p><p className="muted mt-2">{t(dashboardParticipating.length === 1 ? '{count} cadeau auquel vous participez' : '{count} cadeaux auxquels vous participez', { count: dashboardParticipating.length })}</p><button className="secondary mt-5" onClick={() => go('reservations')}>{t('Voir les réservations')} <Icon name="arrow" size={16}/></button></div> : <Empty icon="gift" title={t('Encore rien à préparer')} text={t('Réservez une envie pour organiser un cadeau.')}/>}</div>
@@ -280,6 +292,7 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
               <div><label className="label" htmlFor="filter-max-price">{t('Prix maximum (€)')}</label><input className="field" id="filter-max-price" type="number" min="0" step="0.01" value={personFilters.maxPrice} onChange={event => setPersonFilter('maxPrice', event.target.value)} placeholder={t('Sans limite')}/></div>
             </div>
             {personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div> : <Empty icon="heart" title={t('Aucune envie trouvée')} text={t('Modifiez les filtres pour découvrir d’autres envies.')}/>}
+            {String(selectedPerson.id) !== String(me.id) && <div className="mt-9"><SectionTitle kicker={t('SANS PASSER PAR LA LISTE')} title={t('Cadeaux prévus hors liste')} action={<button className="secondary" onClick={() => openOffList(selectedPerson)}><Icon name="plus" size={17}/> {t('Prévoir un cadeau hors liste')}</button>}/>{personGifts.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{personGifts.map(gift => <OffListGiftCard key={gift.id} gift={gift} me={me} busy={busy} onRequest={() => void requestGift(gift)} onOpen={() => openReservation(gift.id)}/>)}</div> : <p className="muted rounded-xl bg-[#f7f3f9] p-4">{t('Aucun cadeau hors liste partagé pour {name}. Une idée qui n’est pas sur sa liste ? Prévoyez-la ici, sans qu’il ou elle ne le voie.', { name: nameOf(selectedPerson) })}</p>}</div>}
           </>
             : activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">{t('VOTRE TRIBU')}</p><p className="muted mt-1">{t('Découvrez les envies des membres de cette famille.')}</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> {t('Ajouter une occasion')}</button>}</div>{activeFamily.households?.length ? <FamilyHouseholds family={activeFamily} me={me} onPerson={openPerson}/> : activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => openPerson(person)} className="card flex items-center gap-4 p-5 text-left hover:border-[#cbb8de]"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title={t('Aucun membre affiché')} text={t('Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles.')}/ >}{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} busy={busy} perform={perform} handleError={handleError} onRename={name => setSelectedFamily({ ...activeFamily, name })}/>}</>
             : <>
@@ -290,19 +303,20 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
               {otherHouseholds.length > 0 && <div className="mt-9"><SectionTitle kicker={t('DANS VOS FAMILLES')} title={t('Les autres foyers')}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{otherHouseholds.map(household => <HouseholdCard key={household.id} household={household} me={me} onPerson={openPerson}/>)}</div></div>}
             </>}
         </>}
-        {page === 'reservations' && <><SectionTitle kicker={t('CADEAUX EN PRÉPARATION')} title={t('Mes réservations')}/>{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform} onStatus={changeStatus} focused={String(focusedReservation) === String(reservation.id)}/>)}</div> : <Empty icon="gift" title={t('Aucune réservation pour le moment')} text={t('Explorez les listes de vos proches pour leur préparer une surprise.')} action={<button className="primary" onClick={() => go('families')}>{t('Découvrir les envies')} <Icon name="arrow" size={17}/></button>}/>}</>}
+        {page === 'reservations' && <><SectionTitle kicker={t('CADEAUX EN PRÉPARATION')} title={t('Mes réservations')} action={<button className="secondary" onClick={() => openOffList()}><Icon name="plus" size={17}/> {t('Prévoir un cadeau hors liste')}</button>}/>{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform} onStatus={changeStatus} focused={String(focusedReservation) === String(reservation.id)}/>)}</div> : <Empty icon="gift" title={t('Aucune réservation pour le moment')} text={t('Explorez les listes de vos proches pour leur préparer une surprise.')} action={<button className="primary" onClick={() => go('families')}>{t('Découvrir les envies')} <Icon name="arrow" size={17}/></button>}/>}</>}
         {page === 'history' && <><SectionTitle kicker={t('SOUVENIRS PARTAGÉS')} title={t('Historique')}/>{history.length ? <div className="card divide-y divide-[#f0edf1]">{history.map((entry, index) => { const item = entry as { id?: Id; snapshot?: { title?: string; occasions?: { name: string; year: number }[] }; created_at?: string }; return <div className="flex items-start gap-4 p-5" key={String(item.id ?? index)}><span className="rounded-xl bg-[#f2eafa] p-2.5 text-[#795ca7]"><Icon name="clock" size={19}/></span><div><p className="font-semibold">{item.snapshot?.title || t('Un cadeau offert')}</p><p className="muted mt-1">{item.snapshot?.occasions?.map(occasion => `${occasionName(occasion.name, locale)} ${occasion.year}`).join(', ')} · {dateOf(item.created_at)}</p></div></div> })}</div> : <Empty icon="clock" title={t('Vos souvenirs commencent ici')} text={t('L’historique de vos cadeaux et occasions s’affichera ici.')}/>}</>}
         {page === 'search' && <><SectionTitle kicker={t('TROUVEZ L’INSPIRATION')} title={t('Rechercher')}/><label htmlFor="global-search" className="label">{t('Personnes et envies')}</label><div className="relative mb-7"><Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#a399ac]"/><input id="global-search" autoComplete="off" className="field !py-3 !pl-12" placeholder={t('Rechercher une personne, une envie…')} value={searchText} onChange={event => setSearchText(event.target.value)}/></div>{searchResults.length ? <div className="space-y-3">{searchResults.map((result, index) => { const item = result as Record<string, unknown>; const person = item as Person; const wish = item as Wish; const isWish = typeof item.title === 'string'; return <div key={String(item.id ?? index)} className="card flex items-center gap-4 p-4">{isWish ? <span className="rounded-xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="heart"/></span> : <Avatar person={person}/>}<div className="min-w-0 flex-1"><p className="truncate font-semibold">{isWish ? wish.title : nameOf(person)}</p><p className="muted">{isWish ? money(wish.price) || t('Envie cadeau') : t('Personne')}</p></div><button className="secondary !px-3 !py-2 text-sm" onClick={() => isWish ? String(wish.ownerId) === String(me.id) ? go('wishes') : openReserve(wish) : (setSelectedPerson(person), setPage('families'))}>{t('Voir')} <Icon name="arrow" size={15}/></button></div> })}</div> : <Empty icon="search" title={searchText ? t('Aucun résultat') : t('Que recherchez-vous ?')} text={searchText ? t('Essayez d’autres mots-clés.') : t('Retrouvez une personne ou une idée cadeau en quelques lettres.')}/>}</>}
         {page === 'profile' && <><SectionTitle kicker={t('VOTRE ESPACE')} title={t('Mon profil')}/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-[#eee9ef] pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">{t('Votre compte Giftit')}</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">{t('ADRESSE E-MAIL')}</dt><dd>{me.email || t('Non renseignée')}</dd></div><div><dt className="eyebrow mb-1">{t('DATE DE NAISSANCE')}</dt><dd>{dateOf(me.birthDate) || t('Non renseignée')}</dd></div></dl><ProfileForm me={me} busy={busy} perform={perform} onSaved={onProfile}/></div></>}
       </main>
     </div>
-    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241a35]/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-8"><div className="mb-6 flex items-start justify-between gap-3"><div><p className="eyebrow mb-1">{t('GIFTIT')}</p><h2 id="modal-title" className="font-['Outfit'] text-2xl font-bold">{t(modal === 'wish' ? 'Ajouter une envie' : modal === 'family' ? 'Créer une famille' : modal === 'occasion' ? 'Nouvelle occasion' : modal === 'tags' ? 'Modifier les tags' : 'Réserver une envie')}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label={t('Fermer')}><Icon name="close"/></button></div>
+    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#241a35]/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-8"><div className="mb-6 flex items-start justify-between gap-3"><div><p className="eyebrow mb-1">{t('GIFTIT')}</p><h2 id="modal-title" className="font-['Outfit'] text-2xl font-bold">{t(modal === 'wish' ? 'Ajouter une envie' : modal === 'family' ? 'Créer une famille' : modal === 'occasion' ? 'Nouvelle occasion' : modal === 'tags' ? 'Modifier les tags' : modal === 'offList' ? 'Prévoir un cadeau hors liste' : 'Réserver une envie')}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label={t('Fermer')}><Icon name="close"/></button></div>
       {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {modal === 'wish' && <WishForm busy={busy} perform={perform} handleError={handleError}/>}
       {modal === 'family' && <form onSubmit={event => { event.preventDefault(); const name = String(new FormData(event.currentTarget).get('name')).trim(); if (name) void perform(() => api('/families', json('POST', { name })), t('Famille créée.')) }}><label className="label" htmlFor="family-name">{t('Nom de la famille')}</label><input className="field" id="family-name" name="name" placeholder={t('Ex. : La famille Martin')} required/><button disabled={busy} className="primary mt-5 w-full">{t('Créer la famille')}</button></form>}
       {modal === 'occasion' && selectedFamily && <OccasionForm family={selectedFamily} busy={busy} perform={perform}/>}
       {modal === 'tags' && selectedWish && <form onSubmit={event => { event.preventDefault(); const tags = String(new FormData(event.currentTarget).get('tags')).split(',').map(tag => tag.trim()).filter(Boolean); void perform(() => api(`/wishes/${selectedWish.id}`, json('PATCH', { tags })), t('Tags mis à jour.')) }}><label htmlFor="wish-tags" className="label">{t('Tags séparés par des virgules')}</label><input id="wish-tags" name="tags" className="field" defaultValue={selectedWish.tags?.join(', ')} placeholder={t('livre, déco, anniversaire')}/><button disabled={busy} className="primary mt-5 w-full">{t('Enregistrer les tags')}</button></form>}
       {modal === 'reservation' && selectedWish && <ReservationForm wish={selectedWish} reservations={reservations} occasions={occasions} people={allPeople} me={me} busy={busy} perform={perform}/>}
+      {modal === 'offList' && <OffListForm recipient={offListRecipient} people={allPeople} me={me} busy={busy} perform={perform}/>}
     </div></div>}
   </div>
 }
@@ -727,6 +741,73 @@ function ReservationForm({ wish, reservations, occasions, people, me, busy, perf
   </form>
 }
 
+const giftBody = (data: FormData) => {
+  const text = (key: string) => String(data.get(key) ?? '').trim() || null
+  const price = text('price')
+  return { title: text('title') ?? '', description: text('description'), price: price === null ? null : Number(price), url: text('url'), image: text('image') }
+}
+function GiftFields({ gift }: { gift?: Wish }) {
+  const { t } = useTranslation()
+  const id = useId()
+  return <div className="space-y-4">
+    <div><label className="label" htmlFor={`${id}-title`}>{t('Nom du cadeau')}</label><input className="field" id={`${id}-title`} name="title" defaultValue={gift?.title ?? ''} maxLength={200} placeholder={t('Ex. : Un week-end surprise')} required/></div>
+    <div><label className="label" htmlFor={`${id}-description`}>{t('Description')} <span className="font-normal">{t('(facultatif)')}</span></label><textarea className="field min-h-20" id={`${id}-description`} name="description" defaultValue={gift?.description ?? ''}/></div>
+    <div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor={`${id}-price`}>{t('Prix (€)')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id={`${id}-price`} name="price" type="number" min="0" step="0.01" defaultValue={gift?.price ?? ''}/></div><div><label className="label" htmlFor={`${id}-url`}>{t('Lien')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id={`${id}-url`} name="url" type="url" defaultValue={gift?.url ?? ''} placeholder="https://…"/></div></div>
+    <div><label className="label" htmlFor={`${id}-image`}>{t('URL de l’image')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id={`${id}-image`} name="image" type="url" defaultValue={gift?.image ?? ''} placeholder="https://…"/></div>
+  </div>
+}
+
+function OffListForm({ recipient, people, me, busy, perform }: { recipient: Person | null; people: Person[]; me: Person; busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
+  const { locale, t } = useTranslation()
+  const [recipientId, setRecipientId] = useState(recipient ? String(recipient.id) : '')
+  const [occasions, setOccasions] = useState<Occasion[]>([])
+  const [loadError, setLoadError] = useState('')
+  const [selectedOccasions, setSelectedOccasions] = useState<OccasionSelection[]>([])
+  const [selectedParticipants, setSelectedParticipants] = useState<Id[]>([])
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!recipientId) return
+    let active = true
+    api<Occasion[]>(`/occasions?recipientId=${encodeURIComponent(recipientId)}`).then(data => {
+      if (!active) return
+      const loaded = list<Occasion>(data)
+      setOccasions(loaded); setLoadError('')
+      const first = loaded.map(selectionOf).find((item): item is OccasionSelection => item !== null)
+      setSelectedOccasions(first ? [first] : [])
+    }).catch(problem => { if (active) setLoadError(problem instanceof Error ? problem.message : t('Occasions indisponibles.')) })
+    return () => { active = false }
+  }, [recipientId, t])
+  const candidates = people.filter(person => String(person.id) !== String(me.id))
+  const options = recipientId ? occurrences(occasions) : []
+  const toggle = <T,>(values: T[], value: T, same: (a: T, b: T) => boolean) => values.some(item => same(item, value)) ? values.filter(item => !same(item, value)) : [...values, value]
+  return <form onSubmit={event => { event.preventDefault(); const body = { recipientId, ...giftBody(new FormData(event.currentTarget)), occasionIds: selectedOccasions, participantIds: selectedParticipants, openToContributions: open }; void perform(() => api('/reservations/off-list', json('POST', body)), t('Cadeau hors liste prévu !')) }}>
+    <p className="muted mb-5">{t('Un cadeau qui n’est pas sur la liste : le bénéficiaire ne le verra jamais avant qu’il soit offert.')}</p>
+    {recipient ? <p className="mb-5 text-sm">{t('Pour')} <strong className="text-[#4b3e59]">{nameOf(recipient)}</strong></p>
+      : <div className="mb-5"><label className="label" htmlFor="off-list-recipient">{t('Pour qui ?')}</label><select className="field" id="off-list-recipient" value={recipientId} onChange={event => { setRecipientId(event.target.value); setOccasions([]); setSelectedOccasions([]); setSelectedParticipants(values => values.filter(value => String(value) !== event.target.value)) }} required><option value="">{t('Choisir une personne')}</option>{candidates.map(person => <option key={person.id} value={String(person.id)}>{nameOf(person)}</option>)}</select></div>}
+    <GiftFields/>
+    <fieldset className="my-5"><legend className="label">{t('Occasions (au moins une)')}</legend>{!recipientId ? <p className="muted">{t('Choisissez d’abord une personne.')}</p> : loadError ? <p role="alert" className="text-sm text-red-700">{localizeMessage(loadError, locale)}</p> : options.length ? <div className="max-h-36 space-y-2 overflow-y-auto">{options.map(({ occasion, selection }) => <label key={`${selection.id}-${selection.year}`} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={selectedOccasions.some(value => sameSelection(value, selection))} onChange={() => setSelectedOccasions(values => toggle(values, selection, sameSelection))}/>{occasionName(occasion.name || occasion.title, locale, occasion.kind) || t('Occasion')} <span className="text-[#9a91a0]">{occasion.nextDate && Number(occasion.nextDate.slice(0, 4)) === selection.year ? dateOf(occasion.nextDate) : t('année {year}', { year: selection.year })}</span></label>)}</div> : <p className="muted">{t('Aucune occasion datée pour cette personne. Créez une occasion dans une famille commune avant de réserver.')}</p>}</fieldset>
+    {recipientId && <fieldset className="mb-5"><legend className="label">{t('Inviter des participants')}</legend><div className="max-h-32 space-y-2 overflow-y-auto">{candidates.filter(person => String(person.id) !== recipientId).map(person => <label key={person.id} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={selectedParticipants.some(id => String(id) === String(person.id))} onChange={() => setSelectedParticipants(values => toggle(values, person.id, (a, b) => String(a) === String(b)))}/>{nameOf(person)}</label>)}</div></fieldset>}
+    <label className="mb-1 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/><span>{t('Visible et ouvert aux participations')}<span className="muted block">{t('Les proches du bénéficiaire le verront et pourront demander à participer. Sinon, seuls vous et les participants invités le voient.')}</span></span></label>
+    <button disabled={busy || !recipientId || selectedOccasions.length === 0} className="primary mt-5 w-full">{t('Prévoir ce cadeau')}</button>
+  </form>
+}
+
+function OffListGiftCard({ gift, me, busy, showRecipient, onRequest, onOpen, onRecipient }: { gift: Reservation; me: Person; busy: boolean; showRecipient?: boolean; onRequest: () => void; onOpen: () => void; onRecipient?: () => void }) {
+  const { locale, t } = useTranslation()
+  const involved = String(gift.creator?.id) === String(me.id) || !!gift.participants?.some(person => String(person.id) === String(me.id))
+  return <article className="card flex flex-col p-5">
+    <div className="flex items-start gap-3">{gift.wish?.image ? <img src={gift.wish.image} alt="" className="size-12 shrink-0 rounded-xl object-cover"/> : <span className="rounded-xl bg-[#fceee7] p-2.5 text-[#d18a65]"><Icon name="gift" size={21}/></span>}<div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-['Outfit'] font-semibold">{gift.wish?.title}</h3>{!gift.openToContributions && <span className="chip">{t('Privé')}</span>}</div>{showRecipient && gift.recipient && <p className="text-sm font-medium text-[#4b3e59]">{t('Pour')} {onRecipient ? <button className="font-semibold text-[#795ca7] hover:underline" onClick={onRecipient}>{nameOf(gift.recipient)}</button> : nameOf(gift.recipient)}</p>}{gift.wish?.price != null && <p className="text-sm font-semibold text-[#795ca7]">{money(gift.wish.price)}</p>}</div></div>
+    {gift.wish?.description && <p className="muted mt-3 line-clamp-3">{gift.wish.description}</p>}
+    {gift.wish?.url && <a className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-[#795ca7] hover:underline" href={gift.wish.url} target="_blank" rel="noreferrer"><Icon name="external" size={14}/> {t('Voir le lien')}</a>}
+    <p className="muted mt-3">{gift.occasions?.map(item => `${occasionName(item.name, locale)} ${item.year}`).join(', ')}</p>
+    <p className="muted mt-1">{t('Organisé par')} {nameOf(gift.creator)} · {t('Participants :')} {gift.participants?.map(nameOf).join(', ') || t('Aucun')}</p>
+    <div className="mt-auto pt-4">{involved ? <button className="secondary w-full !py-2 text-sm" onClick={onOpen}>{t('Voir dans mes réservations')} <Icon name="arrow" size={15}/></button>
+      : gift.requestStatus === 'pending' ? <p className="rounded-xl bg-[#f7f3f9] p-2 text-center text-sm text-[#6f6479]">{t('Demande envoyée, en attente de réponse.')}</p>
+        : gift.requestStatus === 'refused' ? <p className="rounded-xl bg-[#f7f3f9] p-2 text-center text-sm text-[#6f6479]">{t('Votre demande a été refusée.')}</p>
+          : gift.openToContributions ? <button className="primary w-full !py-2 text-sm" disabled={busy} onClick={onRequest}>{t('Participer')}</button> : null}</div>
+  </article>
+}
+
 function ReservationRow({ reservation, users, me, busy, perform, onStatus, focused }: { reservation: Reservation; users: Person[]; me: Person; busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean>; onStatus: (id: Id, status: ReservationStatus, title?: string) => Promise<boolean>; focused?: boolean }) {
   const { locale, t } = useTranslation()
   const card = useRef<HTMLElement>(null)
@@ -756,11 +837,10 @@ function ReservationRow({ reservation, users, me, busy, perform, onStatus, focus
   async function openEditor() {
     if (editing) { setEditing(false); return }
     setEditing(true); setLocalError('')
-    if (!reservation.wishId) return
     try {
-      const wish = await api<Wish>(`/wishes/${reservation.wishId}`)
-      setRecipientId(wish.ownerId)
-      if (wish.ownerId) setAvailable(list(await api<Occasion[]>(`/occasions?recipientId=${encodeURIComponent(String(wish.ownerId))}`)))
+      const ownerId = reservation.recipient?.id ?? (reservation.wishId && !reservation.offList ? (await api<Wish>(`/wishes/${reservation.wishId}`)).ownerId : undefined)
+      setRecipientId(ownerId)
+      if (ownerId) setAvailable(list(await api<Occasion[]>(`/occasions?recipientId=${encodeURIComponent(String(ownerId))}`)))
     } catch (problem) {
       setLocalError(problem instanceof Error ? problem.message : t('Occasions indisponibles.'))
     }
@@ -770,7 +850,7 @@ function ReservationRow({ reservation, users, me, busy, perform, onStatus, focus
     ...occurrences(available).filter(item => !isSaved(item, reservation.occasions)),
   ]
   return <article ref={card} id={`reservation-${reservation.id}`} className={`card scroll-mt-24 p-5 ${focused ? 'ring-2 ring-[#795ca7]' : ''}`}>
-    <div className="flex flex-wrap items-start gap-4">{reservation.wish?.image ? <img src={reservation.wish.image} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover"/> : <span className="rounded-2xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="gift" size={23}/></span>}<div className="min-w-0 flex-1"><h3 className="font-['Outfit'] text-lg font-semibold">{reservation.wish?.title || t('Réservation #{id}', { id: String(reservation.id).slice(0, 8) })}</h3>{reservation.recipient && <p className="mt-1 text-sm font-medium text-[#4b3e59]">{t('Pour')} {nameOf(reservation.recipient)}</p>}<p className="muted mt-1">{reservation.occasions?.map(item => `${occasionName(item.name, locale)} ${item.year}`).join(', ') || t('Cadeau en préparation')} · {reservation.cancelled ? t('Annulé') : statusText(reservation.status || 'reserved')}</p><p className="muted mt-1">{t('Organisé par')} {nameOf(reservation.creator)} · {t('Participants :')} {reservation.participants?.map(nameOf).join(', ') || t('Aucun')}</p>{reservation.wishDeleted && <p className="muted">{t('L’envie a été supprimée.')}</p>}</div>{editable && <button className="secondary text-sm" onClick={() => void openEditor()}><Icon name="edit" size={16}/> {editing ? t('Fermer') : t('Gérer')}</button>}</div>
+    <div className="flex flex-wrap items-start gap-4">{reservation.wish?.image ? <img src={reservation.wish.image} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover"/> : <span className="rounded-2xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="gift" size={23}/></span>}<div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-['Outfit'] text-lg font-semibold">{reservation.wish?.title || t('Réservation #{id}', { id: String(reservation.id).slice(0, 8) })}</h3>{reservation.offList && <span className="chip !bg-[#fceee7] !text-[#b86f4b]">{t('Hors liste')}</span>}{reservation.offList && <span className="chip">{reservation.openToContributions ? t('Visible par la famille') : t('Privé')}</span>}</div>{reservation.recipient && <p className="mt-1 text-sm font-medium text-[#4b3e59]">{t('Pour')} {nameOf(reservation.recipient)}{reservation.offList && reservation.wish?.price != null && <> · {money(reservation.wish.price)}</>}</p>}{reservation.offList && reservation.wish?.description && <p className="muted mt-1">{reservation.wish.description}</p>}{reservation.offList && reservation.wish?.url && <a className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-[#795ca7] hover:underline" href={reservation.wish.url} target="_blank" rel="noreferrer"><Icon name="external" size={14}/> {t('Voir le lien')}</a>}<p className="muted mt-1">{reservation.occasions?.map(item => `${occasionName(item.name, locale)} ${item.year}`).join(', ') || t('Cadeau en préparation')} · {reservation.cancelled ? t('Annulé') : statusText(reservation.status || 'reserved')}</p><p className="muted mt-1">{t('Organisé par')} {nameOf(reservation.creator)} · {t('Participants :')} {reservation.participants?.map(nameOf).join(', ') || t('Aucun')}</p>{reservation.wishDeleted && !reservation.offList && <p className="muted">{t('L’envie a été supprimée.')}</p>}</div>{editable && <button className="secondary text-sm" onClick={() => void openEditor()}><Icon name="edit" size={16}/> {editing ? t('Fermer') : t('Gérer')}</button>}</div>
     {!reservation.cancelled && reservation.status && <div className="mt-4 space-y-3 rounded-2xl bg-[#faf8fb] p-4">
       <StatusStepper status={current}/>
       {editable && <div className="flex flex-wrap gap-2">
@@ -781,12 +861,13 @@ function ReservationRow({ reservation, users, me, busy, perform, onStatus, focus
       {!creator && current !== 'gifted' && <p className="muted text-xs">{t('Seul l’organisateur peut faire avancer ce cadeau.')}</p>}
     </div>}
     {localError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{localError}</p>}
-    {editing && <div className="mt-5 space-y-4 border-t border-[#eee9ef] pt-5">
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/>{t('Ouvert aux participations')}</label>
+    {editing && <form className="mt-5 space-y-4 border-t border-[#eee9ef] pt-5" onSubmit={event => { event.preventDefault(); const body = { occasionIds, participantIds, openToContributions: open, ...(reservation.offList ? { gift: giftBody(new FormData(event.currentTarget)) } : {}) }; void perform(() => api(`/reservations/${reservation.id}`, json('PATCH', body)), t('Réservation mise à jour.'), false).then(ok => { if (ok) setEditing(false) }) }}>
+      {reservation.offList && reservation.wish && <GiftFields gift={reservation.wish}/>}
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/>{reservation.offList ? t('Visible et ouvert aux participations') : t('Ouvert aux participations')}</label>
       <fieldset><legend className="label">{t('Occasions (au moins une)')}</legend><div className="flex flex-wrap gap-3">{options.map(({ occasion, selection }) => <label className="inline-flex items-center gap-2 text-sm" key={`${selection.id}-${selection.year}`}><input type="checkbox" checked={occasionIds.some(value => sameSelection(value, selection))} onChange={() => setOccasionIds(values => values.some(value => sameSelection(value, selection)) ? values.filter(value => !sameSelection(value, selection)) : [...values, selection])}/>{occasionName(occasion.name || occasion.title, locale, occasion.kind)} {selection.year}</label>)}</div></fieldset>
       <fieldset><legend className="label">{t('Participants')}</legend>{recipientId ? <div className="flex max-h-32 flex-wrap gap-3 overflow-y-auto">{users.filter(person => String(person.id) !== String(me.id) && String(person.id) !== String(recipientId)).map(person => <label className="inline-flex items-center gap-2 text-sm" key={person.id}><input type="checkbox" checked={participantIds.some(id => String(id) === String(person.id))} onChange={() => setParticipantIds(values => values.some(id => String(id) === String(person.id)) ? values.filter(id => String(id) !== String(person.id)) : [...values, person.id])}/>{nameOf(person)}</label>)}</div> : <p className="muted">{t('Participants existants conservés ; détails de l’envie indisponibles.')}</p>}</fieldset>
-      <div className="flex flex-wrap gap-2"><button className="primary" disabled={busy || occasionIds.length === 0} onClick={() => { void perform(() => api(`/reservations/${reservation.id}`, json('PATCH', { occasionIds, participantIds, openToContributions: open })), t('Réservation mise à jour.'), false).then(ok => { if (ok) setEditing(false) }) }}>{t('Enregistrer')}</button><button className="secondary !text-red-600" disabled={busy} onClick={() => { if (window.confirm(t('Annuler cette réservation ?'))) void perform(() => api(`/reservations/${reservation.id}`, { method: 'DELETE' }), t('Réservation annulée.')) }}>{t('Annuler la réservation')}</button></div>
-    </div>}
+      <div className="flex flex-wrap gap-2"><button className="primary" disabled={busy || occasionIds.length === 0}>{t('Enregistrer')}</button><button type="button" className="secondary !text-red-600" disabled={busy} onClick={() => { if (window.confirm(t('Annuler cette réservation ?'))) void perform(() => api(`/reservations/${reservation.id}`, { method: 'DELETE' }), t('Réservation annulée.')) }}>{t('Annuler la réservation')}</button></div>
+    </form>}
     {creator && !!requests.length && <div className="mt-4 border-t border-[#eee9ef] pt-4"><h4 className="mb-3 text-sm font-semibold">{t('Demandes de participation')}</h4><div className="space-y-2">{requests.map(request => <div className="flex flex-wrap items-center gap-2 text-sm" key={request.id}><span className="flex-1">{nameOf(request.user || request.requester || request)} · {requestText(request.status || 'pending')}</span>{editable && request.status === 'pending' && <><button className="secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => { void perform(() => api(`/reservations/${reservation.id}/requests/${request.id}`, json('PATCH', { status: 'accepted' })), t('Demande acceptée.'), false).then(ok => { if (ok) setRequests(values => values.map(value => value.id === request.id ? { ...value, status: 'accepted' } : value)) }) }}>{t('Accepter')}</button><button className="secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => { void perform(() => api(`/reservations/${reservation.id}/requests/${request.id}`, json('PATCH', { status: 'refused' })), t('Demande refusée.'), false).then(ok => { if (ok) setRequests(values => values.map(value => value.id === request.id ? { ...value, status: 'refused' } : value)) }) }}>{t('Refuser')}</button></>}</div>)}</div></div>}
   </article>
 }

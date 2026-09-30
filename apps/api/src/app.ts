@@ -52,6 +52,8 @@ const english: Record<string, string> = {
   'Participation fermée': 'Participation closed',
   'Déjà participant': 'Already a participant',
   'Demande introuvable': 'Request not found',
+  'Impossible de prévoir un cadeau pour soi-même': 'Cannot plan a gift for yourself',
+  'Seul un cadeau hors liste peut être modifié': 'Only an off-list gift can be edited',
   'Ressource introuvable': 'Resource not found',
   'Données invalides': 'Invalid data',
   'Conflit': 'Conflict',
@@ -382,10 +384,10 @@ api.delete('/occasions/:id', async (req, res) => {
     fail(409, 'Occasion utilisée dans une réservation');
   await query('DELETE FROM occasions WHERE id=$1', [id]); res.json({ ok: true });
 });
-type Wish = { id: string; owner_id: string; title: string; description: string | null; url: string; image: string; price: string | null; tags: string[]; position: number; deleted_at: Date | null; gifted_at: Date | null };
+type Wish = { id: string; owner_id: string; title: string; description: string | null; url: string | null; image: string | null; price: string | null; tags: string[]; position: number; deleted_at: Date | null; gifted_at: Date | null; off_list: boolean; created_by: string | null };
 const wishAccess = async (id: string, viewer: string) => {
   const wish = await first<Wish>('SELECT * FROM wishes WHERE id=$1', [id]);
-  if (!wish || !await visible(viewer, wish.owner_id)) fail(404, 'Souhait introuvable');
+  if (!wish || wish.off_list || !await visible(viewer, wish.owner_id)) fail(404, 'Souhait introuvable');
   return wish;
 };
 const wishFilters = z.strictObject({
@@ -413,7 +415,7 @@ const reservationView = async (wish: Wish, viewer: string) => {
 };
 const listWishes = async (viewer: string, owner: string, filters: z.infer<typeof wishFilters> = {}) => {
   if (!await visible(viewer, owner)) fail(403, 'Personne inaccessible');
-  const rows = await query<Wish>(`SELECT * FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL AND gifted_at IS NULL
+  const rows = await query<Wish>(`SELECT * FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL AND gifted_at IS NULL AND NOT off_list
     ORDER BY position,created_at`, [owner]);
   const result = await Promise.all(rows.map(row => reservationView(row, viewer)));
   return result.filter(row => {
@@ -444,7 +446,7 @@ api.post('/wishes', async (req, res) => {
     price: z.coerce.number().min(0).max(99999999).nullable().optional(), tags: tags.default([]) }).parse(req.body);
   if (!/^https?:\/\//.test(d.url) || !/^https?:\/\//.test(d.image)) fail(400, 'URL HTTP(S) requise');
   const row = await first<Wish>(`INSERT INTO wishes(owner_id,title,image,url,description,price,tags,position)
-    VALUES($1,$2,$3,$4,$5,$6,$7,(SELECT count(*) FROM wishes WHERE owner_id=$1)) RETURNING *`,
+    VALUES($1,$2,$3,$4,$5,$6,$7,(SELECT count(*) FROM wishes WHERE owner_id=$1 AND NOT off_list)) RETURNING *`,
     [person(req).id, d.title, d.image, d.url, d.description ?? null, d.price ?? null, d.tags]);
   res.status(201).json(await reservationView(row, person(req).id));
 });
@@ -454,7 +456,7 @@ api.patch('/wishes/order', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const rows = (await client.query<{id:string}>('SELECT id FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL AND gifted_at IS NULL FOR UPDATE', [person(req).id])).rows;
+    const rows = (await client.query<{id:string}>('SELECT id FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL AND gifted_at IS NULL AND NOT off_list FOR UPDATE', [person(req).id])).rows;
     if (rows.length !== ids.length || rows.some(r => !ids.includes(r.id))) fail(400, 'Liste incomplète');
     for (let i = 0; i < ids.length; i++) await client.query('UPDATE wishes SET position=$1 WHERE id=$2', [i, ids[i]]);
     await client.query('COMMIT'); res.json({ ok: true });
@@ -463,21 +465,21 @@ api.patch('/wishes/order', async (req, res) => {
 api.patch('/wishes/:id', async (req, res) => {
   const id = uuid.parse(req.params.id);
   const d = z.strictObject({ tags }).parse(req.body);
-  const row = await first<Wish>('UPDATE wishes SET tags=$1 WHERE id=$2 AND owner_id=$3 AND deleted_at IS NULL AND gifted_at IS NULL RETURNING *',
+  const row = await first<Wish>('UPDATE wishes SET tags=$1 WHERE id=$2 AND owner_id=$3 AND deleted_at IS NULL AND gifted_at IS NULL AND NOT off_list RETURNING *',
     [d.tags, id, person(req).id]);
   if (!row) fail(404, 'Souhait introuvable');
   res.json(await reservationView(row, person(req).id));
 });
 api.delete('/wishes/:id', async (req, res) => {
-  const row = await first('UPDATE wishes SET deleted_at=now() WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL AND gifted_at IS NULL RETURNING id',
+  const row = await first('UPDATE wishes SET deleted_at=now() WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL AND gifted_at IS NULL AND NOT off_list RETURNING id',
     [uuid.parse(req.params.id), person(req).id]);
   if (!row) fail(404, 'Souhait introuvable');
   res.json({ ok: true });
 });
 
-type Reservation = { id: string; wish_id: string; creator_id: string; status: string; open_to_contributions: boolean; cancelled_at: Date | null; created_at: Date; owner_id: string; deleted_at: Date | null; gifted_at: Date | null };
+type Reservation = { id: string; wish_id: string; creator_id: string; status: string; open_to_contributions: boolean; cancelled_at: Date | null; created_at: Date; owner_id: string; deleted_at: Date | null; gifted_at: Date | null; off_list?: boolean };
 const getReservation = async (id: string, viewer: string) => {
-  const row = await first<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at FROM reservations r JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1`, [id]);
+  const row = await first<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1`, [id]);
   if (!row || row.owner_id === viewer || !await visible(viewer, row.owner_id)) fail(404, 'Réservation introuvable');
   return row;
 };
@@ -488,7 +490,9 @@ const reservationDetails = async (r: Reservation, viewer: string) => {
     JOIN occasions o ON o.id=ro.occasion_id WHERE ro.reservation_id=$1 ORDER BY ro.year,o.name`, [r.id]);
   const wish = await first<Wish>('SELECT * FROM wishes WHERE id=$1', [r.wish_id]);
   const recipient = await first<Person>('SELECT * FROM users WHERE id=$1', [r.owner_id]);
-  return { id: r.id, wishId: r.wish_id, wish: wish && { id: wish.id, title: wish.title, image: wish.image, price: wish.price },
+  return { id: r.id, wishId: r.wish_id, offList: !!wish?.off_list,
+    wish: wish && { id: wish.id, title: wish.title, image: wish.image, price: wish.price,
+      ...(wish.off_list ? { description: wish.description, url: wish.url } : {}) },
     recipient: publicPerson(recipient), creator: publicPerson(creator), participants: participantsRows.map(publicPerson),
     openToContributions: r.open_to_contributions, status: r.creator_id === viewer || participantsRows.some(p => p.id === viewer) ? r.status : undefined,
     occasions: occasionsRows, wishDeleted: !!r.deleted_at, cancelled: !!r.cancelled_at };
@@ -525,7 +529,7 @@ api.post('/reservations', async (req, res) => {
   try {
     await client.query('BEGIN');
     const wish = (await client.query<Wish>('SELECT * FROM wishes WHERE id=$1 FOR UPDATE', [d.wishId])).rows[0];
-    if (!wish || wish.deleted_at || wish.gifted_at) fail(404, 'Souhait indisponible');
+    if (!wish || wish.deleted_at || wish.gifted_at || wish.off_list) fail(404, 'Souhait indisponible');
     if (wish.owner_id === actor.id) fail(403, 'Impossible de réserver son propre souhait');
     const common = await client.query(`SELECT f.id FROM families f JOIN memberships mine ON mine.family_id=f.id
       JOIN users buyer ON buyer.household_id=mine.household_id
@@ -543,8 +547,53 @@ api.post('/reservations', async (req, res) => {
     res.status(201).json(await reservationDetails({ ...r, owner_id: wish.owner_id, deleted_at: null, gifted_at: null }, actor.id));
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 });
+const httpUrl = z.url().max(2048).refine(v => /^https?:\/\//.test(v), 'URL HTTP(S) requise');
+const giftFields = {
+  title: z.string().trim().min(1).max(200), description: z.string().max(5000).nullish(),
+  price: z.coerce.number().min(0).max(99999999).nullish(), url: httpUrl.nullish(), image: httpUrl.nullish(),
+};
+api.post('/reservations/off-list', async (req, res) => {
+  const d = z.object({ recipientId: uuid, ...giftFields, occasionIds: occasionInput,
+    participantIds: z.array(uuid).default([]), openToContributions: z.boolean().default(false) }).parse(req.body);
+  const actor = person(req);
+  if (d.recipientId === actor.id) fail(403, 'Impossible de prévoir un cadeau pour soi-même');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const common = await client.query(`SELECT f.id FROM families f JOIN memberships mine ON mine.family_id=f.id
+      JOIN users buyer ON buyer.household_id=mine.household_id
+      JOIN users recipient ON recipient.id=$2 JOIN memberships theirs
+        ON theirs.family_id=f.id AND theirs.household_id=recipient.household_id
+      WHERE buyer.id=$1 ORDER BY f.id FOR SHARE OF f`, [actor.id, d.recipientId]);
+    if (!common.rowCount) fail(403, 'Personne inaccessible');
+    const wish = (await client.query<Wish>(`INSERT INTO wishes(owner_id,title,description,price,url,image,off_list,created_by)
+      VALUES($1,$2,$3,$4,$5,$6,true,$7) RETURNING *`,
+      [d.recipientId, d.title, d.description ?? null, d.price ?? null, d.url ?? null, d.image ?? null, actor.id])).rows[0];
+    const r = (await client.query<Reservation>(`INSERT INTO reservations(wish_id,creator_id,open_to_contributions)
+      VALUES($1,$2,$3) RETURNING *`, [wish.id, actor.id, d.openToContributions])).rows[0];
+    await setOccasions(client, r.id, d.recipientId, actor.household_id, d.occasionIds);
+    await setParticipants(client, r.id, d.recipientId, actor.id, d.participantIds);
+    await client.query('COMMIT');
+    res.status(201).json(await reservationDetails({ ...r, owner_id: d.recipientId, deleted_at: null, gifted_at: null, off_list: true }, actor.id));
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+});
+const offListVisibility = `w.off_list AND r.cancelled_at IS NULL AND r.status!='gifted'`;
+const withRequestStatus = async (r: Reservation, viewer: string) => ({
+  ...await reservationDetails(r, viewer),
+  requestStatus: (await first<{status:string}>('SELECT status FROM requests WHERE reservation_id=$1 AND user_id=$2', [r.id, viewer]))?.status ?? null,
+});
+api.get('/users/:id/off-list', async (req, res) => {
+  const owner = uuid.parse(req.params.id), viewer = person(req).id;
+  if (owner === viewer) { res.json([]); return; }
+  if (!await visible(viewer, owner)) fail(403, 'Personne inaccessible');
+  const rows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r
+    JOIN wishes w ON w.id=r.wish_id WHERE w.owner_id=$1 AND ${offListVisibility}
+    AND (r.open_to_contributions OR r.creator_id=$2 OR EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$2))
+    ORDER BY r.created_at`, [owner, viewer]);
+  res.json(await Promise.all(rows.map(r => withRequestStatus(r, viewer))));
+});
 api.get('/reservations', async (req, res) => {
-  const rows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at FROM reservations r
+  const rows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r
     JOIN wishes w ON w.id=r.wish_id WHERE w.owner_id<>$1 AND
     (r.creator_id=$1 OR EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$1))
     AND EXISTS(SELECT 1 FROM users viewer JOIN memberships mine ON mine.household_id=viewer.household_id
@@ -561,12 +610,13 @@ api.get('/reservations/:id', async (req, res) => {
 api.patch('/reservations/:id', async (req, res) => {
   const id = uuid.parse(req.params.id);
   const d = z.strictObject({ occasionIds: occasionInput.optional(), participantIds: z.array(uuid).optional(),
-    openToContributions: z.boolean().optional(), status: z.enum(['reserved', 'purchased', 'wrapped', 'gifted']).optional() }).parse(req.body);
+    openToContributions: z.boolean().optional(), status: z.enum(['reserved', 'purchased', 'wrapped', 'gifted']).optional(),
+    gift: z.strictObject(giftFields).optional() }).parse(req.body);
   const actor = person(req);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const r = (await client.query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at FROM reservations r
+    const r = (await client.query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r
       JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1 FOR UPDATE OF r,w`, [id])).rows[0];
     if (!r || r.owner_id === actor.id) fail(404, 'Réservation introuvable');
     if (r.creator_id !== actor.id) fail(403, 'Créateur requis');
@@ -580,6 +630,11 @@ api.patch('/reservations/:id', async (req, res) => {
     }
     if (d.occasionIds) await setOccasions(client, id, r.owner_id, actor.household_id, d.occasionIds);
     if (d.participantIds) await setParticipants(client, id, r.owner_id, actor.id, d.participantIds);
+    if (d.gift) {
+      if (!r.off_list) fail(409, 'Seul un cadeau hors liste peut être modifié');
+      await client.query('UPDATE wishes SET title=$1,description=$2,price=$3,url=$4,image=$5 WHERE id=$6',
+        [d.gift.title, d.gift.description ?? null, d.gift.price ?? null, d.gift.url ?? null, d.gift.image ?? null, r.wish_id]);
+    }
     await client.query('UPDATE reservations SET status=COALESCE($1,status),open_to_contributions=COALESCE($2,open_to_contributions) WHERE id=$3',
       [d.status ?? null, d.openToContributions ?? null, id]);
     if (d.status === 'gifted') {
@@ -602,6 +657,7 @@ api.delete('/reservations/:id', async (req, res) => {
   const row = await first('UPDATE reservations SET cancelled_at=now() WHERE id=$1 AND creator_id=$2 AND cancelled_at IS NULL AND status!=\'gifted\' RETURNING id',
     [r.id, person(req).id]);
   if (!row) fail(409, 'Réservation terminée');
+  if (r.off_list) await query('UPDATE wishes SET deleted_at=now() WHERE id=$1 AND deleted_at IS NULL', [r.wish_id]);
   res.json({ ok: true });
 });
 api.post('/reservations/:id/requests', async (req, res) => {
@@ -665,7 +721,7 @@ api.get('/search', async (req, res) => {
     [person(req).household_id, `%${q}%`]);
   const wishesRows = await query<Wish>(`SELECT DISTINCT w.* FROM wishes w JOIN users u ON u.id=w.owner_id
     JOIN memberships m ON m.household_id=u.household_id JOIN memberships mine ON mine.family_id=m.family_id
-    WHERE mine.household_id=$1 AND w.deleted_at IS NULL AND w.gifted_at IS NULL
+    WHERE mine.household_id=$1 AND w.deleted_at IS NULL AND w.gifted_at IS NULL AND NOT w.off_list
     AND (w.title ILIKE $2 OR EXISTS(SELECT 1 FROM unnest(w.tags) tag WHERE tag ILIKE $2)
       OR w.price::text ILIKE $2 OR u.first_name ILIKE $2 OR u.last_name ILIKE $2) LIMIT 100`,
     [person(req).household_id, `%${q}%`]);
@@ -676,7 +732,7 @@ api.get('/dashboard', async (req, res) => {
   const people = await query<Person>(`SELECT DISTINCT u.id,u.first_name,u.last_name,u.avatar,u.birth_date FROM users u
     JOIN memberships m ON m.household_id=u.household_id JOIN memberships mine ON mine.family_id=m.family_id
     WHERE mine.household_id=$1 ORDER BY u.first_name`, [actor.household_id]);
-  const reservationsRows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at FROM reservations r JOIN wishes w ON w.id=r.wish_id
+  const reservationsRows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r JOIN wishes w ON w.id=r.wish_id
     WHERE w.owner_id<>$1 AND r.cancelled_at IS NULL AND r.status!='gifted'
     AND (r.creator_id=$1 OR EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$1))
     AND EXISTS(SELECT 1 FROM users viewer JOIN memberships mine ON mine.household_id=viewer.household_id
@@ -721,15 +777,21 @@ api.get('/dashboard', async (req, res) => {
   const rank = (t: Record<string, unknown>) => t.urgent ? 0 : t.type === 'occasion_without_gift' ? 1 : t.type === 'pending_requests' ? 2 : t.date ? 3 : 4;
   todos.sort((a, b) => rank(a) - rank(b) || String(a.date ?? '').localeCompare(String(b.date ?? '')));
   const onboarding = {
-    hasWishes: !!await first('SELECT 1 FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL LIMIT 1', [actor.id]),
+    hasWishes: !!await first('SELECT 1 FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL AND NOT off_list LIMIT 1', [actor.id]),
     hasSharedFamily: !!await first(`SELECT 1 FROM memberships mine JOIN memberships other ON other.family_id=mine.family_id
       AND other.household_id<>mine.household_id WHERE mine.household_id=$1 LIMIT 1`, [actor.household_id]),
     hasNameDay: !!actor.name_day,
     hasReservation: !!await first(`SELECT 1 FROM reservations r WHERE r.creator_id=$1
       OR EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$1) LIMIT 1`, [actor.id]),
   };
+  const others = people.filter(p => p.id !== actor.id).map(p => p.id);
+  const openRows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r
+    JOIN wishes w ON w.id=r.wish_id WHERE w.owner_id=ANY($2::uuid[]) AND ${offListVisibility} AND r.open_to_contributions
+    AND r.creator_id<>$1 AND NOT EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$1)
+    ORDER BY r.created_at`, [actor.id, others]);
+  const openGifts = await Promise.all(openRows.map(r => withRequestStatus(r, actor.id)));
   res.json({ people: people.map(publicPerson), reservations: reservations.filter(r => r.creator.id === actor.id),
-    participating: reservations.filter(r => r.creator.id !== actor.id), occasions, todos, onboarding });
+    participating: reservations.filter(r => r.creator.id !== actor.id), occasions, todos, onboarding, openGifts });
 });
 app.use('/api', (req, res) => res.vary('Accept-Language').status(404).json({ error: localized(req, 'Ressource introuvable') }));
 app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {

@@ -62,6 +62,8 @@ Wishes and reservations:
 | Lampe de bureau | Charlie | — |
 | Jeu de société | David | — |
 | Vélo | Éloïse | — |
+| Week-end spa *(off-list)* | for Bob | Organised by David, visible and open to contributions, Noël 2026 |
+| Cours de poterie *(off-list)* | for Alice | Organised by Charlie, private, Anniversaire 2026 |
 
 ## 3. What to test
 
@@ -162,7 +164,27 @@ Log in as **Charlie**.
 
 To restore the sample data, use *Revenir à …* or reseed.
 
-### 3.9 Regression checks
+### 3.9 Off-list gifts
+
+An off-list gift is planned for an occasion but does not come from the recipient's wish list. The recipient never sees it before it is given. With *Visible et ouvert aux participations*, the recipient's relatives can see it and ask to contribute; otherwise only the organiser and invited participants see it.
+
+Sample data: *Week-end spa* (for Bob, organised by David, visible, Noël 2026) and *Cours de poterie* (for Alice, organised by Charlie, private).
+
+Log in as **Charlie**.
+
+- [ ] The dashboard shows a *Cadeaux ouverts aux participations* section with *Week-end spa* for Bob Martin, organised by David, and a *Participer* button.
+- [ ] *Réservations* shows *Cours de poterie* with the *Hors liste* and *Privé* badges, its price and description, and the usual steps.
+- [ ] On Bob's page (*Ma famille* → Bob), *Cadeaux prévus hors liste* lists *Week-end spa*. *Prévoir un cadeau hors liste* opens the form with Bob preselected.
+- [ ] From *Réservations*, *Prévoir un cadeau hors liste* opens the form with a *Pour qui ?* selector. Occasions load once a person is chosen, and the first one is preselected. Only the title is required.
+- [ ] Create a visible gift for Bob: it appears in *Réservations* with *Visible par la famille*, and in the À faire list (*Acheter …*).
+- [ ] Click *Participer* on *Week-end spa*: the card shows *Demande envoyée, en attente de réponse.*
+- [ ] Log in as **David**, open *Réservations* and accept Charlie's request. Log back in as **Charlie**: *Week-end spa* is now in his reservations as participant, and no longer in the dashboard section.
+- [ ] As organiser, *Gérer* on an off-list gift allows editing the title, description, price, link and image, as well as toggling visibility. Cancelling the reservation removes the gift entirely.
+- [ ] Log in as **Alice**: she sees *Week-end spa* (she shares family B with Bob and David) but not *Cours de poterie*, which is private and planned for her. Her page shows no off-list section for herself.
+- [ ] Log in as **Bob**: no trace of off-list gifts anywhere (dashboard, his wishes, reservations, search for *spa*).
+- [ ] Once an off-list gift is marked *Offert*, the recipient sees it in *Historique*.
+
+### 3.10 Regression checks
 
 - [ ] **Surprise kept:** log in as **Bob**; his *Console de jeux* and *Roman illustré* do not show who reserved them.
 - [ ] **Access:** log in as **Éloïse**; she cannot see Alice's, Bob's, Charlie's or David's lists.

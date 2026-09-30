@@ -37,8 +37,9 @@ export const occasions = pgTable('occasions', {
 });
 export const wishes = pgTable('wishes', {
   id: id(), ownerId: uuid('owner_id').notNull().references(() => users.id),
-  title: text('title').notNull(), description: text('description'), url: text('url').notNull(),
-  image: text('image').notNull(), price: numeric('price', { precision: 12, scale: 2 }),
+  title: text('title').notNull(), description: text('description'), url: text('url'),
+  image: text('image'), offList: boolean('off_list').notNull().default(false),
+  createdBy: uuid('created_by').references(() => users.id), price: numeric('price', { precision: 12, scale: 2 }),
   tags: text('tags').array().notNull().default([]), position: integer('position').notNull().default(0),
   deletedAt: timestamp('deleted_at', { withTimezone: true }), giftedAt: timestamp('gifted_at', { withTimezone: true }),
   createdAt: created(),
