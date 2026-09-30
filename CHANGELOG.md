@@ -4,7 +4,7 @@ All notable changes are recorded here. This project follows
 [semantic versioning](https://semver.org/): while the major version is `0`, a
 minor bump may change behaviour.
 
-## [0.2.0] — 2026-10-01
+## [0.2.0] — 2026-09-30
 
 **Registration is now invitation-only by default.** If you are upgrading an
 instance that people were signing up to freely, set `OPEN_REGISTRATION=true` to
