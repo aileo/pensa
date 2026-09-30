@@ -24,6 +24,8 @@ docker compose run --rm api npm run seed
 
 Development accounts: `alice@example.test`, `bob@example.test`, `charlie@example.test`, `david@example.test`, `eloise@example.test`; shared password: **`GiftitDemo2026!`** (development only). Families A and B share Alice and Bob's household; Eloise belongs to a separate family. Alice can access Charlie's and David's lists; Eloise cannot. The seed includes reservations, a pending contribution request and a gifted item. The seed is skipped if the sample accounts already exist: to load updated sample data, run `docker compose down -v`, start Compose again, and rerun the seed.
 
+See [docs/testing-guide.md](docs/testing-guide.md) for what to test manually and how.
+
 ## Language
 
 The app supports **English and French**. Select a language in the interface; the preference is saved in the browser. Without a saved preference, the browser language determines the initial language. Dates, currency, interface text and API errors follow the selected language. User-entered content and sample seed data (names, wishes and custom occasions) are not automatically translated.
