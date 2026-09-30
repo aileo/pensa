@@ -287,6 +287,14 @@ describe('permissions métier sur l’API', () => {
     expect(typeof pending.reservation.wishTitle).toBe('string');
     const aliceId = (await call('alice', '/auth/me')).data.id;
     expect(alice.todos.some((t: {person?:{id:string}}) => t.person?.id === aliceId)).toBe(false);
+    const buy = alice.todos.find((t: {type:string;reservation?:{wishTitle:string}}) => t.type === 'reservation_to_buy' && t.reservation?.wishTitle === 'Console de jeux');
+    expect(buy).toMatchObject({ person: { firstName: 'Bob' }, reservation: { status: 'reserved' } });
+    expect(typeof buy.urgent).toBe('boolean');
+    const charlie = (await call('charlie', '/dashboard')).data.todos as {type:string;reservation?:{wishTitle:string}}[];
+    expect(charlie.some(t => t.type === 'reservation_to_wrap' && t.reservation?.wishTitle === 'Roman illustré')).toBe(true);
+    expect(charlie.some(t => t.reservation?.wishTitle === 'Console de jeux' && t.type !== 'pending_requests')).toBe(false);
+    const bob = (await call('bob', '/dashboard')).data.todos as {type:string}[];
+    expect(bob.some(t => t.type.startsWith('reservation_to_'))).toBe(false);
     expect((await call('leap', '/dashboard')).data).toMatchObject({
       todos: [], onboarding: { hasWishes: false, hasSharedFamily: false, hasNameDay: false, hasReservation: false },
     });

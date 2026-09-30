@@ -5,8 +5,9 @@ export type Person = { id: Id; firstName?: string; lastName?: string; email?: st
 export type Household = { id: Id; name: string; mine?: boolean; members?: Person[] }
 export type Family = { id: Id; name: string; admin?: boolean; members?: Person[]; households?: Household[]; users?: Person[] }
 export type Todo = {
-  type: 'occasion_without_gift' | 'pending_requests' | 'reservation_to_buy' | 'reservation_to_wrap';
-  date?: string; person?: Person; occasion?: string; count?: number; reservation?: { id: Id; wishTitle?: string };
+  type: 'occasion_without_gift' | 'pending_requests' | 'reservation_to_buy' | 'reservation_to_wrap' | 'reservation_to_give';
+  date?: string | null; urgent?: boolean; person?: Person; occasion?: string | null; count?: number;
+  reservation?: { id: Id; wishTitle?: string; status?: string; wishDeleted?: boolean };
 }
 export type Onboarding = { hasWishes: boolean; hasSharedFamily: boolean; hasNameDay: boolean; hasReservation: boolean }
 export type Occasion = { id: Id; name?: string; title?: string; nextDate?: string | null; date?: string; year?: number; kind?: 'fixed' | 'birthday' | 'name_day'; person?: Person }

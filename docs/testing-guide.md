@@ -125,7 +125,9 @@ Log in as **Alice** and open *Tableau de bord*.
 - [ ] A **getting-started checklist** shows progress (add a wish, join a family shared with another household, set your name day, reserve a gift). All steps are done for Alice; each step links to the right page.
 - [ ] The checklist can be dismissed and stays hidden after reload.
 - [ ] The **À faire** list shows *1 demande de participation à traiter pour « Console de jeux »* (David's request), with a *Répondre* button opening *Réservations*.
-- [ ] Occasions within 30 days for which you have no gift yet appear as *… : aucun cadeau prévu* items with a *Voir ses envies* button (depends on today's date). Reservations still *Réservé* 14 days before, or *Acheté* 7 days before the occasion, appear as reminders.
+- [ ] It also shows *Acheter « Console de jeux » pour Bob Martin* with the linked occasion and date, a *C'est acheté* button and a *Voir* button.
+- [ ] Items whose occasion is close (≤ 14 days to buy, ≤ 7 to wrap, ≤ 3 to give) are highlighted with a *Bientôt* badge and listed first.
+- [ ] Occasions within 30 days for which you have no gift yet appear as *… : aucun cadeau prévu* items with a *Voir ses envies* button (depends on today's date).
 - [ ] When nothing is due, the list shows *Rien d'urgent pour le moment…*.
 
 Register a new account: the checklist starts at 0 and the À faire list is empty.
@@ -145,12 +147,27 @@ Checks:
 - [ ] Log back in as **Alice** and click *Nommer admin* on Bob to restore the sample data.
 - [ ] As **Éloïse**, *Les autres foyers* is empty (her family has no other household).
 
-### 3.8 Regression checks
+### 3.8 Reservation progress
+
+Log in as **Charlie**.
+
+- [ ] On the dashboard, *Emballer « Roman illustré » pour Bob Martin* is listed. *Voir* opens *Réservations*, scrolls to the card and highlights it.
+- [ ] Each reservation card shows the steps *Réservé → Acheté → Emballé → Offert*, with completed steps ticked and the current one highlighted.
+- [ ] The organiser sees one main button (*Marquer comme emballé*) and a *Revenir à Réservé* button. Clicking them moves the step immediately, without opening *Gérer*.
+- [ ] *Marquer comme offert* asks for confirmation; once confirmed, the gift is marked *Offert*, can no longer be edited and appears in *Historique* (irreversible).
+- [ ] *Gérer* no longer has a status field; it keeps occasions, participants, contributions and cancellation.
+- [ ] On *Console de jeux* (organised by Alice), Charlie sees the steps read-only and the note *Seul l'organisateur peut faire avancer ce cadeau.* No buy/wrap/give item appears for it in Charlie's À faire list.
+- [ ] From the dashboard, *C'est emballé* moves *Roman illustré* to *Emballé*; the item becomes *Offrir « Roman illustré » à Bob Martin*.
+- [ ] Log in as **Bob**: no buy/wrap/give item about his own wishes.
+
+To restore the sample data, use *Revenir à …* or reseed.
+
+### 3.9 Regression checks
 
 - [ ] **Surprise kept:** log in as **Bob**; his *Console de jeux* and *Roman illustré* do not show who reserved them.
 - [ ] **Access:** log in as **Éloïse**; she cannot see Alice's, Bob's, Charlie's or David's lists.
 - [ ] **Participation request:** log in as **Alice**, open *Réservations*; on *Console de jeux*, accept or refuse David's pending request.
-- [ ] **Status flow:** as the organiser, move a reservation *Réservé → Acheté → Emballé → Offert*; once gifted it can no longer be edited and appears in *Historique*.
+- [ ] **Status flow:** as the organiser, move a reservation *Réservé → Acheté → Emballé → Offert* with the step buttons; once gifted it can no longer be edited and appears in *Historique*.
 - [ ] **History:** log in as **Alice**; *Historique* shows *Appareil photo* (Noël 2025).
 - [ ] **Custom occasion:** as a family admin, add an occasion in *Ma famille*; it appears in the reservation form for that family's members.
 

@@ -698,15 +698,19 @@ api.get('/dashboard', async (req, res) => {
     noGift.add(o.person.id);
     todos.push({ type: 'occasion_without_gift', date: o.nextDate, person: o.person, occasion: o.name });
   }
+  const steps: Record<string, { type: string; limit: number }> = {
+    reserved: { type: 'reservation_to_buy', limit: 14 },
+    purchased: { type: 'reservation_to_wrap', limit: 7 },
+    wrapped: { type: 'reservation_to_give', limit: 3 },
+  };
   for (const r of reservations) {
-    if (!r.status || !['reserved', 'purchased'].includes(r.status)) continue;
+    const step = steps[r.status ?? ''];
+    if (!step || r.creator.id !== actor.id) continue;
     const names = new Set(r.occasions.map(o => (o as { name: string }).name));
-    const next = allOccasions.filter(o => o.person.id === r.recipient.id && names.has(o.name) && o.nextDate)[0];
-    if (!next?.nextDate) continue;
-    const limit = r.status === 'reserved' ? 14 : 7;
-    if (daysUntil(next.nextDate) <= limit)
-      todos.push({ type: r.status === 'reserved' ? 'reservation_to_buy' : 'reservation_to_wrap', date: next.nextDate,
-        person: r.recipient, occasion: next.name, reservation: { id: r.id, wishTitle: r.wish?.title } });
+    const next = allOccasions.find(o => o.person.id === r.recipient.id && names.has(o.name) && o.nextDate);
+    todos.push({ type: step.type, date: next?.nextDate ?? null, urgent: !!next?.nextDate && daysUntil(next.nextDate) <= step.limit,
+      person: r.recipient, occasion: next?.name ?? null,
+      reservation: { id: r.id, wishTitle: r.wish?.title, status: r.status, wishDeleted: !!r.wishDeleted } });
   }
   const pending = await query<{id:string;title:string;count:string}>(`SELECT r.id,w.title,count(*) AS count FROM requests q
     JOIN reservations r ON r.id=q.reservation_id JOIN wishes w ON w.id=r.wish_id
@@ -714,7 +718,8 @@ api.get('/dashboard', async (req, res) => {
     GROUP BY r.id,w.title ORDER BY w.title`, [actor.id]);
   for (const p of pending)
     todos.push({ type: 'pending_requests', count: Number(p.count), reservation: { id: p.id, wishTitle: p.title } });
-  todos.sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')));
+  const rank = (t: Record<string, unknown>) => t.urgent ? 0 : t.type === 'occasion_without_gift' ? 1 : t.type === 'pending_requests' ? 2 : t.date ? 3 : 4;
+  todos.sort((a, b) => rank(a) - rank(b) || String(a.date ?? '').localeCompare(String(b.date ?? '')));
   const onboarding = {
     hasWishes: !!await first('SELECT 1 FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL LIMIT 1', [actor.id]),
     hasSharedFamily: !!await first(`SELECT 1 FROM memberships mine JOIN memberships other ON other.family_id=mine.family_id

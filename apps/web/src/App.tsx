@@ -129,6 +129,7 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
+  const [focusedReservation, setFocusedReservation] = useState<Id | null>(null)
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
   const handleError = useCallback((problem: unknown) => setError(problem instanceof Error ? problem.message : t('Une erreur inattendue est survenue.')), [t])
 
@@ -189,7 +190,12 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
     } catch (problem) { handleError(problem); return false }
     finally { setBusy(false) }
   }
-  function go(next: Page) { setPage(next); setSelectedPerson(null); setSelectedFamily(null); setMobileNav(false); setError(''); setNotice('') }
+  function go(next: Page) { setPage(next); setSelectedPerson(null); setSelectedFamily(null); setMobileNav(false); setError(''); setNotice(''); setFocusedReservation(null) }
+  function openReservation(id: Id) { go('reservations'); setFocusedReservation(id) }
+  async function changeStatus(id: Id, status: ReservationStatus, title?: string) {
+    if (status === 'gifted' && !window.confirm(t('Marquer « {title} » comme offert ? Cette étape est définitive.', { title: title ?? '' }))) return false
+    return perform(() => api(`/reservations/${id}`, json('PATCH', { status })), t(statusNotices[status]), false)
+  }
   function openReserve(wish: Wish) {
     setSelectedWish(wish); setError(''); setModal('reservation')
     api<Occasion[]>(`/occasions?recipientId=${encodeURIComponent(String(wish.ownerId ?? ''))}`).then(data => setOccasions(list(data))).catch(handleError)
@@ -256,7 +262,7 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
             { label: t('Mes familles'), count: families.length, icon: 'users' as IconName, color: 'bg-[#fceee7] text-[#d18a65]', target: 'families' as Page },
             { label: t('Réservations'), count: reservations.length, icon: 'gift' as IconName, color: 'bg-[#eaf4f0] text-[#6d9e87]', target: 'reservations' as Page },
           ].map(stat => <button key={stat.target} onClick={() => go(stat.target)} className="card flex items-center gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:shadow-md"><span className={`rounded-2xl p-3 ${stat.color}`}><Icon name={stat.icon} size={23}/></span><span><strong className="block font-['Outfit'] text-2xl">{stat.count}</strong><span className="muted">{stat.label}</span></span><Icon name="chevron" size={17} className="ml-auto text-[#c4b8c9]"/></button>)}</div>
-          <Guidance me={me} onboarding={onboarding} todos={dashboardTodos} onAddWish={() => { setModal('wish'); setError('') }} onGo={go} onPerson={openPerson}/>
+          <Guidance me={me} onboarding={onboarding} todos={dashboardTodos} busy={busy} onAddWish={() => { setModal('wish'); setError('') }} onGo={go} onPerson={openPerson} onReservation={openReservation} onStatus={changeStatus}/>
           <div className="mb-9 grid gap-5 lg:grid-cols-2">
             <div><SectionTitle kicker={t('À VENIR')} title={t('Les prochaines occasions')}/>{dashboardOccasions.length ? <div className="card divide-y divide-[#f0edf1]">{dashboardOccasions.slice(0, 4).map(occasion => <div key={`${occasion.id}-${occasion.person?.id}`} className="flex items-center gap-3 p-4"><span className="rounded-xl bg-[#f2eafa] p-2 text-[#795ca7]"><Icon name="calendar" size={19}/></span><div className="min-w-0 flex-1"><p className="truncate font-semibold">{occasionName(occasion.name, locale, occasion.kind)} · {nameOf(occasion.person)}</p><p className="muted">{dateOf(occasion.nextDate)}</p></div></div>)}</div> : <Empty icon="calendar" title={t('Aucune date à venir')} text={t('Les occasions de vos proches apparaîtront ici.')}/>}</div>
             <div><SectionTitle kicker={t('EN PRÉPARATION')} title={t('Les cadeaux partagés')}/>{dashboardReservations.length || dashboardParticipating.length ? <div className="card p-6"><p className="text-lg font-semibold">{t(dashboardReservations.length === 1 ? '{count} réservation organisée' : '{count} réservations organisées', { count: dashboardReservations.length })}</p><p className="muted mt-2">{t(dashboardParticipating.length === 1 ? '{count} cadeau auquel vous participez' : '{count} cadeaux auxquels vous participez', { count: dashboardParticipating.length })}</p><button className="secondary mt-5" onClick={() => go('reservations')}>{t('Voir les réservations')} <Icon name="arrow" size={16}/></button></div> : <Empty icon="gift" title={t('Encore rien à préparer')} text={t('Réservez une envie pour organiser un cadeau.')}/>}</div>
@@ -284,7 +290,7 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
               {otherHouseholds.length > 0 && <div className="mt-9"><SectionTitle kicker={t('DANS VOS FAMILLES')} title={t('Les autres foyers')}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{otherHouseholds.map(household => <HouseholdCard key={household.id} household={household} me={me} onPerson={openPerson}/>)}</div></div>}
             </>}
         </>}
-        {page === 'reservations' && <><SectionTitle kicker={t('CADEAUX EN PRÉPARATION')} title={t('Mes réservations')}/>{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform}/>)}</div> : <Empty icon="gift" title={t('Aucune réservation pour le moment')} text={t('Explorez les listes de vos proches pour leur préparer une surprise.')} action={<button className="primary" onClick={() => go('families')}>{t('Découvrir les envies')} <Icon name="arrow" size={17}/></button>}/>}</>}
+        {page === 'reservations' && <><SectionTitle kicker={t('CADEAUX EN PRÉPARATION')} title={t('Mes réservations')}/>{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform} onStatus={changeStatus} focused={String(focusedReservation) === String(reservation.id)}/>)}</div> : <Empty icon="gift" title={t('Aucune réservation pour le moment')} text={t('Explorez les listes de vos proches pour leur préparer une surprise.')} action={<button className="primary" onClick={() => go('families')}>{t('Découvrir les envies')} <Icon name="arrow" size={17}/></button>}/>}</>}
         {page === 'history' && <><SectionTitle kicker={t('SOUVENIRS PARTAGÉS')} title={t('Historique')}/>{history.length ? <div className="card divide-y divide-[#f0edf1]">{history.map((entry, index) => { const item = entry as { id?: Id; snapshot?: { title?: string; occasions?: { name: string; year: number }[] }; created_at?: string }; return <div className="flex items-start gap-4 p-5" key={String(item.id ?? index)}><span className="rounded-xl bg-[#f2eafa] p-2.5 text-[#795ca7]"><Icon name="clock" size={19}/></span><div><p className="font-semibold">{item.snapshot?.title || t('Un cadeau offert')}</p><p className="muted mt-1">{item.snapshot?.occasions?.map(occasion => `${occasionName(occasion.name, locale)} ${occasion.year}`).join(', ')} · {dateOf(item.created_at)}</p></div></div> })}</div> : <Empty icon="clock" title={t('Vos souvenirs commencent ici')} text={t('L’historique de vos cadeaux et occasions s’affichera ici.')}/>}</>}
         {page === 'search' && <><SectionTitle kicker={t('TROUVEZ L’INSPIRATION')} title={t('Rechercher')}/><label htmlFor="global-search" className="label">{t('Personnes et envies')}</label><div className="relative mb-7"><Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-[#a399ac]"/><input id="global-search" autoComplete="off" className="field !py-3 !pl-12" placeholder={t('Rechercher une personne, une envie…')} value={searchText} onChange={event => setSearchText(event.target.value)}/></div>{searchResults.length ? <div className="space-y-3">{searchResults.map((result, index) => { const item = result as Record<string, unknown>; const person = item as Person; const wish = item as Wish; const isWish = typeof item.title === 'string'; return <div key={String(item.id ?? index)} className="card flex items-center gap-4 p-4">{isWish ? <span className="rounded-xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="heart"/></span> : <Avatar person={person}/>}<div className="min-w-0 flex-1"><p className="truncate font-semibold">{isWish ? wish.title : nameOf(person)}</p><p className="muted">{isWish ? money(wish.price) || t('Envie cadeau') : t('Personne')}</p></div><button className="secondary !px-3 !py-2 text-sm" onClick={() => isWish ? String(wish.ownerId) === String(me.id) ? go('wishes') : openReserve(wish) : (setSelectedPerson(person), setPage('families'))}>{t('Voir')} <Icon name="arrow" size={15}/></button></div> })}</div> : <Empty icon="search" title={searchText ? t('Aucun résultat') : t('Que recherchez-vous ?')} text={searchText ? t('Essayez d’autres mots-clés.') : t('Retrouvez une personne ou une idée cadeau en quelques lettres.')}/>}</>}
         {page === 'profile' && <><SectionTitle kicker={t('VOTRE ESPACE')} title={t('Mon profil')}/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-[#eee9ef] pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">{t('Votre compte Giftit')}</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">{t('ADRESSE E-MAIL')}</dt><dd>{me.email || t('Non renseignée')}</dd></div><div><dt className="eyebrow mb-1">{t('DATE DE NAISSANCE')}</dt><dd>{dateOf(me.birthDate) || t('Non renseignée')}</dd></div></dl><ProfileForm me={me} busy={busy} perform={perform} onSaved={onProfile}/></div></>}
@@ -602,8 +608,9 @@ function ProfileForm({ me, busy, perform, onSaved }: {
 }
 
 const onboardingKey = (me: Person) => `giftit-onboarding-dismissed-${me.id}`
-function Guidance({ me, onboarding, todos, onAddWish, onGo, onPerson }: {
-  me: Person; onboarding?: Onboarding; todos: Todo[]; onAddWish: () => void; onGo: (page: Page) => void; onPerson: (person: Person) => void
+function Guidance({ me, onboarding, todos, busy, onAddWish, onGo, onPerson, onReservation, onStatus }: {
+  me: Person; onboarding?: Onboarding; todos: Todo[]; busy: boolean; onAddWish: () => void; onGo: (page: Page) => void; onPerson: (person: Person) => void
+  onReservation: (id: Id) => void; onStatus: (id: Id, status: ReservationStatus, title?: string) => Promise<boolean>
 }) {
   const { locale, t } = useTranslation()
   const [dismissed, setDismissed] = useState(() => { try { return localStorage.getItem(onboardingKey(me)) === '1' } catch { return false } })
@@ -616,12 +623,22 @@ function Guidance({ me, onboarding, todos, onAddWish, onGo, onPerson }: {
   const doneCount = steps.filter(step => step.done).length
   const showChecklist = !dismissed && steps.length > 0 && doneCount < steps.length
   const dismiss = () => { try { localStorage.setItem(onboardingKey(me), '1') } catch { /* Keep dismissal for this session only. */ } setDismissed(true) }
+  const statusTodos: Partial<Record<Todo['type'], { verb: TranslationKey; done: TranslationKey; next: ReservationStatus }>> = {
+    reservation_to_buy: { verb: 'Acheter « {title} » pour {name}', done: 'C’est acheté', next: 'purchased' },
+    reservation_to_wrap: { verb: 'Emballer « {title} » pour {name}', done: 'C’est emballé', next: 'wrapped' },
+    reservation_to_give: { verb: 'Offrir « {title} » à {name}', done: 'C’est offert', next: 'gifted' },
+  }
   const describe = (todo: Todo) => {
     const name = nameOf(todo.person), occasion = occasionName(todo.occasion, locale), date = dateOf(todo.date), title = todo.reservation?.wishTitle ?? ''
     if (todo.type === 'occasion_without_gift') return { text: t('{occasion} de {name} le {date} : aucun cadeau prévu', { occasion, name, date }), action: t('Voir ses envies'), icon: 'calendar' as IconName, run: () => todo.person && onPerson(todo.person) }
-    if (todo.type === 'reservation_to_buy') return { text: t('Acheter « {title} » pour {name} avant le {date}', { title, name, date }), action: t('Mettre à jour'), icon: 'gift' as IconName, run: () => onGo('reservations') }
-    if (todo.type === 'reservation_to_wrap') return { text: t('Emballer « {title} » pour {name} avant le {date}', { title, name, date }), action: t('Mettre à jour'), icon: 'gift' as IconName, run: () => onGo('reservations') }
-    return { text: t(todo.count === 1 ? '{count} demande de participation à traiter pour « {title} »' : '{count} demandes de participation à traiter pour « {title} »', { count: todo.count ?? 0, title }), action: t('Répondre'), icon: 'users' as IconName, run: () => onGo('reservations') }
+    const step = statusTodos[todo.type]
+    if (step && todo.reservation) {
+      const reservation = todo.reservation
+      return { text: t(step.verb, { title, name }), detail: todo.date ? t('{occasion} le {date}', { occasion, date }) : undefined,
+        action: t('Voir'), icon: 'gift' as IconName, run: () => onReservation(reservation.id),
+        primary: step.next === 'gifted' && reservation.wishDeleted ? undefined : { label: t(step.done), run: () => void onStatus(reservation.id, step.next, title) } }
+    }
+    return { text: t(todo.count === 1 ? '{count} demande de participation à traiter pour « {title} »' : '{count} demandes de participation à traiter pour « {title} »', { count: todo.count ?? 0, title }), action: t('Répondre'), icon: 'users' as IconName, run: () => todo.reservation ? onReservation(todo.reservation.id) : onGo('reservations') }
   }
   return <div className={`mb-9 grid gap-5 ${showChecklist ? 'lg:grid-cols-2' : ''}`}>
     {showChecklist && <section className="card p-5 sm:p-6" aria-labelledby="onboarding-title">
@@ -635,9 +652,11 @@ function Guidance({ me, onboarding, todos, onAddWish, onGo, onPerson }: {
     </section>}
     <section className="card p-5 sm:p-6" aria-labelledby="todo-title">
       <p className="eyebrow mb-1">{t('PROCHAINES ÉTAPES')}</p><h2 id="todo-title" className="mb-4 font-['Outfit'] text-xl font-semibold">{t('À faire')}</h2>
-      {todos.length ? <ul className="divide-y divide-[#f0edf1]">{todos.map((todo, index) => { const item = describe(todo); return <li key={`${todo.type}-${todo.person?.id ?? ''}-${todo.reservation?.id ?? ''}-${index}`} className="flex items-center gap-3 py-3">
-        <span className="rounded-xl bg-[#f2eafa] p-2 text-[#795ca7]"><Icon name={item.icon} size={18}/></span><span className="flex-1 text-sm font-semibold">{item.text}</span>
-        <button className="secondary !px-3 !py-1.5 text-xs" onClick={item.run}>{item.action} <Icon name="arrow" size={14}/></button>
+      {todos.length ? <ul className="divide-y divide-[#f0edf1]">{todos.map((todo, index) => { const item: { text: string; detail?: string; action: string; icon: IconName; run: () => void; primary?: { label: string; run: () => void } } = describe(todo); return <li key={`${todo.type}-${todo.person?.id ?? ''}-${todo.reservation?.id ?? ''}-${index}`} className={`flex flex-wrap items-center gap-3 py-3 ${todo.urgent ? '-mx-2 rounded-xl bg-[#fff6ef] px-2' : ''}`}>
+        <span className={`rounded-xl p-2 ${todo.urgent ? 'bg-[#fbe3d3] text-[#b86f4a]' : 'bg-[#f2eafa] text-[#795ca7]'}`}><Icon name={item.icon} size={18}/></span>
+        <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2 text-sm font-semibold">{item.text}{todo.urgent && <span className="rounded-full bg-[#b86f4a] px-2 py-0.5 text-[11px] font-bold text-white">{t('Bientôt')}</span>}</span>{item.detail && <span className="muted block text-xs">{item.detail}</span>}</span>
+        <span className="flex gap-2">{item.primary && <button className="primary !px-3 !py-1.5 text-xs" disabled={busy} onClick={item.primary.run}><Icon name="check" size={14}/> {item.primary.label}</button>}
+        <button className="secondary !px-3 !py-1.5 text-xs" onClick={item.run}>{item.action} <Icon name="arrow" size={14}/></button></span>
       </li> })}</ul> : <p className="muted">{t('Rien d’urgent pour le moment. Profitez-en pour compléter votre liste d’envies !')}</p>}
     </section>
   </div>
@@ -658,9 +677,28 @@ const sameSelection = (a: OccasionSelection, b: OccasionSelection) => String(a.i
 const savedOptions = (saved: Occasion[] = []) => saved.map(occasion => ({ occasion, selection: selectionOf(occasion) })).filter((item): item is { occasion: Occasion; selection: OccasionSelection } => item.selection !== null)
 const isSaved = (item: { occasion: Occasion; selection: OccasionSelection }, saved: Occasion[] = []) => saved.some(occasion => occasion.year === item.selection.year &&
   (String(occasion.id) === String(item.selection.id) || (occasion.name ?? occasion.title) === (item.occasion.name ?? item.occasion.title)))
+type ReservationStatus = 'reserved' | 'purchased' | 'wrapped' | 'gifted'
+const statusOrder: ReservationStatus[] = ['reserved', 'purchased', 'wrapped', 'gifted']
 const statusLabels: Record<string, TranslationKey> = { reserved: 'Réservé', purchased: 'Acheté', wrapped: 'Emballé', gifted: 'Offert' }
 const requestLabels: Record<string, TranslationKey> = { pending: 'En attente', accepted: 'Acceptée', refused: 'Refusée' }
-const nextStatuses: Record<string, string[]> = { reserved: ['purchased'], purchased: ['reserved', 'wrapped'], wrapped: ['purchased', 'gifted'] }
+const statusNotices: Record<ReservationStatus, TranslationKey> = { reserved: 'Cadeau repassé en réservé.', purchased: 'Cadeau marqué comme acheté.', wrapped: 'Cadeau marqué comme emballé.', gifted: 'Cadeau marqué comme offert !' }
+const nextActions: Partial<Record<ReservationStatus, TranslationKey>> = { purchased: 'Marquer comme acheté', wrapped: 'Marquer comme emballé', gifted: 'Marquer comme offert' }
+const backActions: Partial<Record<ReservationStatus, TranslationKey>> = { reserved: 'Revenir à Réservé', purchased: 'Revenir à Acheté' }
+
+function StatusStepper({ status, cancelled }: { status: string; cancelled?: boolean }) {
+  const { t } = useTranslation()
+  const current = Math.max(0, statusOrder.indexOf(status as ReservationStatus))
+  return <ol className={`flex items-center gap-1 ${cancelled ? 'opacity-50' : ''}`} aria-label={t('Avancement du cadeau')}>
+    {statusOrder.map((step, index) => {
+      const done = index < current || (index === current && step === 'gifted'), active = index === current
+      return <li key={step} className="flex flex-1 items-center gap-1" aria-current={active ? 'step' : undefined}>
+        <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${done ? 'bg-[#6d9e87] text-white' : active ? 'bg-[#795ca7] text-white ring-4 ring-[#f2eafa]' : 'border-2 border-[#ddd2e8] text-[#a39aab]'}`}>{done ? <Icon name="check" size={13}/> : index + 1}</span>
+        <span className={`truncate text-xs ${active ? 'font-bold text-[#4a3c5c]' : done ? 'text-[#6d9e87]' : 'text-[#a39aab]'}`}>{t(statusLabels[step])}</span>
+        {index < statusOrder.length - 1 && <span aria-hidden="true" className={`mx-1 h-0.5 min-w-3 flex-1 rounded-full ${index < current ? 'bg-[#6d9e87]' : 'bg-[#eee9ef]'}`}/>}
+      </li>
+    })}
+  </ol>
+}
 
 function ReservationForm({ wish, reservations, occasions, people, me, busy, perform }: { wish: Wish; reservations: Reservation[]; occasions: Occasion[]; people: Person[]; me: Person; busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
   const { locale, t } = useTranslation()
@@ -689,14 +727,19 @@ function ReservationForm({ wish, reservations, occasions, people, me, busy, perf
   </form>
 }
 
-function ReservationRow({ reservation, users, me, busy, perform }: { reservation: Reservation; users: Person[]; me: Person; busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
+function ReservationRow({ reservation, users, me, busy, perform, onStatus, focused }: { reservation: Reservation; users: Person[]; me: Person; busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean>; onStatus: (id: Id, status: ReservationStatus, title?: string) => Promise<boolean>; focused?: boolean }) {
   const { locale, t } = useTranslation()
+  const card = useRef<HTMLElement>(null)
+  useEffect(() => { if (focused) card.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, [focused])
   const statusText = (value: string) => Object.prototype.hasOwnProperty.call(statusLabels, value) ? t(statusLabels[value]) : localizeMessage(value, locale)
   const requestText = (value: string) => Object.prototype.hasOwnProperty.call(requestLabels, value) ? t(requestLabels[value]) : localizeMessage(value, locale)
   const creator = reservation.creator?.id === me.id
   const editable = creator && !reservation.cancelled && reservation.status !== 'gifted'
   const [editing, setEditing] = useState(false)
-  const [status, setStatus] = useState(reservation.status || 'reserved')
+  const current = (reservation.status || 'reserved') as ReservationStatus
+  const index = statusOrder.indexOf(current)
+  const next = statusOrder[index + 1], previous = current === 'gifted' ? undefined : statusOrder[index - 1]
+  const nextLabel = next && nextActions[next], backLabel = previous && backActions[previous]
   const [open, setOpen] = useState(reservation.openToContributions || false)
   const [occasionIds, setOccasionIds] = useState<OccasionSelection[]>(reservation.occasions?.map(selectionOf).filter((item): item is OccasionSelection => item !== null) || [])
   const [participantIds, setParticipantIds] = useState<Id[]>(reservation.participants?.map(person => person.id) || [])
@@ -726,14 +769,23 @@ function ReservationRow({ reservation, users, me, busy, perform }: { reservation
     ...savedOptions(reservation.occasions),
     ...occurrences(available).filter(item => !isSaved(item, reservation.occasions)),
   ]
-  return <article className="card p-5">
+  return <article ref={card} id={`reservation-${reservation.id}`} className={`card scroll-mt-24 p-5 ${focused ? 'ring-2 ring-[#795ca7]' : ''}`}>
     <div className="flex flex-wrap items-start gap-4">{reservation.wish?.image ? <img src={reservation.wish.image} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover"/> : <span className="rounded-2xl bg-[#f2eafa] p-3 text-[#795ca7]"><Icon name="gift" size={23}/></span>}<div className="min-w-0 flex-1"><h3 className="font-['Outfit'] text-lg font-semibold">{reservation.wish?.title || t('Réservation #{id}', { id: String(reservation.id).slice(0, 8) })}</h3>{reservation.recipient && <p className="mt-1 text-sm font-medium text-[#4b3e59]">{t('Pour')} {nameOf(reservation.recipient)}</p>}<p className="muted mt-1">{reservation.occasions?.map(item => `${occasionName(item.name, locale)} ${item.year}`).join(', ') || t('Cadeau en préparation')} · {reservation.cancelled ? t('Annulé') : statusText(reservation.status || 'reserved')}</p><p className="muted mt-1">{t('Organisé par')} {nameOf(reservation.creator)} · {t('Participants :')} {reservation.participants?.map(nameOf).join(', ') || t('Aucun')}</p>{reservation.wishDeleted && <p className="muted">{t('L’envie a été supprimée.')}</p>}</div>{editable && <button className="secondary text-sm" onClick={() => void openEditor()}><Icon name="edit" size={16}/> {editing ? t('Fermer') : t('Gérer')}</button>}</div>
+    {!reservation.cancelled && reservation.status && <div className="mt-4 space-y-3 rounded-2xl bg-[#faf8fb] p-4">
+      <StatusStepper status={current}/>
+      {editable && <div className="flex flex-wrap gap-2">
+        {nextLabel && <button className="primary !py-2 text-sm" disabled={busy || (next === 'gifted' && reservation.wishDeleted)} onClick={() => void onStatus(reservation.id, next, reservation.wish?.title)}><Icon name="check" size={16}/> {t(nextLabel)}</button>}
+        {backLabel && <button className="secondary !py-2 text-sm" disabled={busy} onClick={() => void onStatus(reservation.id, previous!)}>{t(backLabel)}</button>}
+      </div>}
+      {editable && next === 'gifted' && reservation.wishDeleted && <p className="muted text-xs">{t('L’envie a été supprimée : impossible de la marquer comme offerte.')}</p>}
+      {!creator && current !== 'gifted' && <p className="muted text-xs">{t('Seul l’organisateur peut faire avancer ce cadeau.')}</p>}
+    </div>}
     {localError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{localError}</p>}
     {editing && <div className="mt-5 space-y-4 border-t border-[#eee9ef] pt-5">
-      <div className="grid gap-4 sm:grid-cols-2"><div><label className="label" htmlFor={`status-${reservation.id}`}>{t('Statut')}</label><select className="field" id={`status-${reservation.id}`} value={status} onChange={event => setStatus(event.target.value)}><option value={reservation.status || 'reserved'}>{statusText(reservation.status || 'reserved')}</option>{(nextStatuses[reservation.status || 'reserved'] || []).filter(value => value !== 'gifted' || !reservation.wishDeleted).map(value => <option key={value} value={value}>{statusText(value)}</option>)}</select></div><label className="flex items-center gap-2 self-end pb-3 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/>{t('Ouvert aux participations')}</label></div>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#795ca7]" checked={open} onChange={event => setOpen(event.target.checked)}/>{t('Ouvert aux participations')}</label>
       <fieldset><legend className="label">{t('Occasions (au moins une)')}</legend><div className="flex flex-wrap gap-3">{options.map(({ occasion, selection }) => <label className="inline-flex items-center gap-2 text-sm" key={`${selection.id}-${selection.year}`}><input type="checkbox" checked={occasionIds.some(value => sameSelection(value, selection))} onChange={() => setOccasionIds(values => values.some(value => sameSelection(value, selection)) ? values.filter(value => !sameSelection(value, selection)) : [...values, selection])}/>{occasionName(occasion.name || occasion.title, locale, occasion.kind)} {selection.year}</label>)}</div></fieldset>
       <fieldset><legend className="label">{t('Participants')}</legend>{recipientId ? <div className="flex max-h-32 flex-wrap gap-3 overflow-y-auto">{users.filter(person => String(person.id) !== String(me.id) && String(person.id) !== String(recipientId)).map(person => <label className="inline-flex items-center gap-2 text-sm" key={person.id}><input type="checkbox" checked={participantIds.some(id => String(id) === String(person.id))} onChange={() => setParticipantIds(values => values.some(id => String(id) === String(person.id)) ? values.filter(id => String(id) !== String(person.id)) : [...values, person.id])}/>{nameOf(person)}</label>)}</div> : <p className="muted">{t('Participants existants conservés ; détails de l’envie indisponibles.')}</p>}</fieldset>
-      <div className="flex flex-wrap gap-2"><button className="primary" disabled={busy || occasionIds.length === 0} onClick={() => { void perform(() => api(`/reservations/${reservation.id}`, json('PATCH', { status, occasionIds, participantIds, openToContributions: open })), t('Réservation mise à jour.'), false).then(ok => { if (ok) setEditing(false) }) }}>{t('Enregistrer')}</button><button className="secondary !text-red-600" disabled={busy} onClick={() => { if (window.confirm(t('Annuler cette réservation ?'))) void perform(() => api(`/reservations/${reservation.id}`, { method: 'DELETE' }), t('Réservation annulée.')) }}>{t('Annuler la réservation')}</button></div>
+      <div className="flex flex-wrap gap-2"><button className="primary" disabled={busy || occasionIds.length === 0} onClick={() => { void perform(() => api(`/reservations/${reservation.id}`, json('PATCH', { occasionIds, participantIds, openToContributions: open })), t('Réservation mise à jour.'), false).then(ok => { if (ok) setEditing(false) }) }}>{t('Enregistrer')}</button><button className="secondary !text-red-600" disabled={busy} onClick={() => { if (window.confirm(t('Annuler cette réservation ?'))) void perform(() => api(`/reservations/${reservation.id}`, { method: 'DELETE' }), t('Réservation annulée.')) }}>{t('Annuler la réservation')}</button></div>
     </div>}
     {creator && !!requests.length && <div className="mt-4 border-t border-[#eee9ef] pt-4"><h4 className="mb-3 text-sm font-semibold">{t('Demandes de participation')}</h4><div className="space-y-2">{requests.map(request => <div className="flex flex-wrap items-center gap-2 text-sm" key={request.id}><span className="flex-1">{nameOf(request.user || request.requester || request)} · {requestText(request.status || 'pending')}</span>{editable && request.status === 'pending' && <><button className="secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => { void perform(() => api(`/reservations/${reservation.id}/requests/${request.id}`, json('PATCH', { status: 'accepted' })), t('Demande acceptée.'), false).then(ok => { if (ok) setRequests(values => values.map(value => value.id === request.id ? { ...value, status: 'accepted' } : value)) }) }}>{t('Accepter')}</button><button className="secondary !px-2 !py-1 text-xs" disabled={busy} onClick={() => { void perform(() => api(`/reservations/${reservation.id}/requests/${request.id}`, json('PATCH', { status: 'refused' })), t('Demande refusée.'), false).then(ok => { if (ok) setRequests(values => values.map(value => value.id === request.id ? { ...value, status: 'refused' } : value)) }) }}>{t('Refuser')}</button></>}</div>)}</div></div>}
   </article>
