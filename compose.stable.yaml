@@ -9,6 +9,6 @@
 # the diff, then pull. Every release updates these two lines.
 services:
   api:
-    image: ghcr.io/aileo/pensa-api:0.3.0
+    image: ghcr.io/aileo/pensa-api:0.4.0
   web:
-    image: ghcr.io/aileo/pensa-web:0.3.0
+    image: ghcr.io/aileo/pensa-web:0.4.0
