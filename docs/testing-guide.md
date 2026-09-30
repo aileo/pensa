@@ -186,7 +186,19 @@ Log in as **Charlie**.
 - [ ] Log in as **Bob**: no trace of off-list gifts anywhere (dashboard, his wishes, reservations, search for *spa*).
 - [ ] Once an off-list gift is marked *Offert*, the recipient sees it in *Historique*.
 
-### 3.10 Regression checks
+### 3.10 Product copy
+
+The wording is built around one promise: **organizing gifts without the mental load**. Warmth
+stays, but every screen names the task it moves forward rather than the emotion.
+
+- [ ] **Sign-in page:** *Fini la charge mentale des cadeaux* / *Organisez les cadeaux, l'esprit tranquille* (EN *No more gift-planning overload* / *Gifts organized, mind at ease*).
+- [ ] **Browser tab:** *Giftit — Organisez les cadeaux, l'esprit tranquille*, and it switches with the language.
+- [ ] **Sidebar card:** *Rien à retenir / Giftit suit les dates, les listes et les cadeaux à votre place*.
+- [ ] **Dashboard hero:** *VOTRE ORGANISATION DU JOUR*, followed by what is coming up and what is left to do.
+- [ ] **Historique:** framed as *DÉJÀ OFFERT*; when empty it explains that it prevents giving the same gift twice.
+- [ ] Switch to English and check the same screens: the English is rewritten, not translated word for word.
+
+### 3.11 Regression checks
 
 - [ ] **Surprise kept:** log in as **Bob**; his *Console de jeux* and *Roman illustré* do not show who reserved them.
 - [ ] **Access:** log in as **Éloïse**; she cannot see Alice's, Bob's, Charlie's or David's lists.
