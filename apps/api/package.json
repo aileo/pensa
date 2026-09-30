@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/migrate.ts",
+    "bootstrap": "tsx src/bootstrap.ts",
     "generate": "drizzle-kit generate",
     "seed": "tsx src/seed.ts",
     "lint": "eslint src",

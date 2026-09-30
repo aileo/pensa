@@ -27,5 +27,6 @@ ENV PORT=3000
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD wget -qO- "http://127.0.0.1:${PORT}/api/health" || exit 1
-# Migrate before serving: the container is responsible for its own schema.
-CMD ["sh", "-c", "node dist/migrate.js && node dist/index.js"]
+# Migrate before serving, and create the first account when one is configured: the container is
+# responsible for its own schema, and for being usable on first start.
+CMD ["sh", "-c", "node dist/migrate.js && node dist/bootstrap.js && node dist/index.js"]

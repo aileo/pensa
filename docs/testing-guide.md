@@ -357,6 +357,40 @@ docker compose -p pensaprod -f compose.prod.yaml exec api node dist/seed.js
       the application, not an nginx 404 — that is the single-page fallback.
 - [ ] Stop with `docker compose -p pensaprod -f compose.prod.yaml down -v`.
 
+### 4.3.1 First account created from the environment
+
+Bootstrap only runs on an empty database, so this needs a fresh stack. Add to your `.env`, or
+pass inline:
+
+```sh
+BOOTSTRAP_EMAIL=camille@example.org BOOTSTRAP_PASSWORD=mot-de-passe-solide \
+BOOTSTRAP_FIRST_NAME=Camille BOOTSTRAP_LAST_NAME=Durand BOOTSTRAP_BIRTH_DATE=1985-07-24 \
+BOOTSTRAP_FAMILY="Famille Durand" API_IMAGE=pensa-api:local WEB_IMAGE=pensa-web:local \
+  docker compose -p pensaboot -f compose.prod.yaml up -d
+```
+
+- [ ] `docker compose -p pensaboot -f compose.prod.yaml logs api` reports *Premier compte créé*.
+- [ ] Log in at http://localhost:8080/ with that address and password. No sign-up needed.
+- [ ] **My family** shows *Famille Durand* with its three default occasions — the same ones a
+      family created from the interface gets.
+- [ ] `docker compose -p pensaboot -f compose.prod.yaml restart api`, then read the logs again:
+      *Bootstrap ignoré*. Restarting must never recreate or reset that account.
+- [ ] Shorten `BOOTSTRAP_PASSWORD` to under 12 characters on an empty database: the API
+      container stops and the log names the variable. It must not start without the account.
+- [ ] Stop with `docker compose -p pensaboot -f compose.prod.yaml down -v`.
+
+### 4.3.2 Following releases rather than `latest`
+
+```sh
+docker compose -f compose.prod.yaml -f compose.stable.yaml config | grep image
+```
+
+- [ ] Both images read `:stable`. The overlay only replaces the two image names; everything
+      else — ports, variables, volumes — must still come from `compose.prod.yaml`.
+- [ ] `docker compose -f compose.prod.yaml -f compose.stable.yaml pull` succeeds. The `stable`
+      tag is published by the release workflow, so this only works once a release has been made
+      after the tag was introduced.
+
 ### 4.4 After the first publication to GHCR
 
 - [ ] **Packages published to GHCR are private by default.** Nothing in the workflow can detect

@@ -78,6 +78,12 @@ to the development database: reset and reseed before manual testing.
 
 ## Repository conventions
 
+- **Never publish a release on your own initiative.** Tagging a version,
+  creating a GitHub release or bumping the version numbers happens only when a
+  human explicitly asks for it. Pushing to `main` is enough to publish `latest`
+  images; a tag moves `stable`, which is what real deployments follow, and that
+  decision belongs to a person. Write the changelog entry under *Unreleased*
+  and stop there.
 - **No npm workspaces.** The two apps are independent: separate lockfiles,
   separate build contexts, different pinned TypeScript versions. The root
   `package.json` holds metadata only. Declaring workspaces without a root

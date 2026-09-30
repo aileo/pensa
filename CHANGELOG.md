@@ -4,6 +4,45 @@ All notable changes are recorded here. This project follows
 [semantic versioning](https://semver.org/): while the major version is `0`, a
 minor bump may change behaviour.
 
+## [Unreleased]
+
+### Added
+
+- **A first account can be created from the environment.** Set the `BOOTSTRAP_*`
+  variables and the account, its household and optionally its family exist the
+  moment the instance answers — no sign-up form to fill in, so an instance can
+  be deployed from a script. It only ever runs on an empty database, so
+  restarting or upgrading never touches a live instance.
+- **`compose.stable.yaml`**, a two-line overlay pinning both images to `stable`,
+  a new tag that only moves when a version is released. `latest` follows the
+  `main` branch and therefore carries unreleased code; production should follow
+  `stable`. Used together with the main file:
+  `docker compose -f compose.prod.yaml -f compose.stable.yaml up -d`.
+
+### Changed
+
+- **The database connection is built from the `POSTGRES_*` variables** when
+  `DATABASE_URL` is not set. `compose.prod.yaml` no longer repeats the
+  credentials in a hardcoded URL, so changing `POSTGRES_PASSWORD` is enough —
+  previously the database accepted the new password while the API kept sending
+  the old one. A generated password containing `@`, `/` or `:` also no longer
+  needs percent-encoding. `DATABASE_URL` still takes priority, for managed
+  databases.
+- **`.env.example` now documents every variable**, for development and
+  production alike, with every line commented out so copying it changes nothing.
+  The deployment quickstart downloads it alongside the Compose files.
+- `docs/deployment.md` lists every environment variable the app reads, grouped
+  by what they configure, and the README gained a copy-paste production
+  quickstart.
+
+### Fixed
+
+- **Logging in over plain HTTP works.** The session cookie was marked `secure`
+  whenever the image ran with `NODE_ENV=production`, which is always, so a
+  browser reaching an instance that has no TLS in front of it silently refused
+  to send it back: the sign-in appeared to succeed and every page then asked for
+  a login again. It now follows the scheme the request actually arrived on.
+
 ## [0.2.0] — 2026-09-30
 
 **Registration is now invitation-only by default.** If you are upgrading an

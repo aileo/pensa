@@ -4,6 +4,7 @@ import { hash, compare } from 'bcryptjs';
 import { z, ZodError } from 'zod';
 import { rateLimit } from 'express-rate-limit';
 import { pool, query } from './db.js';
+import { createDefaultOccasions } from './family.js';
 import { preview } from './metadata.js';
 
 type Person = { id: string; household_id: string; first_name: string; last_name: string; email: string; birth_date: Date | string; name_day: string | null; avatar: string | null; household_admin?: boolean };
@@ -99,8 +100,13 @@ const requireHouseholdAdmin = async (p: Person) => {
 const householdMembers = async (householdId: string) =>
   (await query<Person>('SELECT * FROM users WHERE household_id=$1 ORDER BY first_name', [householdId]))
     .map(p => ({ ...publicPerson(p), householdAdmin: !!p.household_admin }));
-const sessionCookie = (res: Response, value: string) => res.cookie('session', value, {
-  httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 14 * 86400_000,
+// Secure follows the scheme the request actually arrived on, not NODE_ENV. A production image
+// reached over plain http — a first run on a bare server, before TLS is in front — would
+// otherwise set a cookie the browser refuses to send back, and login would appear to succeed
+// and then silently fail. req.secure reads the forwarded proto, so a proxied https request
+// still gets the flag.
+const sessionCookie = (res: Response, value: string, req: Request) => res.cookie('session', value, {
+  httpOnly: true, secure: req.secure, sameSite: 'lax', path: '/', maxAge: 14 * 86400_000,
 });
 const person = (req: Request) => (req as AuthRequest).person!;
 // Everything the app knows about living behind a reverse proxy.
@@ -230,7 +236,7 @@ api.post('/auth/register', strictLimit, async (req, res) => {
     await client.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval \'14 days\')',
       [digest(value), result.rows[0].id]);
     await client.query('COMMIT');
-    sessionCookie(res, value);
+    sessionCookie(res, value, req);
     res.status(201).json(privatePerson(result.rows[0]));
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 });
@@ -240,7 +246,7 @@ api.post('/auth/login', strictLimit, async (req, res) => {
   if (!record || !await compare(data.password, record.password_hash)) fail(401, 'Identifiants invalides');
   const value = token();
   await query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,now()+interval \'14 days\')', [digest(value), record.id]);
-  sessionCookie(res, value);
+  sessionCookie(res, value, req);
   res.json(privatePerson(record));
 });
 api.post('/auth/logout', async (req, res) => {
@@ -348,9 +354,7 @@ api.post('/families', async (req, res) => {
     const family = (await client.query<{ id: string; name: string }>('INSERT INTO families(name) VALUES($1) RETURNING *', [name])).rows[0];
     await client.query('INSERT INTO memberships VALUES($1,$2)', [family.id, person(req).household_id]);
     await client.query('INSERT INTO family_admins VALUES($1,$2)', [family.id, person(req).id]);
-    for (const [label, kind, month, day] of [['Anniversaire', 'birthday', null, null], ['Fête', 'name_day', null, null], ['Noël', 'fixed', 12, 25]])
-      await client.query('INSERT INTO occasions(family_id,name,kind,month,day) VALUES($1,$2,$3,$4,$5)', [family.id, label, kind, month, day]);
-    await client.query('COMMIT'); res.status(201).json(family);
+    await createDefaultOccasions(client, family.id);    await client.query('COMMIT'); res.status(201).json(family);
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 });
 api.patch('/families/:id', async (req, res) => {

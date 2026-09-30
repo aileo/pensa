@@ -6,13 +6,17 @@
 # tell the API the visitor arrived over plain http on an internal hostname, and the API would
 # then reject every write as coming from a foreign origin. Keep what the front said when it
 # said something, fall back to what we can see otherwise.
+#
+# The fallback is $http_host, not $host: $host drops the port, and an instance reached on a
+# non-standard port would tell the API it was reached on the default one — every write then
+# fails with a forbidden origin, because the browser's Origin header does carry the port.
 map $http_x_forwarded_proto $forwarded_proto {
     default $http_x_forwarded_proto;
     ''      $scheme;
 }
 map $http_x_forwarded_host $forwarded_host {
     default $http_x_forwarded_host;
-    ''      $host;
+    ''      $http_host;
 }
 
 server {
@@ -35,7 +39,7 @@ server {
     location /api/ {
         proxy_pass ${API_UPSTREAM};
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $forwarded_proto;

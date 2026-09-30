@@ -52,17 +52,35 @@ What it means in practice:
 ## Deploy it
 
 Two images are published for `linux/amd64` and `linux/arm64`. One port to
-expose, no build step:
+expose, no build step, nothing to compile. On a fresh server:
 
 ```sh
+# 1. The stack, the overlay that follows releases, and the settings
 curl -O https://raw.githubusercontent.com/aileo/pensa/main/compose.prod.yaml
-docker compose -f compose.prod.yaml up -d
+curl -O https://raw.githubusercontent.com/aileo/pensa/main/compose.stable.yaml
+curl -o .env https://raw.githubusercontent.com/aileo/pensa/main/.env.example
+
+# 2. Set a database password — before the first start, or the database keeps the old one
+sed -i "s|^#POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 16)|" .env
+
+# 3. Start
+docker compose -f compose.prod.yaml -f compose.stable.yaml up -d
 ```
 
-The app is then on http://localhost:8080. The API applies its own migrations at
-startup.
+The app is then on http://localhost:8080, with the sign-up form ready for the
+first account — which is always allowed, after which the instance is
+invitation-only. The API applies its own migrations at startup.
 
-[Configuration, reverse proxy, upgrades and backup →](docs/deployment.md)
+`.env` comes fully commented out, so it changes nothing until you uncomment
+something. Three lines are worth a look before opening the site to anyone:
+`WEB_PORT` if 8080 is taken, `WEB_ORIGIN` if you want to pin the public
+address, and the `BOOTSTRAP_*` block if you would rather have the first account
+created for you instead of filling in the form.
+
+Put your own reverse proxy in front for TLS — there is nothing to configure on
+the app side for it to work.
+
+[Configuration, first account, reverse proxy, upgrades and backup →](docs/deployment.md)
 
 ## Contribute
 

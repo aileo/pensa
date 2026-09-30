@@ -1,7 +1,8 @@
-# Deploying Pensa
+﻿# Deploying Pensa
 
-Two images are published to the GitHub Container Registry on every push to
-`main`, for `linux/amd64` and `linux/arm64`:
+Two images are published to the GitHub Container Registry, for `linux/amd64`
+and `linux/arm64`: `latest` on every push to `main`, and `stable` plus the
+version numbers on every release.
 
 | Image | Contains | Port |
 | --- | --- | --- |
@@ -9,18 +10,30 @@ Two images are published to the GitHub Container Registry on every push to
 | `ghcr.io/aileo/pensa-web` | the built interface served by nginx | 8080 |
 
 The web image also proxies `/api` to the API, because the interface calls the
-API on its own origin. You therefore expose **one** port to your users.
+API on its own origin. You therefore expose **one** port to your users: the API
+container has no published port at all and is only reachable from inside the
+stack.
 
 ## Run it
 
+Three files: the stack, the overlay that follows releases, and the settings.
+
 ```sh
 curl -O https://raw.githubusercontent.com/aileo/pensa/main/compose.prod.yaml
-docker compose -f compose.prod.yaml up -d
+curl -O https://raw.githubusercontent.com/aileo/pensa/main/compose.stable.yaml
+curl -o .env https://raw.githubusercontent.com/aileo/pensa/main/.env.example
+docker compose -f compose.prod.yaml -f compose.stable.yaml up -d
 ```
 
 The app is on http://localhost:8080. Nothing else to prepare: the API applies
 its own migrations at startup and only reports healthy once the database
 answers.
+
+`.env.example` is entirely commented out, so downloading it as `.env` changes
+nothing on its own — it is there to show you every setting, with its default,
+at the moment you need it. At minimum, uncomment `POSTGRES_PASSWORD` **before
+the first start**: afterwards the database keeps the password it was created
+with, and editing the file will only stop the API from connecting.
 
 To load the sample data — useful to try the app, never on a real instance:
 
@@ -32,19 +45,58 @@ The accounts it creates are listed in the [testing guide](testing-guide.md).
 
 ## Configuration
 
-Everything is set through the environment; `compose.prod.yaml` gives each one a
-working default.
+Everything is set through the environment, read from the `.env` file next to
+your Compose file. Every variable has a working default; this is the full list.
 
-| Variable | Used by | Default | Purpose |
-| --- | --- | --- | --- |
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | db | `pensa` | database credentials |
-| `DATABASE_URL` | api | `postgres://pensa:pensa@db:5432/pensa` | connection string; point it elsewhere to use a managed database |
-| `WEB_ORIGIN` | api | `http://localhost:8080` | optional allowlist of origins; usually leave it alone |
-| `OPEN_REGISTRATION` | api | `false` | allow signing up without an invitation code |
-| `TRUST_PROXY` | api | `1` | how many proxies sit in front of the API, so rate limits see the visitor |
-| `API_UPSTREAM` | web | `http://api:3000` | where nginx forwards `/api` |
-| `WEB_PORT` | web | `8080` | published port on the host |
-| `API_IMAGE`, `WEB_IMAGE` | — | the GHCR images | override to run locally built images |
+### Database
+
+The API builds its connection from these fields rather than from a URL, so a
+generated password containing `@`, `/`, `:` or `#` needs no encoding. The same
+variables configure the database container, so each credential is written once.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `POSTGRES_USER` | `pensa` | database role |
+| `POSTGRES_PASSWORD` | `pensa` | its password — change it before the first start |
+| `POSTGRES_DB` | `pensa` | database name |
+| `POSTGRES_HOST` | `db` | the service name inside the stack |
+| `POSTGRES_PORT` | `5432` | database port |
+| `DATABASE_URL` | — | a full connection string; when set it wins over everything above. Use it for a managed database |
+
+### API
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `3000` | port the API listens on inside its container; never published on the host |
+| `WEB_ORIGIN` | `http://localhost:8080` | optional comma-separated allowlist of origins; usually leave it alone |
+| `TRUST_PROXY` | `1` | how many proxies sit in front of the API, so rate limits see the visitor |
+| `OPEN_REGISTRATION` | `false` | allow signing up without an invitation code |
+
+There is no session secret to set: sessions are random tokens stored in the
+database, so nothing has to be kept in step between restarts.
+
+### First account
+
+Set together, these create the first account on the first start — see
+[Who can sign up](#who-can-sign-up) below.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `BOOTSTRAP_EMAIL` | — | switches the bootstrap on; the next four are then required |
+| `BOOTSTRAP_PASSWORD` | — | at least 12 characters, as in the sign-up form |
+| `BOOTSTRAP_FIRST_NAME` | — | first name |
+| `BOOTSTRAP_LAST_NAME` | — | last name |
+| `BOOTSTRAP_BIRTH_DATE` | — | `YYYY-MM-DD`; birthdays are half the point of the app |
+| `BOOTSTRAP_HOUSEHOLD` | `Foyer de <first name>` | name of the household |
+| `BOOTSTRAP_FAMILY` | — | also creates that family, with its default occasions, and makes the account its admin |
+
+### Web container
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `WEB_PORT` | `8080` | published port on the host; point your reverse proxy at it |
+| `API_UPSTREAM` | `http://api:3000` | where nginx forwards `/api` |
+| `API_IMAGE`, `WEB_IMAGE` | the GHCR images | override to pin a version or run locally built images |
 
 **Change the database password before exposing anything.** The defaults exist so
 that `docker compose up` works out of the box, not because they are safe.
@@ -63,6 +115,36 @@ of their own, already attached to that family.
 
 Set `OPEN_REGISTRATION=true` if you would rather let anyone join, for instance on
 a throwaway instance you are only using to try the app out.
+
+### Creating that first account from the environment
+
+If you would rather not open the sign-up form at all — because you are
+deploying from a script, or because you want the instance usable the moment it
+answers — fill in the bootstrap variables:
+
+```sh
+BOOTSTRAP_EMAIL=you@example.org
+BOOTSTRAP_PASSWORD=change-me-after-first-login
+BOOTSTRAP_FIRST_NAME=Camille
+BOOTSTRAP_LAST_NAME=Durand
+BOOTSTRAP_BIRTH_DATE=1985-07-24
+BOOTSTRAP_FAMILY=Famille Durand
+```
+
+The account is created on the first start, as admin of its household, and of
+the family too when you name one. It is safe to leave these in place: the
+bootstrap does nothing as soon as any account exists, so restarting, upgrading
+or recreating the container never touches a live instance. It is an install,
+not a repair — there is deliberately no way to recreate an admin this way once
+the instance is in use.
+
+A mistake stops the container instead of starting without the account you are
+waiting for: a password under 12 characters, a date that is not `YYYY-MM-DD`,
+or one of the four required fields left out. `docker compose logs api` names
+the variable to fix.
+
+**That password is readable by anyone who can read the file.** Use it to sign
+in the first time, then change it from your profile.
 
 ## Behind a reverse proxy
 
@@ -119,23 +201,40 @@ endpoint for an external monitor or a Kubernetes probe.
 ## Upgrading
 
 ```sh
-docker compose -f compose.prod.yaml pull
-docker compose -f compose.prod.yaml up -d
+docker compose -f compose.prod.yaml -f compose.stable.yaml pull
+docker compose -f compose.prod.yaml -f compose.stable.yaml up -d
 ```
 
 Pending migrations are applied by the API when it starts, so upgrading is just
 pulling a newer image. Migrations only ever add to the schema; still, take a
 backup first — see below.
 
-Images are tagged `latest`, the short commit SHA, and `x.y` / `x.y.z` for
-version tags. Pin a SHA or a version if you would rather decide when to move:
+### Which tag to follow
 
-```yaml
-services:
-  api:
-    image: ghcr.io/aileo/pensa-api:0.1.0
-  web:
-    image: ghcr.io/aileo/pensa-web:0.1.0
+| Tag | Moves when | Good for |
+| --- | --- | --- |
+| `stable` | a version is released | production. This is what `compose.stable.yaml` uses |
+| `latest` | anything lands on `main` | trying out what is coming, knowing it is unreleased |
+| `0.2.0`, `0.2` | never / on patch releases | pinning, when you want to decide yourself |
+
+`compose.prod.yaml` alone uses `latest`, which tracks the `main` branch and
+therefore carries code that has not been released. `compose.stable.yaml` is a
+two-line overlay that swaps both images for `stable`; it is always used
+*alongside* the main file, never on its own:
+
+```sh
+docker compose -f compose.prod.yaml -f compose.stable.yaml up -d
+```
+
+> The `stable` tag is published by the release workflow, so it appears with the
+> first release made after this file was written. Until then, follow `latest`
+> or pin a version.
+
+To pin a version instead, set the image variables in your `.env`:
+
+```sh
+API_IMAGE=ghcr.io/aileo/pensa-api:0.2.0
+WEB_IMAGE=ghcr.io/aileo/pensa-web:0.2.0
 ```
 
 Read the [changelog](../CHANGELOG.md) before moving between minor versions —

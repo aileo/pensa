@@ -1,6 +1,12 @@
-# Production-ish stack using the published images. Nothing is built locally:
+# Production stack using the published images. Nothing is built locally:
 #   docker compose -f compose.prod.yaml up -d
-# The web container serves the interface and proxies /api to the API container.
+#
+# Settings come from a .env file next to this one — copy .env.example and uncomment what you
+# need. Every variable is documented in docs/deployment.md.
+#
+# The web container is the only thing published on the host: it serves the interface and
+# proxies /api to the API container over the internal network. The API deliberately has no
+# ports section, so it is unreachable from outside the stack.
 services:
   db:
     image: postgres:17-alpine
@@ -18,7 +24,14 @@ services:
   api:
     image: ${API_IMAGE:-ghcr.io/aileo/pensa-api:latest}
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://pensa:pensa@db:5432/pensa}
+      # One set of credentials, shared with the database above: the API builds its connection
+      # from these fields. Set DATABASE_URL instead to point at a database hosted elsewhere.
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-pensa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pensa}
+      POSTGRES_DB: ${POSTGRES_DB:-pensa}
+      DATABASE_URL: ${DATABASE_URL:-}
       PORT: 3000
       # Usually nothing to set: the API accepts writes coming from the address the request was
       # actually made to, whatever your reverse proxy calls it. Set this to a comma-separated
@@ -29,6 +42,15 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-1}
       # Invitation-only by default. The very first account can always be created.
       OPEN_REGISTRATION: ${OPEN_REGISTRATION:-false}
+      # First account, created on the first start when BOOTSTRAP_EMAIL is set and the database
+      # is still empty. Leave it unset to create the account from the sign-up form instead.
+      BOOTSTRAP_EMAIL: ${BOOTSTRAP_EMAIL:-}
+      BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:-}
+      BOOTSTRAP_FIRST_NAME: ${BOOTSTRAP_FIRST_NAME:-}
+      BOOTSTRAP_LAST_NAME: ${BOOTSTRAP_LAST_NAME:-}
+      BOOTSTRAP_BIRTH_DATE: ${BOOTSTRAP_BIRTH_DATE:-}
+      BOOTSTRAP_HOUSEHOLD: ${BOOTSTRAP_HOUSEHOLD:-}
+      BOOTSTRAP_FAMILY: ${BOOTSTRAP_FAMILY:-}
     depends_on:
       db:
         condition: service_healthy
