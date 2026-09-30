@@ -2,8 +2,8 @@
 
 /* Palette Pensa — bois de rose, terre cuite, sauge.
    Les paliers foncés sont retenus sur critère de contraste WCAG AA, pas à l'œil.
-   Les ratios mesurés sont consignés dans le README ; toute retouche de teinte
-   doit être revérifiée avant d'être adoptée. */
+   Les ratios mesurés sont consignés dans docs/design-system.md ; toute retouche
+   de teinte doit être revérifiée avant d'être adoptée. */
 @theme {
   --color-brand-50: #fdf4f4;
   --color-brand-100: #f9e5e6;

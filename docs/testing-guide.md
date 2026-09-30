@@ -269,8 +269,8 @@ Accessibility checks, which matter more here because a soft palette loses legibi
       greyscale, or squint. Each step still reads through its number, its check mark and its
       label. The urgent rows still say *Bientôt*.
 - [ ] **Contrast holds:** body text, buttons and links reach 4.5:1; input borders, the focus
-      ring and progress markers reach 3:1. Measured values are listed in the README. If you
-      change a hue, re-measure before keeping it.
+      ring and progress markers reach 3:1. Measured values are listed in
+      [the design system](design-system.md). If you change a hue, re-measure before keeping it.
 
 ## 4. The name, the AI disclosure and the published images
 
