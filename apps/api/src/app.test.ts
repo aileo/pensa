@@ -20,7 +20,7 @@ beforeAll(async () => {
   if (!address || typeof address === 'string') throw new Error('Port manquant');
   base = `http://127.0.0.1:${address.port}`;
   for (const name of ['alice', 'bob', 'charlie', 'david', 'eloise']) {
-    const login = await call('', '/auth/login', 'POST', { email: `${name}@example.test`, password: 'GiftitDemo2026!' });
+    const login = await call('', '/auth/login', 'POST', { email: `${name}@example.test`, password: 'PensaDemo2026!' });
     if (login.status !== 200) throw new Error('Exécuter le seed avant les tests');
     cookies[name] = login.cookie!.split(';')[0];
   }

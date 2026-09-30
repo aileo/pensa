@@ -1,13 +1,15 @@
 {
   "name": "api",
   "version": "1.0.0",
-  "description": "",
+  "description": "API Pensa",
+  "license": "MIT",
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --noEmit",
-    "migrate": "drizzle-kit migrate",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx src/migrate.ts",
     "generate": "drizzle-kit generate",
     "seed": "tsx src/seed.ts",
     "lint": "eslint src",
@@ -15,7 +17,6 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",

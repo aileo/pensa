@@ -10,7 +10,7 @@ try {
   } else {
     const house = async (name: string) => (await client.query<{id:string}>('INSERT INTO households(name) VALUES($1) RETURNING id', [name])).rows[0].id;
     const homes = [await house('Foyer Alice et Bob'), await house('Foyer Charlie'), await house('Foyer David'), await house('Foyer Éloïse')];
-    const password = await hash('GiftitDemo2026!', 12);
+    const password = await hash('PensaDemo2026!', 12);
     const user = async (first: string, last: string, home: string, birth: string, nameDay: string) =>
       (await client.query<{id:string}>(`INSERT INTO users(household_id,first_name,last_name,email,password_hash,birth_date,name_day,household_admin)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, [home, first, last, `${first.toLowerCase()}@example.test`, password, birth, nameDay, true])).rows[0].id;
@@ -69,7 +69,7 @@ try {
       [gifted, alice, JSON.stringify({ ...snapshot, recipientId: alice, creatorId: bob, recipient, creator: people.find(p => p.id === bob), participants: people,
         occasions: [{ name: 'Noël', year: 2025 }], reservedAt: giftReservation.created_at, giftedAt: snapshot.gifted_at })]);
     await client.query('COMMIT');
-    console.log('Seed chargé. alice/bob/charlie/david/eloise@example.test : GiftitDemo2026!');
+    console.log('Seed chargé. alice/bob/charlie/david/eloise@example.test : PensaDemo2026!');
   }
 } catch (error) { await client.query('ROLLBACK'); throw error; }
 finally { client.release(); await pool.end(); }

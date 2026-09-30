@@ -7,8 +7,8 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     activateLocale(locale)
     document.documentElement.lang = locale
-    document.title = locale === 'fr' ? 'Giftit — Organisez les cadeaux, l’esprit tranquille' : 'Giftit — Gifts organized, mind at ease'
-    document.querySelector('meta[name="description"]')?.setAttribute('content', locale === 'fr' ? 'Giftit, organisez les cadeaux, l’esprit tranquille.' : 'Giftit, gifts organized, mind at ease.')
+    document.title = locale === 'fr' ? 'Pensa — Organisez les cadeaux, l’esprit tranquille' : 'Pensa — Gifts organized, mind at ease'
+    document.querySelector('meta[name="description"]')?.setAttribute('content', locale === 'fr' ? 'Pensa, organisez les cadeaux, l’esprit tranquille.' : 'Pensa, gifts organized, mind at ease.')
   }, [locale])
   function changeLocale(next: Locale) {
     saveLocale(next)

@@ -2,13 +2,13 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: giftit
-      POSTGRES_PASSWORD: giftit
-      POSTGRES_DB: giftit
+      POSTGRES_USER: pensa
+      POSTGRES_PASSWORD: pensa
+      POSTGRES_DB: pensa
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U giftit"]
+      test: ["CMD-SHELL", "pg_isready -U pensa"]
       interval: 5s
       retries: 10
   api:
@@ -21,7 +21,7 @@ services:
       - ./apps/api:/app
       - api_modules:/app/node_modules
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://giftit:giftit@db:5432/giftit}
+      DATABASE_URL: ${DATABASE_URL:-postgres://pensa:pensa@db:5432/pensa}
       PORT: 3000
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
     depends_on:

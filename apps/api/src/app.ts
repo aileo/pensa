@@ -118,6 +118,16 @@ app.use((req, res, next) => {
   next();
 });
 const api = express.Router();
+// Registered before the /api router so that container probes never consume the rate-limit
+// budget. It touches the database, because an API that cannot query is not ready to serve.
+app.get('/api/health', async (_req, res) => {
+  try {
+    await query('select 1');
+    res.json({ status: 'ok' });
+  } catch {
+    res.status(503).json({ status: 'unavailable' });
+  }
+});
 app.use('/api', api);
 const rateLimitError = (_req: Request, _res: Response, next: NextFunction) => next(new HttpError(429, 'Trop de requêtes'));
 api.use(rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError }));

@@ -108,7 +108,7 @@ function App() {
     return () => { active = false }
   }, [t])
 
-  if (!authChecked) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-brand-600"><LanguageControl/><p role="status">{t('Chargement de Giftit…')}</p></div>
+  if (!authChecked) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-brand-600"><LanguageControl/><p role="status">{t('Chargement de Pensa…')}</p></div>
   if (!account) return <Auth mode={authMode} setMode={setAuthMode} onAuth={onAuth} error={error} setError={setError} />
   return <AuthenticatedApp key={account.session} me={account.person} onLogout={() => setAccount(null)} onProfile={person => setAccount(current => current && { ...current, person })} />
 }
@@ -260,13 +260,14 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
   return <div className="min-h-screen bg-surface lg:flex">
     {mobileNav && <button className="fixed inset-0 z-30 bg-ink-900/40 lg:hidden" aria-label={t('Fermer le menu')} onClick={() => setMobileNav(false)} />}
     <aside className={`fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-line bg-white px-4 py-7 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${mobileNav ? 'translate-x-0' : '-translate-x-full'}`}>
-      <button className="mb-11 flex items-center gap-2.5 px-3 text-left" onClick={() => go('dashboard')} aria-label={t('Giftit, accueil')}><span className="flex size-10 items-center justify-center rounded-2xl bg-brand-600 text-white"><Icon name="gift" size={23}/></span><span className="font-['Outfit'] text-[27px] font-extrabold tracking-[-.06em] text-ink-900">giftit<span className="text-brand-400">.</span></span></button>
+      <button className="mb-11 flex items-center gap-2.5 px-3 text-left" onClick={() => go('dashboard')} aria-label={t('Pensa, accueil')}><span className="flex size-10 items-center justify-center rounded-2xl bg-brand-600 text-white"><Icon name="gift" size={23}/></span><span className="font-['Outfit'] text-[27px] font-extrabold tracking-[-.06em] text-ink-900">pensa<span className="text-brand-400">.</span></span></button>
       <span className="eyebrow mb-3 px-3">{t('Menu principal')}</span>
       <nav aria-label={t('Navigation principale')} className="space-y-1">
         {nav.map(item => <button key={item.page} onClick={() => go(item.page)} aria-current={page === item.page ? 'page' : undefined} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${page === item.page ? 'bg-brand-50 text-brand-600' : 'text-ink-500 hover:bg-brand-50 hover:text-brand-600'}`}><Icon name={item.icon} size={19}/>{t(item.label)}</button>)}
       </nav>
       <div className="mt-auto px-2">
-        <div className="mb-5 rounded-2xl bg-brand-50 p-4"><Icon name="spark" size={20} className="mb-2 text-brand-500"/><p className="font-['Outfit'] text-sm font-bold">{t('Rien à retenir')}</p><p className="mt-1 text-xs leading-relaxed text-ink-500">{t('Giftit suit les dates, les listes et les cadeaux à votre place.')}</p></div>
+        <div className="mb-5 rounded-2xl bg-brand-50 p-4"><Icon name="spark" size={20} className="mb-2 text-brand-500"/><p className="font-['Outfit'] text-sm font-bold">{t('Rien à retenir')}</p><p className="mt-1 text-xs leading-relaxed text-ink-500">{t('Pensa suit les dates, les listes et les cadeaux à votre place.')}</p></div>
+        <p className="mb-2 px-1 text-xs leading-relaxed text-ink-500">{t('Application entièrement générée par IA. Code ouvert sous licence MIT.')}</p>
       </div>
     </aside>
     <div className="min-w-0 flex-1">
@@ -317,10 +318,10 @@ function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: (
         {page === 'reservations' && <><SectionTitle icon="gift" kicker={t('CADEAUX EN PRÉPARATION')} title={t('Mes réservations')} action={<button className="secondary" onClick={() => openOffList()}><Icon name="plus" size={17}/> {t('Prévoir un cadeau hors liste')}</button>}/>{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform} onStatus={changeStatus} focused={String(focusedReservation) === String(reservation.id)}/>)}</div> : <Empty icon="gift" title={t('Aucune réservation pour le moment')} text={t('Explorez les listes de vos proches pour leur préparer une surprise.')} action={<button className="primary" onClick={() => go('families')}>{t('Découvrir les envies')} <Icon name="arrow" size={17}/></button>}/>}</>}
         {page === 'history' && <><SectionTitle icon="clock" tone="sage" kicker={t('DÉJÀ OFFERT')} title={t('Historique')}/>{history.length ? <div className="card divide-y divide-line-soft">{history.map((entry, index) => { const item = entry as { id?: Id; snapshot?: { title?: string; recipient?: { birthDate?: string; birth_date?: string }; occasions?: { name: string; kind?: Occasion['kind']; year: number }[] }; created_at?: string }; const birthDate = item.snapshot?.recipient?.birthDate ?? item.snapshot?.recipient?.birth_date; return <div className="flex items-start gap-4 p-5" key={String(item.id ?? index)}><span className="rounded-xl bg-brand-50 p-2.5 text-brand-600"><Icon name="clock" size={19}/></span><div><p className="font-semibold">{item.snapshot?.title || t('Un cadeau offert')}</p><p className="muted mt-1">{item.snapshot?.occasions?.map(occasion => occasionWithYear(occasion, locale, birthDate)).join(', ')} · {dateOf(item.created_at)}</p></div></div> })}</div> : <Empty icon="clock" title={t('Rien d’offert pour l’instant')} text={t('Les cadeaux déjà offerts s’afficheront ici, pour éviter d’offrir deux fois la même chose.')}/>}</>}
         {page === 'search' && <><SectionTitle icon="search" kicker={t('RECHERCHE')} title={t('Rechercher')}/><label htmlFor="global-search" className="label">{t('Personnes et envies')}</label><div className="relative mb-7"><Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-500"/><input id="global-search" autoComplete="off" className="field !py-3 !pl-12" placeholder={t('Rechercher une personne, une envie…')} value={searchText} onChange={event => setSearchText(event.target.value)}/></div>{searchResults.length ? <div className="space-y-3">{searchResults.map((result, index) => { const item = result as Record<string, unknown>; const person = item as Person; const wish = item as Wish; const isWish = typeof item.title === 'string'; return <div key={String(item.id ?? index)} className="card flex items-center gap-4 p-4">{isWish ? <span className="rounded-xl bg-brand-50 p-3 text-brand-600"><Icon name="heart"/></span> : <Avatar person={person}/>}<div className="min-w-0 flex-1"><p className="truncate font-semibold">{isWish ? wish.title : nameOf(person)}</p><p className="muted">{isWish ? money(wish.price) || t('Envie cadeau') : t('Personne')}</p></div><button className="secondary !px-3 !py-2 text-sm" onClick={() => isWish ? String(wish.ownerId) === String(me.id) ? go('wishes') : openReserve(wish) : (setSelectedPerson(person), setPage('families'))}>{t('Voir')} <Icon name="arrow" size={15}/></button></div> })}</div> : <Empty icon="search" title={searchText ? t('Aucun résultat') : t('Que recherchez-vous ?')} text={searchText ? t('Essayez d’autres mots-clés.') : t('Retrouvez une personne ou une idée cadeau en quelques lettres.')}/>}</>}
-        {page === 'profile' && <><SectionTitle icon="user" kicker={t('VOTRE ESPACE')} title={t('Mon profil')}/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-line pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">{t('Votre compte Giftit')}</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">{t('ADRESSE E-MAIL')}</dt><dd>{me.email || t('Non renseignée')}</dd></div><div><dt className="eyebrow mb-1">{t('DATE DE NAISSANCE')}</dt><dd>{dateOf(me.birthDate) || t('Non renseignée')}</dd></div></dl><ProfileForm me={me} busy={busy} perform={perform} onSaved={onProfile}/></div></>}
+        {page === 'profile' && <><SectionTitle icon="user" kicker={t('VOTRE ESPACE')} title={t('Mon profil')}/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-line pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">{t('Votre compte Pensa')}</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">{t('ADRESSE E-MAIL')}</dt><dd>{me.email || t('Non renseignée')}</dd></div><div><dt className="eyebrow mb-1">{t('DATE DE NAISSANCE')}</dt><dd>{dateOf(me.birthDate) || t('Non renseignée')}</dd></div></dl><ProfileForm me={me} busy={busy} perform={perform} onSaved={onProfile}/></div></>}
       </main>
     </div>
-    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-8"><div className="mb-6 flex items-start justify-between gap-3"><div><p className="eyebrow mb-1">{t('GIFTIT')}</p><h2 id="modal-title" className="font-['Outfit'] text-2xl font-bold">{t(modal === 'wish' ? 'Ajouter une envie' : modal === 'family' ? 'Créer une famille' : modal === 'occasion' ? 'Nouvelle occasion' : modal === 'tags' ? 'Modifier les tags' : modal === 'offList' ? 'Prévoir un cadeau hors liste' : 'Réserver une envie')}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label={t('Fermer')}><Icon name="close"/></button></div>
+    {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-8"><div className="mb-6 flex items-start justify-between gap-3"><div><p className="eyebrow mb-1">{t('PENSA')}</p><h2 id="modal-title" className="font-['Outfit'] text-2xl font-bold">{t(modal === 'wish' ? 'Ajouter une envie' : modal === 'family' ? 'Créer une famille' : modal === 'occasion' ? 'Nouvelle occasion' : modal === 'tags' ? 'Modifier les tags' : modal === 'offList' ? 'Prévoir un cadeau hors liste' : 'Réserver une envie')}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label={t('Fermer')}><Icon name="close"/></button></div>
       {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {modal === 'wish' && <WishForm busy={busy} perform={perform} handleError={handleError}/>}
       {modal === 'family' && <form onSubmit={event => { event.preventDefault(); const name = String(new FormData(event.currentTarget).get('name')).trim(); if (name) void perform(() => api('/families', json('POST', { name })), t('Famille créée.')) }}><label className="label" htmlFor="family-name">{t('Nom de la famille')}</label><input className="field" id="family-name" name="name" placeholder={t('Ex. : La famille Martin')} required/><button disabled={busy} className="primary mt-5 w-full">{t('Créer la famille')}</button></form>}
@@ -364,18 +365,18 @@ function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'reg
   // further is a choice, never a detour to sign in.
   return <div className="mx-auto grid max-w-[1500px] lg:grid-cols-[minmax(0,1fr)_minmax(390px,460px)]">
     <div className="flex flex-col bg-brand-100 p-7 sm:p-12 lg:col-start-1 lg:row-start-1 lg:min-h-screen">
-      <div className="flex items-center justify-between gap-2.5"><div className="flex items-center gap-2.5"><span className="flex size-10 items-center justify-center rounded-2xl bg-brand-600 text-white"><Icon name="gift"/></span><span className="font-['Outfit'] text-[27px] font-extrabold tracking-tight">giftit.</span></div><LanguageControl/></div>
+      <div className="flex items-center justify-between gap-2.5"><div className="flex items-center gap-2.5"><span className="flex size-10 items-center justify-center rounded-2xl bg-brand-600 text-white"><Icon name="gift"/></span><span className="font-['Outfit'] text-[27px] font-extrabold tracking-tight">pensa.</span></div><LanguageControl/></div>
       <div className="my-auto max-w-lg py-14">
         <span className="eyebrow">{t('FINI LA CHARGE MENTALE DES CADEAUX')}</span>
         <h1 className="mt-5 font-['Outfit'] text-4xl font-bold leading-[1.13] tracking-tight text-ink-900 sm:text-6xl">{t('Organisez les cadeaux,')} <span className="text-brand-600">{t('l’esprit tranquille.')}</span></h1>
         <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-500">{t('Les envies de chacun, les dates qui arrivent, qui offre quoi : tout est au même endroit, et personne n’a à tout retenir.')}</p>
         <div className="mt-10 flex items-center gap-3 rounded-2xl bg-white/65 p-4 text-sm font-semibold text-ink-600"><span className="rounded-xl bg-brand-200 p-2.5 text-brand-600"><Icon name="heart"/></span> {t('Plus de doublons, plus de listes dans un coin de la tête.')}</div>
-        <p className="muted mt-8 hidden items-center gap-2 lg:flex"><Icon name="chevron" size={15} className="rotate-90"/> {t('Faites défiler pour voir ce que Giftit change au quotidien.')}</p>
+        <p className="muted mt-8 hidden items-center gap-2 lg:flex"><Icon name="chevron" size={15} className="rotate-90"/> {t('Faites défiler pour voir ce que Pensa change au quotidien.')}</p>
       </div>
     </div>
     <div id="auth-panel" className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
       <div className="flex items-center justify-center px-6 py-12 lg:sticky lg:top-0 lg:h-screen lg:flex-col lg:justify-start lg:overflow-y-auto"><div className="w-full max-w-[420px] lg:my-auto">
-      <p className="eyebrow mb-3">{t('BIENVENUE SUR GIFTIT')}</p>
+      <p className="eyebrow mb-3">{t('BIENVENUE SUR PENSA')}</p>
       <h2 className="font-['Outfit'] text-3xl font-bold">{mode === 'login' ? t('Reprenez où vous en étiez') : t('Créons votre compte')}</h2>
       <p className="muted mb-8 mt-2">{mode === 'login' ? t('Connectez-vous pour retrouver vos listes et vos cadeaux en cours.') : t('Quelques informations suffisent pour commencer.')}</p>
       {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{localizeMessage(error, locale)}</p>}
@@ -426,12 +427,20 @@ function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login' | 'reg
           <LandingPoint icon="user" title={t('On entre par invitation')} text={t('Une famille se rejoint avec un code partagé par un proche, jamais par une recherche.')}/>
         </div>
       </LandingSection>
+      <LandingSection id="landing-ai" kicker={t('EN TOUTE TRANSPARENCE')} title={t('Cette application a été entièrement générée par une IA.')} intro={t('Le code, les textes et le design ont été produits par une intelligence artificielle, dirigée par un humain. Autant que vous le sachiez avant de créer un compte.')}>
+        <div className="grid gap-7 sm:grid-cols-3">
+          <LandingPoint icon="spark" title={t('Ce que cela signifie')} text={t('Chaque ligne de code, chaque phrase et chaque icône de cette interface ont été écrites par une IA, pas par une équipe de développeurs.')}/>
+          <LandingPoint icon="check" title={t('Le code est ouvert')} text={t('Le projet est public et sous licence MIT : vous pouvez le lire, le vérifier et l’héberger vous-même.')}/>
+          <LandingPoint icon="clock" title={t('À garder en tête')} text={t('C’est un projet personnel, pas un service commercial avec des garanties. N’y mettez que des données que vous pourriez perdre.')}/>
+        </div>
+      </LandingSection>
       <div className="mt-4 rounded-[26px] bg-brand-100 px-7 py-9 sm:px-10">
         <h2 className="font-['Outfit'] text-2xl font-bold tracking-tight text-ink-900">{t('Prêt à vous libérer la tête ?')}</h2>
         <p className="mt-3 max-w-md leading-relaxed text-ink-500">{t('Créez votre compte, ajoutez une première envie, invitez vos proches. Le reste suit tout seul.')}</p>
         <a className="primary mt-6" href="#auth-panel">{t('Commencer maintenant')} <Icon name="arrow" size={17}/></a>
       </div>
-      <p className="mt-10 text-sm text-ink-500">{t('Giftit. L’organisation des cadeaux, en clair.')}</p>
+      <p className="mt-10 text-sm text-ink-500">{t('Pensa. L’organisation des cadeaux, en clair.')}</p>
+      <p className="mt-2 text-sm text-ink-500">{t('Application entièrement générée par IA. Code ouvert sous licence MIT.')}</p>
     </div>
   </div>
 }
@@ -712,7 +721,7 @@ function ProfileForm({ me, busy, perform, onSaved }: {
   </form>
 }
 
-const onboardingKey = (me: Person) => `giftit-onboarding-dismissed-${me.id}`
+const onboardingKey = (me: Person) => `pensa-onboarding-dismissed-${me.id}`
 function Guidance({ me, onboarding, todos, busy, onAddWish, onGo, onPerson, onReservation, onStatus }: {
   me: Person; onboarding?: Onboarding; todos: Todo[]; busy: boolean; onAddWish: () => void; onGo: (page: Page) => void; onPerson: (person: Person) => void
   onReservation: (id: Id) => void; onStatus: (id: Id, status: ReservationStatus, title?: string) => Promise<boolean>

@@ -1,4 +1,4 @@
-# Giftit web application
+# Pensa web application
 
 React, TypeScript, Vite and Tailwind CSS frontend with English and French UI. For setup **without Node.js on the host**, use the [repository Docker Compose instructions](../../README.md). Run frontend checks with:
 

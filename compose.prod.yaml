@@ -1,0 +1,40 @@
+# Production-ish stack using the published images. Nothing is built locally:
+#   docker compose -f compose.prod.yaml up -d
+# The web container serves the interface and proxies /api to the API container.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pensa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pensa}
+      POSTGRES_DB: ${POSTGRES_DB:-pensa}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pensa}"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+  api:
+    image: ${API_IMAGE:-ghcr.io/aileo/pensa-api:latest}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://pensa:pensa@db:5432/pensa}
+      PORT: 3000
+      # The browser's origin is the web container, not the API.
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/aileo/pensa-web:latest}
+    environment:
+      API_UPSTREAM: http://api:3000
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  pgdata:
