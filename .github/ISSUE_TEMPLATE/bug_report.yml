@@ -1,0 +1,46 @@
+name: Bug report
+description: Report something that is not working as expected.
+title: ""
+labels:
+  - type: bug
+body:
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: Current behavior
+      description: What happens now?
+      placeholder: Describe what you observed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to reproduce
+      description: List the steps that consistently reproduce the issue.
+      placeholder: |
+        1. Go to …
+        2. Do …
+        3. Observe …
+    validations:
+      required: true
+  - type: textarea
+    id: conditions
+    attributes:
+      label: Conditions
+      description: Include relevant context, such as language, browser/device, and whether you use the development stack or published images.
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add screenshots, links, or other details that may help diagnose the issue.
+    validations:
+      required: false
