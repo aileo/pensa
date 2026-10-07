@@ -83,7 +83,8 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
-          context: apps/${{ matrix.app }}
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
           push: false
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}
