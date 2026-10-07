@@ -7,6 +7,7 @@ import type { PersonView } from '../../../packages/contracts/src/index.js';
 import { registerFamilyRoutes } from './routes/families.js';
 import { registerWishRoutes } from './routes/wishes.js';
 import { registerReservationRoutes } from './routes/reservations.js';
+import { createWishService } from './services/wishes.js';
 import { pool, query } from './db.js';
 import { createDefaultOccasions } from './family.js';
 import { preview } from './metadata.js';
@@ -386,87 +387,16 @@ const upcoming = async (viewer: Person, recipientId: string) => {
 };
 
 export type Wish = { id: string; owner_id: string; title: string; description: string | null; url: string | null; image: string | null; price: string | null; tags: string[]; position: number; deleted_at: Date | null; gifted_at: Date | null; off_list: boolean; created_by: string | null };
-const wishAccess = async (id: string, viewer: string) => {
-  const wish = await first<Wish>('SELECT * FROM wishes WHERE id=$1', [id]);
-  if (!wish || wish.off_list || !await visible(viewer, wish.owner_id)) fail(404, 'Souhait introuvable');
-  return wish;
-};
 const wishFilters = z.strictObject({
   tag: z.string().trim().min(1).max(40).optional(),
   availability: z.enum(['available', 'reserved']).optional(),
   minPrice: z.coerce.number().finite().min(0).optional(),
   maxPrice: z.coerce.number().finite().min(0).optional(),
 });
-const reservationView = async (wish: Wish, viewer: string) => {
-  const result: Record<string, unknown> = {
-    id: wish.id, ownerId: wish.owner_id, title: wish.title, description: wish.description,
-    url: wish.url, image: wish.image, price: wish.price, tags: wish.tags, position: wish.position,
-  };
-  if (wish.owner_id !== viewer) {
-    const r = await first<{id:string; creator_id:string; open_to_contributions:boolean}>(`SELECT id,creator_id,open_to_contributions FROM reservations
-      WHERE wish_id=$1 AND cancelled_at IS NULL AND status!='gifted'`, [wish.id]);
-    if (r) {
-      const creator = await first<Person>('SELECT * FROM users WHERE id=$1', [r.creator_id]);
-      const people = await query<Person>('SELECT u.* FROM users u JOIN participants p ON p.user_id=u.id WHERE p.reservation_id=$1', [r.id]);
-      result.reservation = { id: r.id, creator: publicPerson(creator), participants: people.map(publicPerson),
-        openToContributions: r.open_to_contributions };
-    }
-  }
-  return result;
-};
-const listWishes = async (viewer: string, owner: string, filters: z.infer<typeof wishFilters> = {}) => {
-  if (!await visible(viewer, owner)) fail(403, 'Personne inaccessible');
-  const rows = await query<Wish>(`SELECT * FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL AND gifted_at IS NULL AND NOT off_list
-    ORDER BY position,created_at`, [owner]);
-  const result = await Promise.all(rows.map(row => reservationView(row, viewer)));
-  return result.filter(row => {
-    if (filters.tag && !(row.tags as string[]).includes(String(filters.tag))) return false;
-    if (filters.minPrice !== undefined && (row.price === null || Number(row.price) < filters.minPrice)) return false;
-    if (filters.maxPrice !== undefined && (row.price === null || Number(row.price) > filters.maxPrice)) return false;
-    if (filters.availability && viewer !== owner && (filters.availability === 'reserved') !== !!row.reservation) return false;
-    return true;
-  });
-};
 
-// Whose list the actor may write in: their own, or that of a managed member of their household.
-const writableOwner = async (actor: Person, ownerId: string) => {
-  if (ownerId !== actor.id && !await curates(actor, ownerId)) fail(403, 'Personne inaccessible');
-  return ownerId;
-};
 const wishInput = z.object({ title: z.string().trim().min(1).max(200), image: httpUrl.or(z.literal('')).nullish(),
   url: z.url().max(2048), description: z.string().max(5000).nullish(),
   price: z.coerce.number().min(0).max(99999999).nullable().optional(), tags: tags.default([]) });
-const addWish = async (req: Request, res: Response, ownerId: string) => {
-  const d = wishInput.parse(req.body);
-  if (!/^https?:\/\//.test(d.url)) fail(400, 'URL HTTP(S) requise');
-  const owner = await writableOwner(person(req), ownerId);
-  const row = await first<Wish>(`INSERT INTO wishes(owner_id,title,image,url,description,price,tags,position)
-    VALUES($1,$2,$3,$4,$5,$6,$7,(SELECT count(*) FROM wishes WHERE owner_id=$1 AND NOT off_list)) RETURNING *`,
-    [owner, d.title, d.image || null, d.url, d.description ?? null, d.price ?? null, d.tags]);
-  res.status(201).json(await reservationView(row, person(req).id));
-};
-
-const reorderWishes = async (req: Request, res: Response, ownerId: string) => {
-  const { ids } = z.object({ ids: z.array(uuid).max(1000) }).parse(req.body);
-  if (new Set(ids).size !== ids.length) fail(400, 'Ordre invalide');
-  const owner = await writableOwner(person(req), ownerId);
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const rows = (await client.query<{id:string}>('SELECT id FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL AND gifted_at IS NULL AND NOT off_list FOR UPDATE', [owner])).rows;
-    if (rows.length !== ids.length || rows.some(r => !ids.includes(r.id))) fail(400, 'Liste incomplète');
-    for (let i = 0; i < ids.length; i++) await client.query('UPDATE wishes SET position=$1 WHERE id=$2', [i, ids[i]]);
-    await client.query('COMMIT'); res.json({ ok: true });
-  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
-};
-
-// Editing and removing go through the wish, so the owner is whatever the row says; a curator is
-// let through the same door as the owner instead of getting a route of their own.
-const writableWish = async (actor: Person, id: string) => {
-  const wish = await first<Wish>('SELECT * FROM wishes WHERE id=$1 AND deleted_at IS NULL AND gifted_at IS NULL AND NOT off_list', [id]);
-  if (!wish || (wish.owner_id !== actor.id && !await curates(actor, wish.owner_id))) fail(404, 'Souhait introuvable');
-  return wish;
-};
 
 export type Reservation = { id: string; wish_id: string; creator_id: string; status: string; open_to_contributions: boolean; cancelled_at: Date | null; created_at: Date; owner_id: string; deleted_at: Date | null; gifted_at: Date | null; off_list?: boolean };
 const getReservation = async (id: string, viewer: string) => {
@@ -527,10 +457,11 @@ const withRequestStatus = async (r: Reservation, viewer: string) => ({
   requestStatus: (await first<{status:string}>('SELECT status FROM requests WHERE reservation_id=$1 AND user_id=$2', [r.id, viewer]))?.status ?? null,
 });
 
-const routeDeps = { pool, query, person, fail, uuid, first, visible, ownFamily, birthday, isManaged, publicPerson, requireHouseholdAdmin, requireOwnHouseholdAdmin, managedMember, curates, householdMembers, token, digest, hash, HttpError, nameDay, createDefaultOccasions, occasionData, upcoming, occasionMonthDay, wishAccess, wishFilters, reservationView, listWishes, preview, previewLimit, previewErrors, writableOwner, wishInput, addWish, reorderWishes, writableWish, tags, httpUrl, getReservation, reservationDetails, occasionInput, setOccasions, setParticipants, giftFields, offListVisibility, withRequestStatus };
+const routeDeps = { pool, query, person, fail, uuid, first, visible, ownFamily, birthday, isManaged, publicPerson, requireHouseholdAdmin, requireOwnHouseholdAdmin, managedMember, curates, householdMembers, token, digest, hash, HttpError, nameDay, createDefaultOccasions, occasionData, upcoming, occasionMonthDay, wishFilters, preview, previewLimit, previewErrors, wishInput, tags, httpUrl, getReservation, reservationDetails, occasionInput, setOccasions, setParticipants, giftFields, offListVisibility, withRequestStatus };
 export type RouteDeps = typeof routeDeps;
+const wishes = createWishService(routeDeps);
 registerFamilyRoutes(api, routeDeps);
-registerWishRoutes(api, routeDeps);
+registerWishRoutes(api, routeDeps, wishes);
 registerReservationRoutes(api, routeDeps);
 api.get('/history', async (req, res) => {
   res.json(await query(`SELECT h.id,h.snapshot,h.created_at FROM history h WHERE h.recipient_id=$1 OR EXISTS(
@@ -550,7 +481,7 @@ api.get('/search', async (req, res) => {
     AND (w.title ILIKE $2 OR EXISTS(SELECT 1 FROM unnest(w.tags) tag WHERE tag ILIKE $2)
       OR w.price::text ILIKE $2 OR u.first_name ILIKE $2 OR u.last_name ILIKE $2) LIMIT 100`,
     [person(req).household_id, `%${q}%`]);
-  res.json({ people: people.map(publicPerson), wishes: await Promise.all(wishesRows.map(w => reservationView(w, person(req).id))) });
+  res.json({ people: people.map(publicPerson), wishes: await Promise.all(wishesRows.map(w => wishes.reservationView(w, person(req).id))) });
 });
 api.get('/dashboard', async (req, res) => {
   const actor = person(req);

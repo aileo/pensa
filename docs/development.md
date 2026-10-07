@@ -135,7 +135,8 @@ Both commands keep the PostgreSQL volume.
 ```
 apps/api/            Express + PostgreSQL
   src/app.ts         application setup, middleware and cross-domain endpoints
-  src/routes/        families.ts, wishes.ts, reservations.ts
+  src/routes/        HTTP adapters for family, wish and reservation APIs
+  src/services/      family, wish and reservation domain methods
   src/schema.ts      Drizzle schema
   src/metadata.ts    link preview fetching
   src/migrate.ts     applies drizzle/ at startup
@@ -155,10 +156,14 @@ docs/                this documentation
 site/                the documentation site (home page, theme, VitePress config)
 ```
 
-API domain routes live in `apps/api/src/routes/`; shared middleware and
-cross-domain behavior stay in `app.ts`. The browser imports public data types
-through `apps/web/src/api.ts`, while the API uses the same contract types for its
-response projections. Database row types remain internal to the API.
+API route adapters live in `apps/api/src/routes/`; they validate HTTP inputs,
+obtain the authenticated actor, and map service results to HTTP responses.
+Domain operations and persistence rules live in `apps/api/src/services/` as
+methods that accept validated values and return data without depending on
+Express. Shared middleware and cross-domain behavior stay in `app.ts`. The
+browser imports public data types through `apps/web/src/api.ts`, while the API
+uses the same contract types for its response projections. Database row types
+remain internal to the API.
 
 The frontend keeps application orchestration in `AppShell.tsx`, with general
 building blocks under `components/atoms/`, `components/molecules/` and

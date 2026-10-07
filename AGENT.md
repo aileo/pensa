@@ -123,7 +123,8 @@ to the development database: reset and reseed before manual testing.
 | Path | What it holds |
 | --- | --- |
 | `apps/api/src/app.ts` | API setup, middleware and cross-domain endpoints |
-| `apps/api/src/routes/` | family, wish and reservation route modules |
+| `apps/api/src/routes/` | family, wish and reservation HTTP adapters |
+| `apps/api/src/services/` | family, wish and reservation domain methods |
 | `apps/api/src/schema.ts` | Drizzle schema |
 | `apps/api/drizzle/` | generated migrations, committed |
 | `packages/contracts/src/` | shared frontend/backend API types |
