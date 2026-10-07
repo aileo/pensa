@@ -1,6 +1,6 @@
 name: Feature request
 description: Suggest an improvement or a new capability.
-title: ""
+title: "Feature request"
 labels:
   - type: feature
 body:

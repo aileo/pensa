@@ -90,7 +90,8 @@ to the development database: reset and reseed before manual testing.
   changelog heading. Forgetting it leaves every deployment on the previous
   version.
 - **No npm workspaces.** The two apps are independent: separate lockfiles,
-  separate build contexts, different pinned TypeScript versions. The root
+  package manifests and pinned TypeScript versions. Docker image builds use the
+  repository root context only to include the shared contracts. The root
   `package.json` holds metadata only. Declaring workspaces without a root
   lockfile breaks `npm ci` in CI — it already happened once.
 - **Comment only what needs explaining.** Prefer a name that makes the comment
@@ -121,10 +122,16 @@ to the development database: reset and reseed before manual testing.
 
 | Path | What it holds |
 | --- | --- |
-| `apps/api/src/app.ts` | every route and rule |
+| `apps/api/src/app.ts` | API setup, middleware and cross-domain endpoints |
+| `apps/api/src/routes/` | family, wish and reservation HTTP adapters |
+| `apps/api/src/services/` | family, wish and reservation domain methods |
 | `apps/api/src/schema.ts` | Drizzle schema |
 | `apps/api/drizzle/` | generated migrations, committed |
-| `apps/web/src/App.tsx` | the whole interface |
+| `packages/contracts/src/` | shared frontend/backend API types |
+| `apps/web/src/App.tsx` | authentication check and app entry |
+| `apps/web/src/AppShell.tsx` | authenticated page composition and application state |
+| `apps/web/src/components/` | reusable atoms, molecules and organisms |
+| `apps/web/src/features/` | feature-specific UI and behavior |
 | `apps/web/src/locale.ts` | FR → EN translations |
 | `apps/web/src/index.css` | theme tokens |
 | `docs/` | the documentation |

@@ -134,27 +134,56 @@ Both commands keep the PostgreSQL volume.
 
 ```
 apps/api/            Express + PostgreSQL
-  src/app.ts         every route and rule (the bulk of the API)
+  src/app.ts         application setup, middleware and cross-domain endpoints
+  src/routes/        HTTP adapters for family, wish and reservation APIs
+  src/services/      family, wish and reservation domain methods
   src/schema.ts      Drizzle schema
   src/metadata.ts    link preview fetching
   src/migrate.ts     applies drizzle/ at startup
   src/seed.ts        sample data
   drizzle/           generated migrations, committed
 apps/web/            React + Vite + Tailwind
-  src/App.tsx        the whole interface
+  src/App.tsx        authentication check and app entry
+  src/AppShell.tsx   authenticated page composition and application state
+  src/components/    reusable atoms, molecules and organisms
+  src/features/      feature-specific UI and behavior
   src/locale.ts      FR → EN translations
   src/index.css      the theme tokens
+packages/contracts/ shared API data types imported by both apps
 compose.yaml         development stack
 compose.prod.yaml    stack using the published images
 docs/                this documentation
 site/                the documentation site (home page, theme, VitePress config)
 ```
 
+API route adapters live in `apps/api/src/routes/`; they validate HTTP inputs,
+obtain the authenticated actor, and map service results to HTTP responses.
+Domain operations and persistence rules live in `apps/api/src/services/` as
+methods that accept validated values and return data without depending on
+Express. Shared middleware and cross-domain behavior stay in `app.ts`. The
+browser imports public data types through `apps/web/src/api.ts`, while the API
+uses the same contract types for its response projections. Database row types
+remain internal to the API.
+
+The frontend keeps application orchestration in `AppShell.tsx`, with general
+building blocks under `components/atoms/`, `components/molecules/` and
+`components/organisms/`. Feature-specific forms and panels live under
+`features/` and compose those shared building blocks. Use these levels where
+they clarify responsibility; simple HTML does not need its own component.
+`FormField` pairs a label with an input/control atom and optional help text;
+complete feature forms compose these molecules rather than defining generic
+form behavior in the app shell.
+
+Development and image builds use the repository root as their Docker context
+so both apps can resolve `packages/contracts/`. The API and web apps still have
+independent package manifests, lockfiles and dependency installations.
+
 ## Why there are no npm workspaces
 
-Each app has its own lockfile, its own Docker build context and even its own
-pinned TypeScript version. They are independent, and the root `package.json`
-holds only repository metadata.
+Each app has its own lockfile and pinned TypeScript version. They are installed
+independently, and the root `package.json` holds only repository metadata.
+Docker image builds use the repository root as context only to include the
+shared contract source; this does not make the app packages an npm workspace.
 
 This is worth stating because the opposite was once declared there. Nothing
 noticed, since no one ever ran npm from the root — until CI did, per app: npm

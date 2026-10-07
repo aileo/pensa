@@ -325,6 +325,7 @@ describe('permissions métier sur l’API', () => {
     const familyInvite = await call('alice', `/families/${familyA.id}/invitations`, 'POST', {});
     expect((await call('member', '/families/join', 'POST', { code: familyInvite.data.code })).status).toBe(403);
     expect((await call('member', `/households/${householdId}/members/${member.data.id}`, 'PATCH', { admin: true })).status).toBe(403);
+    expect((await call('member', `/households/${householdId}/members/${member.data.id}`, 'PATCH', { admin: 'true' })).status).toBe(403);
     expect((await call('charlie', `/households/${householdId}/members/${member.data.id}`, 'PATCH', { admin: true })).status).toBe(403);
     expect((await call('owner', `/households/${householdId}/members/${owner.data.id}`, 'PATCH', { admin: false }, 'en')))
       .toMatchObject({ status: 409, data: { error: 'A household must retain an administrator' } });
