@@ -634,6 +634,8 @@ describe('permissions métier sur l’API', () => {
     });
     // Invalid values are rejected and leave the wish untouched.
     expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { price: -1 })).status).toBe(400);
+    expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { price: '20' })).status).toBe(400);
+    expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { price: '' })).status).toBe(400);
     expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { url: 'ftp://example.com/x' })).status).toBe(400);
     expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { title: 'Jamais' })).status).toBe(400);
     expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { somethingElse: true })).status).toBe(400);

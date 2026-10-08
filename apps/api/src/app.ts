@@ -406,7 +406,10 @@ const wishUpdate = z.strictObject({
   image: httpUrl.or(z.literal('')).nullable().optional(),
   url: httpUrl.or(z.literal('')).nullable().optional(),
   description: z.string().max(5000).nullable().optional(),
-  price: z.coerce.number().min(0).max(99999999).nullable().optional(),
+  // No z.coerce here, unlike the creation schema above: a partial update is meant to be
+  // strictly typed, so a stray string price (including '', which coerce would turn into 0)
+  // must be rejected rather than silently accepted or used to clear/zero the field.
+  price: z.number().min(0).max(99999999).nullable().optional(),
   tags: tags.optional(),
 });
 
