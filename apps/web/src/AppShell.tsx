@@ -54,13 +54,21 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const routeFamilyId = route.page === 'families' ? route.familyId : undefined
   const [occasionFamily, setOccasionFamily] = useState<Family | null>(null)
   const [familyNameOverride, setFamilyNameOverride] = useState<{ id: Id; name: string } | null>(null)
-  const [personWishesState, setPersonWishesState] = useState<{ id: Id; items: Wish[] } | null>(null)
-  const [personWishesDeniedId, setPersonWishesDeniedId] = useState<Id | null>(null)
-  const personWishesReady = !!selectedPerson && !!personWishesState && String(personWishesState.id) === String(selectedPerson.id)
-  const personWishesDenied = !!selectedPerson && personWishesDeniedId !== null && String(personWishesDeniedId) === String(selectedPerson.id)
+  const personFilters: WishFilters = { tag: searchParams.get('tag') ?? '', availability: searchParams.get('availability') ?? '', minPrice: searchParams.get('minPrice') ?? '', maxPrice: searchParams.get('maxPrice') ?? '' }
+  const [revision, setRevision] = useState(0)
+  // A signature of everything that should force a fresh, authorized refetch of the
+  // selected person's wishes/off-list gifts: the person, active filters, an explicit
+  // refresh, and the navigation entry itself (so revisiting via back/forward or a
+  // direct link always re-resolves against the API instead of showing stale/cached
+  // data for someone whose access may have changed).
+  const personWishesSignature = selectedPerson ? [String(selectedPerson.id), personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision, location.key].join('|') : null
+  const personGiftsSignature = selectedPerson && String(selectedPerson.id) !== String(me.id) ? [String(selectedPerson.id), revision, location.key].join('|') : null
+  const [personWishesState, setPersonWishesState] = useState<{ signature: string; items: Wish[] } | null>(null)
+  const [personWishesDeniedSignature, setPersonWishesDeniedSignature] = useState<string | null>(null)
+  const personWishesReady = !!personWishesSignature && !!personWishesState && personWishesState.signature === personWishesSignature
+  const personWishesDenied = !!personWishesSignature && personWishesDeniedSignature === personWishesSignature
   const personWishesLoading = !!selectedPerson && !personWishesReady && !personWishesDenied
   const personWishes = personWishesReady ? personWishesState!.items : []
-  const personFilters: WishFilters = { tag: searchParams.get('tag') ?? '', availability: searchParams.get('availability') ?? '', minPrice: searchParams.get('minPrice') ?? '', maxPrice: searchParams.get('maxPrice') ?? '' }
   const [modal, setModal] = useState<Modal>(null)
   const [selectedWish, setSelectedWish] = useState<Wish | null>(null)
   const [wishOwner, setWishOwner] = useState<Person | null>(null)
@@ -69,13 +77,12 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [revision, setRevision] = useState(0)
   const [offListRecipient, setOffListRecipient] = useState<Person | null>(null)
-  const [personGiftsState, setPersonGiftsState] = useState<{ id: Id; items: Reservation[] } | null>(null)
-  const [personGiftsDeniedId, setPersonGiftsDeniedId] = useState<Id | null>(null)
-  const personGiftsReady = !!selectedPerson && !!personGiftsState && String(personGiftsState.id) === String(selectedPerson.id)
-  const personGiftsDenied = !!selectedPerson && personGiftsDeniedId !== null && String(personGiftsDeniedId) === String(selectedPerson.id)
-  const personGiftsLoading = !!selectedPerson && !personGiftsReady && !personGiftsDenied
+  const [personGiftsState, setPersonGiftsState] = useState<{ signature: string; items: Reservation[] } | null>(null)
+  const [personGiftsDeniedSignature, setPersonGiftsDeniedSignature] = useState<string | null>(null)
+  const personGiftsReady = !!personGiftsSignature && !!personGiftsState && personGiftsState.signature === personGiftsSignature
+  const personGiftsDenied = !!personGiftsSignature && personGiftsDeniedSignature === personGiftsSignature
+  const personGiftsLoading = !!selectedPerson && String(selectedPerson.id) !== String(me.id) && !personGiftsReady && !personGiftsDenied
   const personGifts = personGiftsReady ? personGiftsState!.items : []
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
   const handleError = useCallback((problem: unknown) => setError(problem instanceof Error ? problem.message : t('Une erreur inattendue est survenue.')), [t])
@@ -122,25 +129,25 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     return () => { active = false; window.clearTimeout(timer) }
   }, [me, route.page, searchText, revision, handleError])
   useEffect(() => {
-    if (!selectedPerson) return
+    if (!selectedPerson || !personWishesSignature) return
     let active = true
-    const personId = selectedPerson.id
+    const signature = personWishesSignature
     const query = new URLSearchParams()
     if (personFilters.tag.trim()) query.set('tag', personFilters.tag.trim())
     if (personFilters.availability) query.set('availability', personFilters.availability)
     if (personFilters.minPrice.trim()) query.set('minPrice', personFilters.minPrice.trim())
     if (personFilters.maxPrice.trim()) query.set('maxPrice', personFilters.maxPrice.trim())
     const suffix = query.size ? `?${query}` : ''
-    api<Wish[]>(`/users/${encodeURIComponent(String(personId))}/wishes${suffix}`).then(data => { if (active) setPersonWishesState({ id: personId, items: list(data) }) }).catch(() => { if (active) setPersonWishesDeniedId(personId) })
+    api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes${suffix}`).then(data => { if (active) setPersonWishesState({ signature, items: list(data) }) }).catch(() => { if (active) setPersonWishesDeniedSignature(signature) })
     return () => { active = false }
-  }, [selectedPerson, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision])
+  }, [selectedPerson, personWishesSignature, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice])
   useEffect(() => {
-    if (!selectedPerson || String(selectedPerson.id) === String(me.id)) return
+    if (!selectedPerson || !personGiftsSignature) return
     let active = true
-    const personId = selectedPerson.id
-    api<Reservation[]>(`/users/${encodeURIComponent(String(personId))}/off-list`).then(data => { if (active) setPersonGiftsState({ id: personId, items: list(data) }) }).catch(() => { if (active) setPersonGiftsDeniedId(personId) })
+    const signature = personGiftsSignature
+    api<Reservation[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/off-list`).then(data => { if (active) setPersonGiftsState({ signature, items: list(data) }) }).catch(() => { if (active) setPersonGiftsDeniedSignature(signature) })
     return () => { active = false }
-  }, [selectedPerson, me.id, revision])
+  }, [selectedPerson, personGiftsSignature])
 
   async function perform(action: () => Promise<unknown>, success: string, close = true) {
     setBusy(true); setError('')
