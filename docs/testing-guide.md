@@ -318,6 +318,10 @@ Log in as `alice@example.test` (admin of the *Alice & Bob* household).
 - [ ] **Her list is editable:** open Lucie's page. A banner says you keep her list for her,
       and her two wishes can be re-tagged and deleted. *Ajouter une envie* adds to her list,
       not yours — check *Mes envies* is unchanged afterwards.
+- [ ] **Same ordering controls as my wishes:** her list uses the same draggable rows and
+      up/down arrows as *Mes envies*. Reorder her two wishes, leave the page and come back:
+      the order persists. Set a *Tag* filter that only matches one wish — the controls
+      disappear and a note asks you to clear the filters before reordering again.
 - [ ] **The household is reminded:** delete both of her wishes. The dashboard *À faire* list
       shows *La liste de Lucie est vide…*; adding a wish back makes it disappear.
 - [ ] **Others see an ordinary list:** log in as `charlie@example.test`, open Lucie's page.
