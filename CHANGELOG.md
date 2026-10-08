@@ -40,6 +40,16 @@ minor bump may change behaviour.
   a tag, availability or price filter narrows the list, since saving a
   filtered subset would silently drop the hidden wishes from the order.
 
+### Fixed
+
+- **A gift given early no longer looks undone.** When a linked gift was marked
+  *offert* well before the occasion itself — a birthday present bought and
+  given weeks in advance, say — the dashboard still listed the occasion as
+  needing a gift. Coverage now matches a linked reservation to the exact
+  occasion it was created for (the recipient, the occasion's name and kind,
+  and the year), including completed gifts, instead of a blunt per-recipient
+  check that ignored which occasion or year the reservation actually covered.
+
 ## [0.5.0] — 2026-09-30
 
 ### Added

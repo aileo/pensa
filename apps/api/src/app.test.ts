@@ -280,6 +280,196 @@ describe('permissions métier sur l’API', () => {
     const dashboardKeys = dashboard.map(o => JSON.stringify([o.person.id, o.name, o.kind, o.nextDate]));
     expect(new Set(dashboardKeys).size).toBe(dashboardKeys.length);
   });
+  it('couvre une occasion dont le cadeau lié a été offert avant la date, sans dissimuler les autres', async () => {
+    // Every recipient here gets a birthday within the next 30 days so the dashboard would flag
+    // it, unless a correctly-matched linked gift says otherwise. Recipients are managed
+    // household members (not separate accounts) to stay well under the registration rate
+    // limit; only the accounts that must log in themselves (the organizer and the privacy
+    // check) are real registrations.
+    const futureBirth = (daysAhead: number) => {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() + daysAhead);
+      if (d.getUTCMonth() === 1 && d.getUTCDate() === 29) d.setUTCDate(d.getUTCDate() + 1);
+      return `1990-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    };
+    // Registrations use a dedicated simulated client address so this test spends its own
+    // rate-limit budget instead of the one shared by the rest of the suite.
+    const testIp = '10.11.12.13';
+    const orgEmail = `early-org-${Date.now()}@example.test`;
+    const org = await call('', '/auth/register', 'POST', {
+      firstName: 'EgOrg', lastName: 'EarlyGift', email: orgEmail, password: 'LongSecret2026!', birthDate: futureBirth(90),
+    }, undefined, testIp);
+    cookies.egOrg = org.cookie!.split(';')[0];
+    const orgHouseholdId = org.data.householdId as string;
+    const family1 = await call('egOrg', '/families', 'POST', { name: 'Famille Cadeau Anticipé' });
+    expect(family1.status).toBe(201);
+    const familyId = family1.data.id as string;
+    // Creating a second family under the same organizer household means every managed member
+    // automatically gets a duplicated-but-identical "Anniversaire" occasion row per family,
+    // which is exactly the shared-family dedup scenario the fix must match semantically.
+    const family2 = await call('egOrg', '/families', 'POST', { name: 'Famille Cadeau Anticipé bis' });
+    expect(family2.status).toBe(201);
+    const familyId2 = family2.data.id as string;
+
+    const createManaged = async (firstName: string, daysAhead: number) => {
+      const created = await call('egOrg', `/households/${orgHouseholdId}/members`, 'POST',
+        { firstName, lastName: 'EarlyGift', birthDate: futureBirth(daysAhead) });
+      expect(created.status).toBe(201);
+      return created.data.members.find((m: { firstName: string }) => m.firstName === firstName) as { id: string };
+    };
+    const birthdayOf = async (recipientId: string) =>
+      (await call('egOrg', `/occasions?recipientId=${recipientId}`)).data
+        .find((o: { kind: string }) => o.kind === 'birthday') as { id: string; kind: string; name: string; nextDate: string; family_id: string };
+    const giveGift = async (recipientId: string, occasionId: string, year: number, finalStatus: 'reserved' | 'purchased' | 'wrapped' | 'gifted') => {
+      const created = await call('egOrg', '/reservations/off-list', 'POST', {
+        recipientId, title: 'Cadeau anticipé', occasionIds: [{ id: occasionId, year }],
+      });
+      expect(created.status).toBe(201);
+      const moves: ('purchased' | 'wrapped' | 'gifted')[] = ['purchased', 'wrapped', 'gifted'];
+      const target = moves.indexOf(finalStatus as 'purchased' | 'wrapped' | 'gifted');
+      for (const status of moves) {
+        if (moves.indexOf(status) > target) break;
+        expect((await call('egOrg', `/reservations/${created.data.id}`, 'PATCH', { status })).status).toBe(200);
+      }
+      return created.data.id as string;
+    };
+
+    // Early gifted coverage: a birthday gift marked "given" well before the date still covers it.
+    const earlyGifted = await createManaged('EgEarly', 10);
+    const earlyBirthday = await birthdayOf(earlyGifted.id);
+    await giveGift(earlyGifted.id, earlyBirthday.id, Number(earlyBirthday.nextDate.slice(0, 4)), 'gifted');
+
+    // Duplicate family birthdays: another member born the same day must not borrow coverage
+    // from someone else's gift — matching is keyed by recipient, not just date.
+    const duplicateDate = await createManaged('EgDuplicate', 10);
+
+    // Active (non-gifted) matching still covers the occasion.
+    const active = await createManaged('EgActive', 12);
+    const activeBirthday = await birthdayOf(active.id);
+    await giveGift(active.id, activeBirthday.id, Number(activeBirthday.nextDate.slice(0, 4)), 'purchased');
+
+    // Wrong year: a gift linked to the wrong occurrence must not cover this year's birthday.
+    const wrongYear = await createManaged('EgWrongYear', 14);
+    const wrongYearBirthday = await birthdayOf(wrongYear.id);
+    await giveGift(wrongYear.id, wrongYearBirthday.id, Number(wrongYearBirthday.nextDate.slice(0, 4)) + 1, 'reserved');
+
+    // Wrong occasion: a gift linked to the name day must not cover the birthday.
+    const wrongOccasion = await createManaged('EgWrongOccasion', 16);
+    const nameDayOccasion = (await call('egOrg', `/occasions?recipientId=${wrongOccasion.id}`)).data
+      .find((o: { kind: string }) => o.kind === 'name_day') as { id: string };
+    await giveGift(wrongOccasion.id, nameDayOccasion.id, new Date().getUTCFullYear(), 'reserved');
+
+    // Cancellation: a cancelled reservation must not count as a covering gift.
+    const cancelled = await createManaged('EgCancelled', 18);
+    const cancelledBirthday = await birthdayOf(cancelled.id);
+    const cancelledId = await giveGift(cancelled.id, cancelledBirthday.id, Number(cancelledBirthday.nextDate.slice(0, 4)), 'reserved');
+    expect((await call('egOrg', `/reservations/${cancelledId}`, 'DELETE')).status).toBe(200);
+
+    // Shared-family dedup: the gift is linked through the family whose occasion row the
+    // deduplicated dashboard view does *not* surface, so coverage must be matched semantically
+    // (recipient + name + kind + year), not by occasion id.
+    const dedup = await createManaged('EgDedup', 22);
+    const dedupShown = await birthdayOf(dedup.id);
+    const otherFamilyOccasion = (await pool.query<{ id: string }>(
+      'SELECT id FROM occasions WHERE family_id=$1 AND kind=$2',
+      [dedupShown.family_id === familyId ? familyId2 : familyId, 'birthday'],
+    )).rows[0];
+    await giveGift(dedup.id, otherFamilyOccasion.id, Number(dedupShown.nextDate.slice(0, 4)), 'gifted');
+
+    // Removed access: once the household leaves the family it must vanish entirely, not just
+    // lose its coverage. This also doubles as the beneficiary-privacy account, since managed
+    // members have no login of their own — this is the only other real registration needed.
+    const removedEmail = `early-removed-${Date.now()}@example.test`;
+    const removed = await call('', '/auth/register', 'POST', {
+      firstName: 'EgRemoved', lastName: 'EarlyGift', email: removedEmail, password: 'LongSecret2026!', birthDate: futureBirth(20),
+    }, undefined, testIp);
+    cookies.egRemoved = removed.cookie!.split(';')[0];
+    const removedHouseholdId = removed.data.householdId as string;
+    const removedId = removed.data.id as string;
+    const invite = await call('egOrg', `/families/${familyId}/invitations`, 'POST', {});
+    expect((await call('egRemoved', '/families/join', 'POST', { code: invite.data.code })).status).toBe(201);
+    const removedBirthday = await birthdayOf(removedId);
+    await giveGift(removedId, removedBirthday.id, Number(removedBirthday.nextDate.slice(0, 4)), 'gifted');
+
+    // Beneficiary privacy: nothing about their own occasion, plans or completion leaks to them,
+    // even though their birthday is covered by a gift.
+    const own = (await call('egRemoved', '/dashboard')).data;
+    expect(own.todos.some((t: { person?: { id: string } }) => t.person?.id === removedId)).toBe(false);
+    expect(own.occasions.some((o: { person: { id: string } }) => o.person.id === removedId)).toBe(false);
+    expect(own.reservations).toHaveLength(0);
+    expect(own.participating).toHaveLength(0);
+
+    expect((await call('egOrg', `/families/${familyId}/households/${removedHouseholdId}`, 'DELETE')).status).toBe(200);
+
+    const dashboard = (await call('egOrg', '/dashboard')).data;
+    const uncoveredTodos = dashboard.todos.filter((t: { type: string }) => t.type === 'occasion_without_gift') as
+      { person: { id: string } }[];
+    const uncoveredIds = new Set(uncoveredTodos.map(t => t.person.id));
+    expect(uncoveredIds.has(duplicateDate.id)).toBe(true);
+    expect(uncoveredIds.has(wrongYear.id)).toBe(true);
+    expect(uncoveredIds.has(wrongOccasion.id)).toBe(true);
+    expect(uncoveredIds.has(cancelled.id)).toBe(true);
+    expect(uncoveredIds.has(earlyGifted.id)).toBe(false);
+    expect(uncoveredIds.has(active.id)).toBe(false);
+    expect(uncoveredIds.has(dedup.id)).toBe(false);
+    expect(uncoveredIds.has(removedId)).toBe(false);
+    expect(dashboard.occasions.some((o: { person: { id: string } }) => o.person.id === removedId)).toBe(false);
+    expect(dashboard.reservations.some((r: { recipient: { id: string } }) => r.recipient.id === earlyGifted.id)).toBe(false);
+  });
+  it('ne confond pas deux occasions fixes de même nom et de même type à des dates différentes', async () => {
+    // Fixed occasions (like "Noël") are shared by the whole family rather than being
+    // per-recipient, so this scenario needs its own isolated organizer and family: two
+    // occasions sharing a name and kind, but a different date, must still be matched
+    // separately by the coverage key (recipient + name + kind + month/day + year).
+    const testIp = '10.11.12.14';
+    const orgEmail = `same-name-org-${Date.now()}@example.test`;
+    const futureDate = (daysAhead: number) => {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() + daysAhead);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    };
+    const org = await call('', '/auth/register', 'POST', {
+      firstName: 'SnOrg', lastName: 'SameName', email: orgEmail, password: 'LongSecret2026!', birthDate: '1990-06-15',
+    }, undefined, testIp);
+    cookies.snOrg = org.cookie!.split(';')[0];
+    const orgHouseholdId = org.data.householdId as string;
+    const family = await call('snOrg', '/families', 'POST', { name: 'Famille Occasions Homonymes' });
+    expect(family.status).toBe(201);
+    const familyId = family.data.id as string;
+    const member = await call('snOrg', `/households/${orgHouseholdId}/members`, 'POST',
+      { firstName: 'SnMember', lastName: 'SameName', birthDate: '1995-03-10' });
+    expect(member.status).toBe(201);
+    const memberId = (member.data.members.find((m: { firstName: string }) => m.firstName === 'SnMember') as { id: string }).id;
+    const dueDate = futureDate(8);
+    const laterDate = futureDate(24);
+    const dueOccasion = await call('snOrg', `/families/${familyId}/occasions`, 'POST',
+      { name: 'Fête commune', kind: 'fixed', month: Number(dueDate.slice(5, 7)), day: Number(dueDate.slice(8, 10)) });
+    expect(dueOccasion.status).toBe(201);
+    const laterOccasion = await call('snOrg', `/families/${familyId}/occasions`, 'POST',
+      { name: 'Fête commune', kind: 'fixed', month: Number(laterDate.slice(5, 7)), day: Number(laterDate.slice(8, 10)) });
+    expect(laterOccasion.status).toBe(201);
+    const memberOccasions = (await call('snOrg', `/occasions?recipientId=${memberId}`)).data
+      .filter((o: { name: string }) => o.name === 'Fête commune') as { id: string; nextDate: string }[];
+    const dueNextDate = memberOccasions.find(o => o.id === dueOccasion.data.id)!.nextDate;
+    const laterNextDate = memberOccasions.find(o => o.id === laterOccasion.data.id)!.nextDate;
+    // Gift only the earlier occurrence, linked to its actual occurrence year (derived from its
+    // own nextDate rather than "this calendar year") so the test stays correct across the
+    // December/January boundary where a near-term occasion can fall in the next year.
+    const created = await call('snOrg', '/reservations/off-list', 'POST', {
+      recipientId: memberId, title: 'Cadeau homonyme', occasionIds: [{ id: dueOccasion.data.id, year: Number(dueNextDate.slice(0, 4)) }],
+    });
+    expect(created.status).toBe(201);
+    for (const status of ['purchased', 'wrapped', 'gifted'] as const)
+      expect((await call('snOrg', `/reservations/${created.data.id}`, 'PATCH', { status })).status).toBe(200);
+    const snDashboard = (await call('snOrg', '/dashboard')).data;
+    const snUncovered = (snDashboard.todos as { type: string; person: { id: string }; occasion: string; date: string }[])
+      .filter(t => t.type === 'occasion_without_gift' && t.person.id === memberId);
+    // The later occurrence, sharing the same name/kind as the gifted one, must still show up as
+    // uncovered — specifically it, not the earlier (now gifted) one — rather than borrowing
+    // coverage from the other occasion's linked gift.
+    expect(snUncovered.some(t => t.occasion === 'Fête commune' && t.date === laterNextDate)).toBe(true);
+    expect(snUncovered.some(t => t.date === dueNextDate)).toBe(false);
+  });
   it('expose l’envie et le bénéficiaire dans les réservations', async () => {
     const reservation = (await call('alice', '/reservations')).data.find((r: {wish?:{title:string}}) => r.wish?.title === 'Console de jeux');
     expect(reservation).toMatchObject({ wish: { title: 'Console de jeux' }, recipient: { firstName: 'Bob' } });

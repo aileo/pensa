@@ -136,6 +136,7 @@ Log in as **Alice** and open *Tableau de bord*.
 - [ ] It also shows *Acheter « Console de jeux » pour Bob Martin* with the linked occasion and date, a *C'est acheté* button and a *Voir* button.
 - [ ] Items whose occasion is close (≤ 14 days to buy, ≤ 7 to wrap, ≤ 3 to give) are highlighted with a *Bientôt* badge and listed first.
 - [ ] Occasions within 30 days for which you have no gift yet appear as *… : aucun cadeau prévu* items with a *Voir ses envies* button (depends on today's date).
+- [ ] If a linked gift for that occasion is marked *Offert* ahead of the date — even well in advance — the *aucun cadeau prévu* item disappears for that occasion and year; it does not hide the person's other, unrelated occasions.
 - [ ] When nothing is due, the list shows *Rien d'urgent pour le moment…*.
 
 Register a new account: the checklist starts at 0 and the À faire list is empty.
