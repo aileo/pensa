@@ -6,6 +6,17 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Reordering a managed member's list.** A household admin curating a member
+  without an account could only browse that person's wishes as a read-only
+  grid — there was no way to put the most wanted gift first the way you can on
+  your own list. Managed lists you curate now show the same draggable rows and
+  up/down arrows as *Mes envies*, with the new order saved through the
+  existing `/users/:id/wishes/order` endpoint. Reordering stays disabled while
+  a tag, availability or price filter narrows the list, since saving a
+  filtered subset would silently drop the hidden wishes from the order.
+
 ## [0.5.0] — 2026-09-30
 
 ### Added

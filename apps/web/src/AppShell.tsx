@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api, dateOf, json, list, money, nameOf, type Family, type Household, type Id, type Occasion, type Onboarding, type Person, type Reservation, type Todo, type Wish } from './api'
 import { localizeMessage, occasionLabel, type TranslationKey } from './locale'
 import { useTranslation } from './language-context'
@@ -6,6 +6,7 @@ import { Avatar } from './components/atoms/Avatar'
 import { Icon, type IconName } from './components/atoms/Icon'
 import { Empty, SectionTitle } from './components/molecules/Empty'
 import { ManagedListsBar } from './components/molecules/ManagedListsBar'
+import { SortableWishList } from './components/organisms/SortableWishList'
 import { WishCard } from './components/organisms/WishCard'
 import { type Modal, type Page, type ReservationStatus, type WishFilters } from './app-types'
 import { FamilyHouseholds, FamilyManagement, HouseholdCard, HouseholdPanel, JoinFamily, OccasionForm, RoleBadges } from './features/families/FamilyComponents'
@@ -46,6 +47,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null)
   const [personWishes, setPersonWishes] = useState<Wish[]>([])
+  const [loadedPersonWishesKey, setLoadedPersonWishesKey] = useState<string | null>(null)
   const [personFilterState, setPersonFilterState] = useState<WishFilters & { personId: string }>({ ...emptyWishFilters, personId: '' })
   const personFilters = personFilterState.personId === String(selectedPerson?.id) ? personFilterState : emptyWishFilters
   const [modal, setModal] = useState<Modal>(null)
@@ -57,6 +59,14 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
+  // Bumped automatically (not by any call site) whenever the rendered reorder context — the
+  // selected managed person, any filter on their list, or the data revision — actually changes,
+  // so an in-flight reorder's failure handler can tell its optimistic snapshot is now stale and
+  // must not roll back over newer data. Deriving this from render output (rather than requiring
+  // every state-changing call site to remember to bump a ref) keeps it correct for any future
+  // navigation source — including router-driven history changes that bypass our own handlers —
+  // without needing those call sites to know about the reorder guard at all.
+  const reorderGuardRef = useRef(0)
   const [focusedReservation, setFocusedReservation] = useState<Id | null>(null)
   const [offListRecipient, setOffListRecipient] = useState<Person | null>(null)
   const [personGifts, setPersonGifts] = useState<Reservation[]>([])
@@ -97,18 +107,36 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     }, 300)
     return () => { active = false; window.clearTimeout(timer) }
   }, [me, page, searchText, revision, handleError])
+  const personWishesKey = selectedPerson ? `${String(selectedPerson.id)}|${personFilters.tag}|${personFilters.availability}|${personFilters.minPrice}|${personFilters.maxPrice}|${revision}` : null
+  // Always-defined signature (unlike personWishesKey, which collapses to null with no selected
+  // person) of everything an in-flight reorder's rollback must treat as "the same context": the
+  // data revision plus, when curating, the selected person and their filters. A layout effect —
+  // not a passive one — mirrors it into a ref synchronously during the commit that follows any
+  // state change, before the browser can run a pending network callback's microtask, and bumps
+  // a monotonic counter on each observed transition. Using "did it change" rather than "does it
+  // currently equal the value captured at drag-start" also correctly invalidates an A → B → A
+  // round trip even though the signature returns to its original string value.
+  const guardSignature = `${revision}|${selectedPerson ? String(selectedPerson.id) : ''}|${personFilters.tag}|${personFilters.availability}|${personFilters.minPrice}|${personFilters.maxPrice}`
+  const guardSignatureRef = useRef(guardSignature)
+  useLayoutEffect(() => {
+    if (guardSignatureRef.current !== guardSignature) {
+      guardSignatureRef.current = guardSignature
+      reorderGuardRef.current += 1
+    }
+  }, [guardSignature])
   useEffect(() => {
     if (!selectedPerson) return
     let active = true
+    const key = personWishesKey
     const query = new URLSearchParams()
     if (personFilters.tag.trim()) query.set('tag', personFilters.tag.trim())
     if (selectedPerson.id !== me?.id && personFilters.availability) query.set('availability', personFilters.availability)
     if (personFilters.minPrice.trim()) query.set('minPrice', personFilters.minPrice.trim())
     if (personFilters.maxPrice.trim()) query.set('maxPrice', personFilters.maxPrice.trim())
     const suffix = query.size ? `?${query}` : ''
-    api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes${suffix}`).then(data => { if (active) setPersonWishes(list(data)) }).catch(problem => { if (active) handleError(problem) })
+    api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes${suffix}`).then(data => { if (active) { setPersonWishes(list(data)); setLoadedPersonWishesKey(key) } }).catch(problem => { if (active) handleError(problem) })
     return () => { active = false }
-  }, [selectedPerson, me?.id, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision, handleError])
+  }, [selectedPerson, me?.id, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision, handleError, personWishesKey])
   useEffect(() => {
     if (!selectedPerson || String(selectedPerson.id) === String(me.id)) return
     let active = true
@@ -143,14 +171,26 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     if (window.confirm(t('Supprimer « {title} » de votre liste ?', { title: wish.title }))) await perform(() => api(`/wishes/${wish.id}`, { method: 'DELETE' }), t('Envie supprimée.'))
   }
   async function reorder(from: number, to: number) {
-    if (from === to || to < 0 || to >= myWishes.length) return
+    if (busy || from === to || from < 0 || to < 0 || from >= myWishes.length || to >= myWishes.length) return
     const reordered = [...myWishes]
     const [item] = reordered.splice(from, 1)
     reordered.splice(to, 0, item)
     const previous = wishes
+    const version = reorderGuardRef.current
     setWishes([...reordered, ...wishes.filter(wish => String(wish.ownerId) !== String(me?.id))])
     const ok = await perform(() => api('/wishes/order', json('PATCH', { ids: reordered.map(wish => wish.id) })), t('Ordre enregistré.'), false)
-    if (!ok) setWishes(previous)
+    if (!ok && reorderGuardRef.current === version) setWishes(previous)
+  }
+  async function reorderManaged(from: number, to: number) {
+    if (!selectedPerson || busy || from === to || from < 0 || to < 0 || from >= personWishes.length || to >= personWishes.length) return
+    const reordered = [...personWishes]
+    const [item] = reordered.splice(from, 1)
+    reordered.splice(to, 0, item)
+    const previous = personWishes
+    const version = reorderGuardRef.current
+    setPersonWishes(reordered)
+    const ok = await perform(() => api(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes/order`, json('PATCH', { ids: reordered.map(wish => wish.id) })), t('Ordre enregistré.'), false)
+    if (!ok && reorderGuardRef.current === version) setPersonWishes(previous)
   }
   const myWishes = wishes.filter(wish => String(wish.ownerId) === String(me?.id) || wish.ownerId == null)
   const allPeople = users
@@ -166,6 +206,8 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const otherHouseholds = households.filter(household => !household.mine)
   const curating = isHouseholdAdmin && !!selectedPerson && !!myHousehold?.members?.some(member => String(member.id) === String(selectedPerson.id) && member.managed)
   const managedMembers = isHouseholdAdmin ? (myHousehold?.members ?? []).filter(member => member.managed) : []
+  const personFiltersActive = !!(personFilters.tag.trim() || personFilters.availability || personFilters.minPrice.trim() || personFilters.maxPrice.trim())
+  const canReorderManaged = curating && !personFiltersActive && loadedPersonWishesKey === personWishesKey
   const openWish = (owner: Person | null = null) => { setWishOwner(owner); setModal('wish'); setError('') }
   const openPerson = (person: Person) => {
     if (String(person.id) === String(me.id)) { go('wishes'); return }
@@ -222,7 +264,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
           <SectionTitle icon="heart" kicker={t('POUR VOUS')} title={t('Les envies de vos proches')} action={<button className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline" onClick={() => go('families')}>{t('Voir la famille')} <Icon name="arrow" size={15}/></button>}/>
           {sharedWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{sharedWishes.slice(0, 4).map(wish => <WishCard key={wish.id} wish={wish} mine={false} onReserve={() => openReserve(wish)}/>)}</div> : <Empty icon="users" title={t('Aucune envie partagée pour l’instant')} text={t('Les envies de vos proches apparaîtront ici dès qu’ils les partageront.')} action={<button className="secondary" onClick={() => go('families')}>{t('Voir ma famille')}</button>}/>}
         </>}
-        {page === 'wishes' && <><ManagedListsBar me={me} managed={managedMembers} activeId={null} onSelf={() => go('wishes')} onPerson={openPerson}/><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-2">{t('VOTRE LISTE PERSONNELLE')}</p><h1 className="font-['Outfit'] text-3xl font-bold">{t('Mes envies')} <span className="text-brand-500">({myWishes.length})</span></h1><p className="muted mt-2">{t('Notez vos idées une fois : vos proches sauront quoi offrir.')}</p></div><button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div>{myWishes.length ? <><p className="muted mb-4">{t('Glissez les envies ou utilisez les flèches pour changer leur priorité.')}</p><div className="space-y-3">{myWishes.map((wish, index) => <div key={wish.id} draggable onDragStart={event => event.dataTransfer.setData('text/plain', String(index))} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) void reorder(from, index) }} className="card flex items-center gap-3 p-3 sm:gap-5 sm:p-4"><span className="hidden cursor-grab text-ink-400 sm:block"><Icon name="grip"/></span><div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-soft sm:size-20">{wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" className="text-brand-300"/>}</div><div className="min-w-0 flex-1"><h2 className="truncate font-['Outfit'] font-semibold">{wish.title}</h2><p className="muted mt-1 truncate">{wish.description || wish.url || t('Sans description')}</p><div className="mt-1 flex flex-wrap gap-1">{wish.tags?.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div></div><strong className="hidden text-sm text-brand-600 sm:block">{money(wish.price)}</strong><div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row"><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => reorder(index, index - 1)} aria-label={t('Monter {title}', { title: wish.title })}><Icon name="arrowUp" size={16}/></button><button className="icon-button !size-7" disabled={index === myWishes.length - 1 || busy} onClick={() => reorder(index, index + 1)} aria-label={t('Descendre {title}', { title: wish.title })}><Icon name="arrowDown" size={16}/></button><button className="icon-button" onClick={() => { setSelectedWish(wish); setModal('tags') }} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={() => removeWish(wish)} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button></div></div>)}</div></> : <Empty icon="heart" title={t('Votre liste est encore vide')} text={t('Collez le lien d’un produit et nous vous aiderons à l’ajouter.')} action={<button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button>}/>}</>}
+        {page === 'wishes' && <><ManagedListsBar me={me} managed={managedMembers} activeId={null} onSelf={() => go('wishes')} onPerson={openPerson}/><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-2">{t('VOTRE LISTE PERSONNELLE')}</p><h1 className="font-['Outfit'] text-3xl font-bold">{t('Mes envies')} <span className="text-brand-500">({myWishes.length})</span></h1><p className="muted mt-2">{t('Notez vos idées une fois : vos proches sauront quoi offrir.')}</p></div><button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div>{myWishes.length ? <><p className="muted mb-4">{t('Glissez les envies ou utilisez les flèches pour changer leur priorité.')}</p><SortableWishList wishes={myWishes} busy={busy} canReorder onReorder={reorder} onTags={wish => { setSelectedWish(wish); setModal('tags') }} onDelete={removeWish}/></> : <Empty icon="heart" title={t('Votre liste est encore vide')} text={t('Collez le lien d’un produit et nous vous aiderons à l’ajouter.')} action={<button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button>}/>}</>}
         {page === 'families' && <><SectionTitle icon="users" kicker={t('VOS PROCHES')} title={selectedPerson ? t('Les envies de {name}', { name: nameOf(selectedPerson) }) : selectedFamily ? selectedFamily.name : t('Ma famille')} action={selectedPerson || selectedFamily ? <button className="secondary" onClick={() => { setSelectedPerson(null); setSelectedFamily(null) }}><Icon name="arrowLeft" size={16}/> {t('Retour aux familles')}</button> : undefined}/>
           {selectedPerson ? <>
             {curating && <ManagedListsBar me={me} managed={managedMembers} activeId={selectedPerson.id} onSelf={() => go('wishes')} onPerson={openPerson}/>}
@@ -233,7 +275,10 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
               <div><label className="label" htmlFor="filter-min-price">{t('Prix minimum (€)')}</label><input className="field" id="filter-min-price" type="number" min="0" step="0.01" value={personFilters.minPrice} onChange={event => setPersonFilter('minPrice', event.target.value)} placeholder="0"/></div>
               <div><label className="label" htmlFor="filter-max-price">{t('Prix maximum (€)')}</label><input className="field" id="filter-max-price" type="number" min="0" step="0.01" value={personFilters.maxPrice} onChange={event => setPersonFilter('maxPrice', event.target.value)} placeholder={t('Sans limite')}/></div>
             </div>
-            {personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} curated={curating} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div> : <Empty icon="heart" title={t('Aucune envie trouvée')} text={curating ? t('Ajoutez ses idées de cadeaux pour que vos proches sachent quoi offrir.') : t('Modifiez les filtres pour découvrir d’autres envies.')} action={curating ? <button className="primary" onClick={() => openWish(selectedPerson)}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button> : undefined}/>}
+            {personWishes.length ? curating
+              ? <>{personFiltersActive && <p className="muted mb-4">{t('Supprimez les filtres pour réorganiser cette liste.')}</p>}<SortableWishList wishes={personWishes} busy={busy} canReorder={canReorderManaged} curated onReorder={reorderManaged} onTags={wish => { setSelectedWish(wish); setModal('tags') }} onDelete={removeWish} onReserve={openReserve}/></>
+              : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} curated={curating} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)}/>)}</div>
+              : <Empty icon="heart" title={t('Aucune envie trouvée')} text={curating ? t('Ajoutez ses idées de cadeaux pour que vos proches sachent quoi offrir.') : t('Modifiez les filtres pour découvrir d’autres envies.')} action={curating ? <button className="primary" onClick={() => openWish(selectedPerson)}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button> : undefined}/>}
             {String(selectedPerson.id) !== String(me.id) && <div className="mt-9"><SectionTitle icon="spark" tone="clay" kicker={t('SANS PASSER PAR LA LISTE')} title={t('Cadeaux prévus hors liste')} action={<button className="secondary" onClick={() => openOffList(selectedPerson)}><Icon name="plus" size={17}/> {t('Prévoir un cadeau hors liste')}</button>}/>{personGifts.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{personGifts.map(gift => <OffListGiftCard key={gift.id} gift={gift} me={me} busy={busy} onRequest={() => void requestGift(gift)} onOpen={() => openReservation(gift.id)}/>)}</div> : <p className="muted rounded-xl bg-brand-50 p-4">{t('Aucun cadeau hors liste partagé pour {name}. Une idée qui n’est pas sur sa liste ? Prévoyez-la ici, sans qu’il ou elle ne le voie.', { name: nameOf(selectedPerson) })}</p>}</div>}
           </>
             : activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">{t('LES MEMBRES')}</p><p className="muted mt-1">{t('Découvrez les envies des membres de cette famille.')}</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> {t('Ajouter une occasion')}</button>}</div>{activeFamily.households?.length ? <FamilyHouseholds family={activeFamily} me={me} onPerson={openPerson}/> : activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => openPerson(person)} className="card flex items-center gap-4 p-5 text-left hover:border-brand-200"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title={t('Aucun membre affiché')} text={t('Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles.')}/ >}{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} busy={busy} perform={perform} handleError={handleError} onRename={name => setSelectedFamily({ ...activeFamily, name })}/>}</>

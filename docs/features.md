@@ -70,6 +70,14 @@ managed lists the household keeps, and the same shortcuts sit at the top of *my
 wishes*, so switching from your own list to a child's takes one click instead of
 a detour through the family screen.
 
+A managed member's list uses the same display and ordering controls as *my
+wishes*: drag a wish or use the up/down arrows, and the order persists the next
+time anyone opens the list. Reordering only changes priority — it never touches
+a wish's details, its reservations or what the rest of the family is allowed to
+see. The controls step aside while a filter narrows the list to a subset, since
+persisting an order built from only part of the wishes would silently misplace
+the hidden ones; clearing the filters brings them back.
+
 Nobody stays managed forever:
 
 - **a claim code** lets the person open their own account from the sign-in
