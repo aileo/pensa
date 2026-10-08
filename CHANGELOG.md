@@ -6,6 +6,8 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-10-08
+
 ### Added
 
 - **Clean, shareable URLs for every screen.** The dashboard, wish list, families,
@@ -38,7 +40,18 @@ minor bump may change behaviour.
   up/down arrows as *Mes envies*, with the new order saved through the
   existing `/users/:id/wishes/order` endpoint. Reordering stays disabled while
   a tag, availability or price filter narrows the list, since saving a
-  filtered subset would silently drop the hidden wishes from the order.
+  filtered subset would silently drop the hidden wishes from the order. It
+  also waits for the full list to load again after clearing filters, and a
+  failed save cannot roll back over a newer person, filter or refresh.
+
+### Changed
+
+- **API domain logic has its own services.** Family, wish and reservation
+  rules now live separately from their HTTP adapters. Shared form fields and
+  family-form parsing have also been extracted to make future changes easier
+  to maintain without changing the app's behaviour.
+- **Bug reports and feature requests use issue forms**, so reports arrive
+  with the context needed to reproduce a problem or understand a proposal.
 
 ### Fixed
 
@@ -47,8 +60,14 @@ minor bump may change behaviour.
   given weeks in advance, say — the dashboard still listed the occasion as
   needing a gift. Coverage now matches a linked reservation to the exact
   occasion it was created for (the recipient, the occasion's name and kind,
-  and the year), including completed gifts, instead of a blunt per-recipient
-  check that ignored which occasion or year the reservation actually covered.
+  its month and day, and the year), including completed gifts, instead of a
+  blunt per-recipient check that ignored which occasion or year the
+  reservation actually covered. Same-named fixed occasions on different dates
+  stay distinct, and coverage is fetched in one query rather than expanding
+  every historical gift.
+- **Returning to a relative's list fetches it afresh.** Browser back/forward
+  navigation cannot reuse stale list data after access changes; loading and
+  inaccessible states remain distinct without exposing private information.
 
 ## [0.5.0] — 2026-09-30
 
@@ -244,6 +263,7 @@ which would already be a hint.
 This release was written by an AI agent under human direction. The
 [README](README.md) says so in full, and says what it means for you.
 
+[0.6.0]: https://github.com/aileo/pensa/releases/tag/v0.6.0
 [0.5.0]: https://github.com/aileo/pensa/releases/tag/v0.5.0
 [0.4.0]: https://github.com/aileo/pensa/releases/tag/v0.4.0
 [0.3.0]: https://github.com/aileo/pensa/releases/tag/v0.3.0
