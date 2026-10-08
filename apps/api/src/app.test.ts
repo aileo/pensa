@@ -416,6 +416,52 @@ describe('permissions métier sur l’API', () => {
     expect(dashboard.occasions.some((o: { person: { id: string } }) => o.person.id === removedId)).toBe(false);
     expect(dashboard.reservations.some((r: { recipient: { id: string } }) => r.recipient.id === earlyGifted.id)).toBe(false);
   });
+  it('ne confond pas deux occasions fixes de même nom et de même type à des dates différentes', async () => {
+    // Fixed occasions (like "Noël") are shared by the whole family rather than being
+    // per-recipient, so this scenario needs its own isolated organizer and family: two
+    // occasions sharing a name and kind, but a different date, must still be matched
+    // separately by the coverage key (recipient + name + kind + month/day + year).
+    const testIp = '10.11.12.14';
+    const orgEmail = `same-name-org-${Date.now()}@example.test`;
+    const futureDate = (daysAhead: number) => {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() + daysAhead);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    };
+    const org = await call('', '/auth/register', 'POST', {
+      firstName: 'SnOrg', lastName: 'SameName', email: orgEmail, password: 'LongSecret2026!', birthDate: '1990-06-15',
+    }, undefined, testIp);
+    cookies.snOrg = org.cookie!.split(';')[0];
+    const orgHouseholdId = org.data.householdId as string;
+    const family = await call('snOrg', '/families', 'POST', { name: 'Famille Occasions Homonymes' });
+    expect(family.status).toBe(201);
+    const familyId = family.data.id as string;
+    const member = await call('snOrg', `/households/${orgHouseholdId}/members`, 'POST',
+      { firstName: 'SnMember', lastName: 'SameName', birthDate: '1995-03-10' });
+    expect(member.status).toBe(201);
+    const memberId = (member.data.members.find((m: { firstName: string }) => m.firstName === 'SnMember') as { id: string }).id;
+    const dueDate = futureDate(8);
+    const laterDate = futureDate(24);
+    const dueOccasion = await call('snOrg', `/families/${familyId}/occasions`, 'POST',
+      { name: 'Fête commune', kind: 'fixed', month: Number(dueDate.slice(5, 7)), day: Number(dueDate.slice(8, 10)) });
+    expect(dueOccasion.status).toBe(201);
+    const laterOccasion = await call('snOrg', `/families/${familyId}/occasions`, 'POST',
+      { name: 'Fête commune', kind: 'fixed', month: Number(laterDate.slice(5, 7)), day: Number(laterDate.slice(8, 10)) });
+    expect(laterOccasion.status).toBe(201);
+    // Gift only the earlier occurrence.
+    const created = await call('snOrg', '/reservations/off-list', 'POST', {
+      recipientId: memberId, title: 'Cadeau homonyme', occasionIds: [{ id: dueOccasion.data.id, year: new Date().getUTCFullYear() }],
+    });
+    expect(created.status).toBe(201);
+    for (const status of ['purchased', 'wrapped', 'gifted'] as const)
+      expect((await call('snOrg', `/reservations/${created.data.id}`, 'PATCH', { status })).status).toBe(200);
+    const snDashboard = (await call('snOrg', '/dashboard')).data;
+    const snUncovered = (snDashboard.todos as { type: string; person: { id: string }; occasion: string }[])
+      .filter(t => t.type === 'occasion_without_gift' && t.person.id === memberId);
+    // The later occurrence, sharing the same name/kind as the gifted one, must still show up as
+    // uncovered rather than borrowing coverage from the other occasion's linked gift.
+    expect(snUncovered.some(t => t.occasion === 'Fête commune')).toBe(true);
+  });
   it('expose l’envie et le bénéficiaire dans les réservations', async () => {
     const reservation = (await call('alice', '/reservations')).data.find((r: {wish?:{title:string}}) => r.wish?.title === 'Console de jeux');
     expect(reservation).toMatchObject({ wish: { title: 'Console de jeux' }, recipient: { firstName: 'Bob' } });
