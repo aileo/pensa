@@ -30,6 +30,58 @@ const titleByPage: Record<Page, TranslationKey> = {
   dashboard: 'Tableau de bord', wishes: 'Mes envies', families: 'Ma famille',
   reservations: 'Réservations', history: 'Historique', search: 'Rechercher', profile: 'Mon profil',
 }
+
+type PersonWishesFetchState<T> = { status: 'loading' } | { status: 'ready'; items: T[] } | { status: 'denied' }
+
+// Mounted only while the route is on this person (see the call site, which only
+// renders it when `selectedPerson` resolves, and keys it by person id). Each mount
+// starts fresh at `{ status: 'loading' }`, so navigating away and back — including via
+// browser back/forward to the very same history entry, which reuses the same
+// `location.key` — always re-resolves this person's wishes/off-list gifts against the
+// authorized API before showing anything, instead of reusing cached data that may no
+// longer reflect the viewer's current access.
+function PersonWishesPanel({ person, me, filters, curating, busy, managedMembers, revision, onSelf, onPerson, onFilterChange, onOpenWish, onReserve, onEditTags, onRemoveWish, onOpenWishDetail, onOpenOffList, onRequestGift, onOpenReservation }: {
+  person: Person; me: Person; filters: WishFilters; curating: boolean; busy: boolean; managedMembers: Person[]; revision: number
+  onSelf: () => void; onPerson: (person: Person) => void; onFilterChange: (key: keyof WishFilters, value: string) => void
+  onOpenWish: (owner: Person) => void; onReserve: (wish: Wish) => void; onEditTags: (wish: Wish) => void; onRemoveWish: (wish: Wish) => void
+  onOpenWishDetail: (wish: Wish) => void; onOpenOffList: (person: Person) => void; onRequestGift: (gift: Reservation) => void; onOpenReservation: (id: Id) => void
+}) {
+  const { t } = useTranslation()
+  const [wishesState, setWishesState] = useState<PersonWishesFetchState<Wish>>({ status: 'loading' })
+  const [giftsState, setGiftsState] = useState<PersonWishesFetchState<Reservation>>({ status: 'loading' })
+  useEffect(() => {
+    let active = true
+    const query = new URLSearchParams()
+    if (filters.tag.trim()) query.set('tag', filters.tag.trim())
+    if (filters.availability) query.set('availability', filters.availability)
+    if (filters.minPrice.trim()) query.set('minPrice', filters.minPrice.trim())
+    if (filters.maxPrice.trim()) query.set('maxPrice', filters.maxPrice.trim())
+    const suffix = query.size ? `?${query}` : ''
+    api<Wish[]>(`/users/${encodeURIComponent(String(person.id))}/wishes${suffix}`).then(data => { if (active) setWishesState({ status: 'ready', items: list(data) }) }).catch(() => { if (active) setWishesState({ status: 'denied' }) })
+    return () => { active = false }
+  }, [person.id, filters.tag, filters.availability, filters.minPrice, filters.maxPrice, revision])
+  useEffect(() => {
+    let active = true
+    api<Reservation[]>(`/users/${encodeURIComponent(String(person.id))}/off-list`).then(data => { if (active) setGiftsState({ status: 'ready', items: list(data) }) }).catch(() => { if (active) setGiftsState({ status: 'denied' }) })
+    return () => { active = false }
+  }, [person.id, revision])
+
+  if (wishesState.status === 'denied') return <Empty icon="users" title={t('Personne introuvable')} text={t('Cette personne n’existe pas ou vous n’avez pas accès à sa liste.')}/>
+  const personWishes = wishesState.status === 'ready' ? wishesState.items : []
+  const personGifts = giftsState.status === 'ready' ? giftsState.items : []
+  return <>
+    {curating && <ManagedListsBar me={me} managed={managedMembers} activeId={person.id} onSelf={onSelf} onPerson={onPerson}/>}
+    {curating && <div className="card mb-6 flex flex-wrap items-center justify-between gap-3 border-sage-200 bg-sage-50 p-4"><div><p className="eyebrow">{t('LISTE GÉRÉE PAR VOTRE FOYER')}</p><p className="muted mt-1">{t('{name} n’a pas de compte : vous tenez sa liste à sa place.', { name: nameOf(person) })}</p></div><button className="primary" onClick={() => onOpenWish(person)}><Icon name="plus" size={17}/> {t('Ajouter une envie')}</button></div>}
+    <div className="card mb-6 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div><label className="label" htmlFor="filter-tag">{t('Tag')}</label><input className="field" id="filter-tag" value={filters.tag} onChange={event => onFilterChange('tag', event.target.value)} placeholder={t('Ex. : livres')}/></div>
+      <div><label className="label" htmlFor="filter-availability">{t('Disponibilité')}</label><select className="field" id="filter-availability" value={filters.availability} onChange={event => onFilterChange('availability', event.target.value)}><option value="">{t('Toutes')}</option><option value="available">{t('Disponibles')}</option><option value="reserved">{t('Réservées')}</option></select></div>
+      <div><label className="label" htmlFor="filter-min-price">{t('Prix minimum (€)')}</label><input className="field" id="filter-min-price" type="number" min="0" step="0.01" value={filters.minPrice} onChange={event => onFilterChange('minPrice', event.target.value)} placeholder="0"/></div>
+      <div><label className="label" htmlFor="filter-max-price">{t('Prix maximum (€)')}</label><input className="field" id="filter-max-price" type="number" min="0" step="0.01" value={filters.maxPrice} onChange={event => onFilterChange('maxPrice', event.target.value)} placeholder={t('Sans limite')}/></div>
+    </div>
+    {wishesState.status === 'loading' ? <p role="status" className="muted">{t('Chargement de la liste…')}</p> : personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} curated={curating} onReserve={() => onReserve(wish)} onTags={() => onEditTags(wish)} onDelete={() => onRemoveWish(wish)} onOpen={() => onOpenWishDetail(wish)}/>)}</div> : <Empty icon="heart" title={t('Aucune envie trouvée')} text={curating ? t('Ajoutez ses idées de cadeaux pour que vos proches sachent quoi offrir.') : t('Modifiez les filtres pour découvrir d’autres envies.')} action={curating ? <button className="primary" onClick={() => onOpenWish(person)}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button> : undefined}/>}
+    <div className="mt-9"><SectionTitle icon="spark" tone="clay" kicker={t('SANS PASSER PAR LA LISTE')} title={t('Cadeaux prévus hors liste')} action={<button className="secondary" onClick={() => onOpenOffList(person)}><Icon name="plus" size={17}/> {t('Prévoir un cadeau hors liste')}</button>}/>{giftsState.status === 'loading' ? <p role="status" className="muted">{t('Chargement des cadeaux…')}</p> : personGifts.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{personGifts.map(gift => <OffListGiftCard key={gift.id} gift={gift} me={me} busy={busy} onRequest={() => onRequestGift(gift)} onOpen={() => onOpenReservation(gift.id)}/>)}</div> : <p className="muted rounded-xl bg-brand-50 p-4">{t('Aucun cadeau hors liste partagé pour {name}. Une idée qui n’est pas sur sa liste ? Prévoyez-la ici, sans qu’il ou elle ne le voie.', { name: nameOf(person) })}</p>}</div>
+  </>
+}
 export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLogout: () => void; onProfile: (person: Person) => void }) {
   const { locale, t } = useTranslation()
   const location = useLocation()
@@ -56,19 +108,6 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [familyNameOverride, setFamilyNameOverride] = useState<{ id: Id; name: string } | null>(null)
   const personFilters: WishFilters = { tag: searchParams.get('tag') ?? '', availability: searchParams.get('availability') ?? '', minPrice: searchParams.get('minPrice') ?? '', maxPrice: searchParams.get('maxPrice') ?? '' }
   const [revision, setRevision] = useState(0)
-  // A signature of everything that should force a fresh, authorized refetch of the
-  // selected person's wishes/off-list gifts: the person, active filters, an explicit
-  // refresh, and the navigation entry itself (so revisiting via back/forward or a
-  // direct link always re-resolves against the API instead of showing stale/cached
-  // data for someone whose access may have changed).
-  const personWishesSignature = selectedPerson ? [String(selectedPerson.id), personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision, location.key].join('|') : null
-  const personGiftsSignature = selectedPerson && String(selectedPerson.id) !== String(me.id) ? [String(selectedPerson.id), revision, location.key].join('|') : null
-  const [personWishesState, setPersonWishesState] = useState<{ signature: string; items: Wish[] } | null>(null)
-  const [personWishesDeniedSignature, setPersonWishesDeniedSignature] = useState<string | null>(null)
-  const personWishesReady = !!personWishesSignature && !!personWishesState && personWishesState.signature === personWishesSignature
-  const personWishesDenied = !!personWishesSignature && personWishesDeniedSignature === personWishesSignature
-  const personWishesLoading = !!selectedPerson && !personWishesReady && !personWishesDenied
-  const personWishes = personWishesReady ? personWishesState!.items : []
   const [modal, setModal] = useState<Modal>(null)
   const [selectedWish, setSelectedWish] = useState<Wish | null>(null)
   const [wishOwner, setWishOwner] = useState<Person | null>(null)
@@ -78,12 +117,6 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [offListRecipient, setOffListRecipient] = useState<Person | null>(null)
-  const [personGiftsState, setPersonGiftsState] = useState<{ signature: string; items: Reservation[] } | null>(null)
-  const [personGiftsDeniedSignature, setPersonGiftsDeniedSignature] = useState<string | null>(null)
-  const personGiftsReady = !!personGiftsSignature && !!personGiftsState && personGiftsState.signature === personGiftsSignature
-  const personGiftsDenied = !!personGiftsSignature && personGiftsDeniedSignature === personGiftsSignature
-  const personGiftsLoading = !!selectedPerson && String(selectedPerson.id) !== String(me.id) && !personGiftsReady && !personGiftsDenied
-  const personGifts = personGiftsReady ? personGiftsState!.items : []
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
   const handleError = useCallback((problem: unknown) => setError(problem instanceof Error ? problem.message : t('Une erreur inattendue est survenue.')), [t])
 
@@ -128,26 +161,6 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     }, 300)
     return () => { active = false; window.clearTimeout(timer) }
   }, [me, route.page, searchText, revision, handleError])
-  useEffect(() => {
-    if (!selectedPerson || !personWishesSignature) return
-    let active = true
-    const signature = personWishesSignature
-    const query = new URLSearchParams()
-    if (personFilters.tag.trim()) query.set('tag', personFilters.tag.trim())
-    if (personFilters.availability) query.set('availability', personFilters.availability)
-    if (personFilters.minPrice.trim()) query.set('minPrice', personFilters.minPrice.trim())
-    if (personFilters.maxPrice.trim()) query.set('maxPrice', personFilters.maxPrice.trim())
-    const suffix = query.size ? `?${query}` : ''
-    api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes${suffix}`).then(data => { if (active) setPersonWishesState({ signature, items: list(data) }) }).catch(() => { if (active) setPersonWishesDeniedSignature(signature) })
-    return () => { active = false }
-  }, [selectedPerson, personWishesSignature, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice])
-  useEffect(() => {
-    if (!selectedPerson || !personGiftsSignature) return
-    let active = true
-    const signature = personGiftsSignature
-    api<Reservation[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/off-list`).then(data => { if (active) setPersonGiftsState({ signature, items: list(data) }) }).catch(() => { if (active) setPersonGiftsDeniedSignature(signature) })
-    return () => { active = false }
-  }, [selectedPerson, personGiftsSignature])
 
   async function perform(action: () => Promise<unknown>, success: string, close = true) {
     setBusy(true); setError('')
@@ -263,19 +276,10 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
         {route.page === 'wishes' && (route.wishId
           ? <WishDetail key={route.wishId} id={route.wishId} me={me} users={users} busy={busy} curates={curatesOwner} onReserve={wish => openReserve(wish)} onTags={wish => { setSelectedWish(wish); setModal('tags') }} onDelete={wish => void removeWish(wish)}/>
           : <><ManagedListsBar me={me} managed={managedMembers} activeId={null} onSelf={() => go('wishes')} onPerson={openPerson}/><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-2">{t('VOTRE LISTE PERSONNELLE')}</p><h1 className="font-['Outfit'] text-3xl font-bold">{t('Mes envies')} <span className="text-brand-500">({myWishes.length})</span></h1><p className="muted mt-2">{t('Notez vos idées une fois : vos proches sauront quoi offrir.')}</p></div><button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div>{myWishes.length ? <><p className="muted mb-4">{t('Glissez les envies ou utilisez les flèches pour changer leur priorité.')}</p><div className="space-y-3">{myWishes.map((wish, index) => <div key={wish.id} draggable onDragStart={event => event.dataTransfer.setData('text/plain', String(index))} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) void reorder(from, index) }} className="card flex items-center gap-3 p-3 sm:gap-5 sm:p-4"><span className="hidden cursor-grab text-ink-400 sm:block"><Icon name="grip"/></span><div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-soft sm:size-20">{wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" className="text-brand-300"/>}</div><div className="min-w-0 flex-1"><h2 className="truncate font-['Outfit'] font-semibold">{wish.title}</h2><p className="muted mt-1 truncate">{wish.description || wish.url || t('Sans description')}</p><div className="mt-1 flex flex-wrap gap-1">{wish.tags?.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div></div><strong className="hidden text-sm text-brand-600 sm:block">{money(wish.price)}</strong><div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row"><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => reorder(index, index - 1)} aria-label={t('Monter {title}', { title: wish.title })}><Icon name="arrowUp" size={16}/></button><button className="icon-button !size-7" disabled={index === myWishes.length - 1 || busy} onClick={() => reorder(index, index + 1)} aria-label={t('Descendre {title}', { title: wish.title })}><Icon name="arrowDown" size={16}/></button><button className="icon-button" onClick={() => navigate(wishPath(String(wish.id)))} aria-label={t('Voir le permalien de {title}', { title: wish.title })}><Icon name="link" size={17}/></button><button className="icon-button" onClick={() => { setSelectedWish(wish); setModal('tags') }} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={() => removeWish(wish)} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button></div></div>)}</div></> : <Empty icon="heart" title={t('Votre liste est encore vide')} text={t('Collez le lien d’un produit et nous vous aiderons à l’ajouter.')} action={<button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button>}/>}</>)}
-        {(route.page === 'families' || route.page === 'personWishes') && <><SectionTitle icon="users" kicker={t('VOS PROCHES')} title={selectedPerson && !personWishesDenied ? t('Les envies de {name}', { name: nameOf(selectedPerson) }) : activeFamily ? activeFamily.name : routePersonId ? t('Personne introuvable') : routeFamilyId ? t('Famille introuvable') : t('Ma famille')} action={routePersonId || routeFamilyId ? <button className="secondary" onClick={() => go('families')}><Icon name="arrowLeft" size={16}/> {t('Retour aux familles')}</button> : undefined}/>
-          {routePersonId ? (selectedPerson && !personWishesDenied ? <>
-            {curating && <ManagedListsBar me={me} managed={managedMembers} activeId={selectedPerson.id} onSelf={() => go('wishes')} onPerson={openPerson}/>}
-            {curating && <div className="card mb-6 flex flex-wrap items-center justify-between gap-3 border-sage-200 bg-sage-50 p-4"><div><p className="eyebrow">{t('LISTE GÉRÉE PAR VOTRE FOYER')}</p><p className="muted mt-1">{t('{name} n’a pas de compte : vous tenez sa liste à sa place.', { name: nameOf(selectedPerson) })}</p></div><button className="primary" onClick={() => openWish(selectedPerson)}><Icon name="plus" size={17}/> {t('Ajouter une envie')}</button></div>}
-            <div className="card mb-6 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div><label className="label" htmlFor="filter-tag">{t('Tag')}</label><input className="field" id="filter-tag" value={personFilters.tag} onChange={event => setPersonFilter('tag', event.target.value)} placeholder={t('Ex. : livres')}/></div>
-              <div><label className="label" htmlFor="filter-availability">{t('Disponibilité')}</label><select className="field" id="filter-availability" value={personFilters.availability} onChange={event => setPersonFilter('availability', event.target.value)}><option value="">{t('Toutes')}</option><option value="available">{t('Disponibles')}</option><option value="reserved">{t('Réservées')}</option></select></div>
-              <div><label className="label" htmlFor="filter-min-price">{t('Prix minimum (€)')}</label><input className="field" id="filter-min-price" type="number" min="0" step="0.01" value={personFilters.minPrice} onChange={event => setPersonFilter('minPrice', event.target.value)} placeholder="0"/></div>
-              <div><label className="label" htmlFor="filter-max-price">{t('Prix maximum (€)')}</label><input className="field" id="filter-max-price" type="number" min="0" step="0.01" value={personFilters.maxPrice} onChange={event => setPersonFilter('maxPrice', event.target.value)} placeholder={t('Sans limite')}/></div>
-            </div>
-            {personWishesLoading ? <p role="status" className="muted">{t('Chargement de la liste…')}</p> : personWishes.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{personWishes.map(wish => <WishCard key={wish.id} wish={wish} mine={String(wish.ownerId) === String(me.id)} curated={curating} onReserve={() => openReserve(wish)} onTags={() => { setSelectedWish(wish); setModal('tags') }} onDelete={() => removeWish(wish)} onOpen={() => navigate(wishPath(String(wish.id)))}/>)}</div> : <Empty icon="heart" title={t('Aucune envie trouvée')} text={curating ? t('Ajoutez ses idées de cadeaux pour que vos proches sachent quoi offrir.') : t('Modifiez les filtres pour découvrir d’autres envies.')} action={curating ? <button className="primary" onClick={() => openWish(selectedPerson)}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button> : undefined}/>}
-            <div className="mt-9"><SectionTitle icon="spark" tone="clay" kicker={t('SANS PASSER PAR LA LISTE')} title={t('Cadeaux prévus hors liste')} action={<button className="secondary" onClick={() => openOffList(selectedPerson)}><Icon name="plus" size={17}/> {t('Prévoir un cadeau hors liste')}</button>}/>{personGiftsLoading ? <p role="status" className="muted">{t('Chargement des cadeaux…')}</p> : personGifts.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{personGifts.map(gift => <OffListGiftCard key={gift.id} gift={gift} me={me} busy={busy} onRequest={() => void requestGift(gift)} onOpen={() => openReservation(gift.id)}/>)}</div> : <p className="muted rounded-xl bg-brand-50 p-4">{t('Aucun cadeau hors liste partagé pour {name}. Une idée qui n’est pas sur sa liste ? Prévoyez-la ici, sans qu’il ou elle ne le voie.', { name: nameOf(selectedPerson) })}</p>}</div>
-          </> : !loading ? <Empty icon="users" title={t('Personne introuvable')} text={t('Cette personne n’existe pas ou vous n’avez pas accès à sa liste.')}/> : null)
+        {(route.page === 'families' || route.page === 'personWishes') && <><SectionTitle icon="users" kicker={t('VOS PROCHES')} title={selectedPerson ? t('Les envies de {name}', { name: nameOf(selectedPerson) }) : activeFamily ? activeFamily.name : routePersonId ? t('Personne introuvable') : routeFamilyId ? t('Famille introuvable') : t('Ma famille')} action={routePersonId || routeFamilyId ? <button className="secondary" onClick={() => go('families')}><Icon name="arrowLeft" size={16}/> {t('Retour aux familles')}</button> : undefined}/>
+          {routePersonId ? (selectedPerson
+            ? <PersonWishesPanel key={String(selectedPerson.id)} person={selectedPerson} me={me} filters={personFilters} curating={curating} busy={busy} managedMembers={managedMembers} revision={revision} onSelf={() => go('wishes')} onPerson={openPerson} onFilterChange={setPersonFilter} onOpenWish={openWish} onReserve={openReserve} onEditTags={wish => { setSelectedWish(wish); setModal('tags') }} onRemoveWish={wish => void removeWish(wish)} onOpenWishDetail={wish => navigate(wishPath(String(wish.id)))} onOpenOffList={openOffList} onRequestGift={gift => void requestGift(gift)} onOpenReservation={openReservation}/>
+            : !loading ? <Empty icon="users" title={t('Personne introuvable')} text={t('Cette personne n’existe pas ou vous n’avez pas accès à sa liste.')}/> : null)
           : routeFamilyId ? (activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">{t('LES MEMBRES')}</p><p className="muted mt-1">{t('Découvrez les envies des membres de cette famille.')}</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> {t('Ajouter une occasion')}</button>}</div>{activeFamily.households?.length ? <FamilyHouseholds family={activeFamily} me={me} onPerson={openPerson}/> : activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => openPerson(person)} className="card flex items-center gap-4 p-5 text-left hover:border-brand-200"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title={t('Aucun membre affiché')} text={t('Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles.')}/ >}{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} busy={busy} perform={perform} handleError={handleError} onRename={name => setFamilyNameOverride({ id: activeFamily.id, name })}/>}</>
             : !loading ? <Empty icon="users" title={t('Famille introuvable')} text={t('Cette famille n’existe pas ou vous n’y avez plus accès.')}/> : null)
           : <>
