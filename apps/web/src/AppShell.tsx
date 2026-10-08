@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, dateOf, json, list, money, nameOf, type Family, type Household, type Id, type Occasion, type Onboarding, type Person, type Reservation, type Todo, type Wish } from './api'
 import { localizeMessage, occasionLabel, type TranslationKey } from './locale'
 import { useTranslation } from './language-context'
@@ -47,6 +47,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null)
   const [personWishes, setPersonWishes] = useState<Wish[]>([])
+  const [loadedPersonWishesKey, setLoadedPersonWishesKey] = useState<string | null>(null)
   const [personFilterState, setPersonFilterState] = useState<WishFilters & { personId: string }>({ ...emptyWishFilters, personId: '' })
   const personFilters = personFilterState.personId === String(selectedPerson?.id) ? personFilterState : emptyWishFilters
   const [modal, setModal] = useState<Modal>(null)
@@ -58,6 +59,8 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
+  const revisionRef = useRef(revision)
+  useEffect(() => { revisionRef.current = revision }, [revision])
   const [focusedReservation, setFocusedReservation] = useState<Id | null>(null)
   const [offListRecipient, setOffListRecipient] = useState<Person | null>(null)
   const [personGifts, setPersonGifts] = useState<Reservation[]>([])
@@ -98,18 +101,20 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     }, 300)
     return () => { active = false; window.clearTimeout(timer) }
   }, [me, page, searchText, revision, handleError])
+  const personWishesKey = selectedPerson ? `${String(selectedPerson.id)}|${personFilters.tag}|${personFilters.availability}|${personFilters.minPrice}|${personFilters.maxPrice}|${revision}` : null
   useEffect(() => {
     if (!selectedPerson) return
     let active = true
+    const key = personWishesKey
     const query = new URLSearchParams()
     if (personFilters.tag.trim()) query.set('tag', personFilters.tag.trim())
     if (selectedPerson.id !== me?.id && personFilters.availability) query.set('availability', personFilters.availability)
     if (personFilters.minPrice.trim()) query.set('minPrice', personFilters.minPrice.trim())
     if (personFilters.maxPrice.trim()) query.set('maxPrice', personFilters.maxPrice.trim())
     const suffix = query.size ? `?${query}` : ''
-    api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes${suffix}`).then(data => { if (active) setPersonWishes(list(data)) }).catch(problem => { if (active) handleError(problem) })
+    api<Wish[]>(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes${suffix}`).then(data => { if (active) { setPersonWishes(list(data)); setLoadedPersonWishesKey(key) } }).catch(problem => { if (active) handleError(problem) })
     return () => { active = false }
-  }, [selectedPerson, me?.id, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision, handleError])
+  }, [selectedPerson, me?.id, personFilters.tag, personFilters.availability, personFilters.minPrice, personFilters.maxPrice, revision, handleError, personWishesKey])
   useEffect(() => {
     if (!selectedPerson || String(selectedPerson.id) === String(me.id)) return
     let active = true
@@ -149,9 +154,10 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     const [item] = reordered.splice(from, 1)
     reordered.splice(to, 0, item)
     const previous = wishes
+    const version = revisionRef.current
     setWishes([...reordered, ...wishes.filter(wish => String(wish.ownerId) !== String(me?.id))])
     const ok = await perform(() => api('/wishes/order', json('PATCH', { ids: reordered.map(wish => wish.id) })), t('Ordre enregistré.'), false)
-    if (!ok) setWishes(previous)
+    if (!ok && revisionRef.current === version) setWishes(previous)
   }
   async function reorderManaged(from: number, to: number) {
     if (!selectedPerson || busy || from === to || from < 0 || to < 0 || from >= personWishes.length || to >= personWishes.length) return
@@ -159,9 +165,10 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     const [item] = reordered.splice(from, 1)
     reordered.splice(to, 0, item)
     const previous = personWishes
+    const version = revisionRef.current
     setPersonWishes(reordered)
     const ok = await perform(() => api(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes/order`, json('PATCH', { ids: reordered.map(wish => wish.id) })), t('Ordre enregistré.'), false)
-    if (!ok) setPersonWishes(previous)
+    if (!ok && revisionRef.current === version) setPersonWishes(previous)
   }
   const myWishes = wishes.filter(wish => String(wish.ownerId) === String(me?.id) || wish.ownerId == null)
   const allPeople = users
@@ -178,7 +185,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const curating = isHouseholdAdmin && !!selectedPerson && !!myHousehold?.members?.some(member => String(member.id) === String(selectedPerson.id) && member.managed)
   const managedMembers = isHouseholdAdmin ? (myHousehold?.members ?? []).filter(member => member.managed) : []
   const personFiltersActive = !!(personFilters.tag.trim() || personFilters.availability || personFilters.minPrice.trim() || personFilters.maxPrice.trim())
-  const canReorderManaged = curating && !personFiltersActive
+  const canReorderManaged = curating && !personFiltersActive && loadedPersonWishesKey === personWishesKey
   const openWish = (owner: Person | null = null) => { setWishOwner(owner); setModal('wish'); setError('') }
   const openPerson = (person: Person) => {
     if (String(person.id) === String(me.id)) { go('wishes'); return }
