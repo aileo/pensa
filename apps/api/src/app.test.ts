@@ -448,19 +448,27 @@ describe('permissions métier sur l’API', () => {
     const laterOccasion = await call('snOrg', `/families/${familyId}/occasions`, 'POST',
       { name: 'Fête commune', kind: 'fixed', month: Number(laterDate.slice(5, 7)), day: Number(laterDate.slice(8, 10)) });
     expect(laterOccasion.status).toBe(201);
-    // Gift only the earlier occurrence.
+    const memberOccasions = (await call('snOrg', `/occasions?recipientId=${memberId}`)).data
+      .filter((o: { name: string }) => o.name === 'Fête commune') as { id: string; nextDate: string }[];
+    const dueNextDate = memberOccasions.find(o => o.id === dueOccasion.data.id)!.nextDate;
+    const laterNextDate = memberOccasions.find(o => o.id === laterOccasion.data.id)!.nextDate;
+    // Gift only the earlier occurrence, linked to its actual occurrence year (derived from its
+    // own nextDate rather than "this calendar year") so the test stays correct across the
+    // December/January boundary where a near-term occasion can fall in the next year.
     const created = await call('snOrg', '/reservations/off-list', 'POST', {
-      recipientId: memberId, title: 'Cadeau homonyme', occasionIds: [{ id: dueOccasion.data.id, year: new Date().getUTCFullYear() }],
+      recipientId: memberId, title: 'Cadeau homonyme', occasionIds: [{ id: dueOccasion.data.id, year: Number(dueNextDate.slice(0, 4)) }],
     });
     expect(created.status).toBe(201);
     for (const status of ['purchased', 'wrapped', 'gifted'] as const)
       expect((await call('snOrg', `/reservations/${created.data.id}`, 'PATCH', { status })).status).toBe(200);
     const snDashboard = (await call('snOrg', '/dashboard')).data;
-    const snUncovered = (snDashboard.todos as { type: string; person: { id: string }; occasion: string }[])
+    const snUncovered = (snDashboard.todos as { type: string; person: { id: string }; occasion: string; date: string }[])
       .filter(t => t.type === 'occasion_without_gift' && t.person.id === memberId);
     // The later occurrence, sharing the same name/kind as the gifted one, must still show up as
-    // uncovered rather than borrowing coverage from the other occasion's linked gift.
-    expect(snUncovered.some(t => t.occasion === 'Fête commune')).toBe(true);
+    // uncovered — specifically it, not the earlier (now gifted) one — rather than borrowing
+    // coverage from the other occasion's linked gift.
+    expect(snUncovered.some(t => t.occasion === 'Fête commune' && t.date === laterNextDate)).toBe(true);
+    expect(snUncovered.some(t => t.date === dueNextDate)).toBe(false);
   });
   it('expose l’envie et le bénéficiaire dans les réservations', async () => {
     const reservation = (await call('alice', '/reservations')).data.find((r: {wish?:{title:string}}) => r.wish?.title === 'Console de jeux');
