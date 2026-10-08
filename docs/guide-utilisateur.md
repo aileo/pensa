@@ -70,11 +70,14 @@ Ce sont elles qui permettront à quelqu'un qui lit votre liste de n'en garder qu
 la partie qui l'intéresse.
 
 ::: warning Ce qui reste modifiable
-Une fois l'envie enregistrée, seules ses **étiquettes** restent modifiables. Le
-reste est figé, parce que quelqu'un l'a peut-être déjà réservée et que vous lui
-déplaceriez le sol sous les pieds. Supprimer une envie ne la détruit pas non
-plus : elle disparaît de votre liste pendant qu'une réservation qui s'y rattache
-continue de fonctionner.
+Une fois l'envie enregistrée, son **nom ne change plus jamais** — même après
+une réservation — pour que personne vérifiant une réservation ne découvre un
+autre objet dessous. Tout le reste — le lien, l'image, le prix, la description
+et les étiquettes — reste modifiable ou effaçable à tout moment, par vous ou
+par la personne qui gère la liste d'un membre géré. Modifier ces informations
+ne touche jamais à une réservation existante. Supprimer une envie ne la détruit
+pas non plus : elle disparaît de votre liste pendant qu'une réservation qui s'y
+rattache continue de fonctionner.
 :::
 
 Notez librement, et à l'avance. Une envie glissée en mars, c'est tout l'intérêt :
@@ -248,8 +251,9 @@ Annulez la réservation : l'envie redevient disponible pour les autres, et la
 personne concernée n'en aura rien su, ni dans un sens ni dans l'autre.
 
 **Quelqu'un dans la famille n'a pas de compte et n'en aura jamais.**
-Ajoutez-le comme membre géré. Sa liste fonctionne exactement comme celle des
-autres.
+Ajoutez-le comme membre géré. Sa liste utilise les mêmes contrôles d'affichage
+et de réorganisation que *mes envies*, et le reste de la famille la voit comme
+celle de n'importe qui d'autre.
 
 **Mes données sont-elles en sécurité ?**
 Pensa est un projet personnel, pas un service commercial : il a été

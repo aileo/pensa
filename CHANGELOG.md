@@ -24,6 +24,21 @@ minor bump may change behaviour.
   single-wish page at `/wishes/:id` with the same reserve/edit/delete actions
   already available there — no new permissions, just a narrower view that is
   easy to share.
+- **Editing a wish after it was added.** Only the tags could be changed once a
+  wish existed, so a mistyped link or a product that changed price meant
+  deleting the whole entry and starting over. Wish owners and the curators of
+  a managed list can now update the link, image, description, price and tags
+  from a *Modifier l'envie* form, and clear any of them back to empty. The
+  name stays fixed forever — before and after a reservation — and nothing
+  about an existing reservation changes when the other fields do.
+- **Reordering a managed member's list.** A household admin curating a member
+  without an account could only browse that person's wishes as a read-only
+  grid — there was no way to put the most wanted gift first the way you can on
+  your own list. Managed lists you curate now show the same draggable rows and
+  up/down arrows as *Mes envies*, with the new order saved through the
+  existing `/users/:id/wishes/order` endpoint. Reordering stays disabled while
+  a tag, availability or price filter narrows the list, since saving a
+  filtered subset would silently drop the hidden wishes from the order.
 
 ## [0.5.0] — 2026-09-30
 

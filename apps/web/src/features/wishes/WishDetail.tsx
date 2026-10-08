@@ -12,14 +12,14 @@ type DetailState = { status: 'loading' } | { status: 'notFound' } | { status: 'r
 // the owner never sees who reserved it — so no new API plumbing was needed to keep that true.
 // Malformed ids fail the same way as missing ones: the server rejects them before ever
 // looking a wish up, so there is nothing for a direct URL to distinguish.
-export function WishDetail({ id, me, users, busy, curates, onReserve, onTags, onDelete }: {
+export function WishDetail({ id, me, users, busy, curates, onReserve, onEdit, onDelete }: {
   id: string
   me: Person
   users: Person[]
   busy: boolean
   curates: (ownerId: string) => boolean
   onReserve: (wish: Wish) => void
-  onTags: (wish: Wish) => void
+  onEdit: (wish: Wish) => void
   onDelete: (wish: Wish) => void
 }) {
   const { t } = useTranslation()
@@ -60,7 +60,7 @@ export function WishDetail({ id, me, users, busy, curates, onReserve, onTags, on
         <div className="mt-6 flex flex-wrap items-center gap-2">
           {wish.url && <a className="secondary" href={wish.url} target="_blank" rel="noopener noreferrer"><Icon name="external" size={16}/> {t('Voir le lien')}</a>}
           {(mine || curated) && <>
-            <button className="icon-button" onClick={() => onTags(wish)} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button>
+            <button className="icon-button" onClick={() => onEdit(wish)} aria-label={t('Modifier {title}', { title: wish.title })}><Icon name="edit" size={17}/></button>
             <button className="icon-button hover:!text-red-600" onClick={() => onDelete(wish)} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button>
           </>}
           {!mine && <button className="primary" disabled={busy} onClick={() => onReserve(wish)}>{wish.reservation ? t('Voir la réservation') : t('Réserver')} <Icon name="arrow" size={16}/></button>}

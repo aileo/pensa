@@ -520,6 +520,12 @@ describe('permissions métier sur l’API', () => {
       { ids: [second.data.id, wish.data.id] })).status).toBe(200);
     expect((await call('alice', `/users/${nina.id}/wishes`)).data.map((w: {title:string}) => w.title))
       .toEqual(['Casque', 'Patins à roulettes']);
+    // A filtered subset can never be saved as the new order: the hidden wishes would
+    // silently lose their place, so the whole list must be sent back.
+    expect((await call('alice', `/users/${nina.id}/wishes/order`, 'PATCH',
+      { ids: [wish.data.id] }, 'en')).data.error).toBe('Incomplete list');
+    expect((await call('alice', `/users/${nina.id}/wishes`)).data.map((w: {title:string}) => w.title))
+      .toEqual(['Casque', 'Patins à roulettes']);
     // Relatives see the list like any other, through the family they share.
     expect((await call('charlie', `/users/${nina.id}/wishes`)).data).toHaveLength(2);
     // Administration needs someone who can sign in.
@@ -605,5 +611,88 @@ describe('permissions métier sur l’API', () => {
       await call('alice', `/families/${family.id}/households/${jadeHousehold}`, 'DELETE');
     for (const family of (await call('theo', '/families')).data as unknown as {id: string}[])
       await call('alice', `/families/${family.id}/households/${moved.data.householdId}`, 'DELETE');
+  });
+  it('édite les champs optionnels d’un souhait, réservé ou non, sans jamais toucher au titre ni à la réservation', async () => {
+    // Dedicated rate-limit budget: this test alone makes well over a dozen calls, enough to
+    // threaten the shared suite-wide budget once combined with every other test file.
+    const editIp = '10.9.0.2';
+    const bobId = (await call('bob', '/auth/me', 'GET', undefined, undefined, editIp)).data.id;
+    // Unreserved: every optional field can be added, updated and cleared; a partial call only
+    // ever touches the keys it sends, and the title is never one of them.
+    const created = await call('bob', '/wishes', 'POST', {
+      title: 'Edition libre', url: 'https://example.com/a', image: 'https://example.com/a.png',
+      description: 'Avant', price: 10, tags: ['un'],
+    }, undefined, editIp);
+    expect(created.status).toBe(201);
+    const wishId = created.data.id;
+    const priceOnly = await call('bob', `/wishes/${wishId}`, 'PATCH', { price: 20 }, undefined, editIp);
+    expect(priceOnly.status).toBe(200);
+    expect(priceOnly.data).toMatchObject({
+      title: 'Edition libre', url: 'https://example.com/a', image: 'https://example.com/a.png',
+      description: 'Avant', price: '20.00', tags: ['un'],
+    });
+    const cleared = await call('bob', `/wishes/${wishId}`, 'PATCH', { url: '', image: null, description: null, price: null }, undefined, editIp);
+    expect(cleared.status).toBe(200);
+    expect(cleared.data).toMatchObject({ title: 'Edition libre', url: null, image: null, description: null, price: null, tags: ['un'] });
+    const restored = await call('bob', `/wishes/${wishId}`, 'PATCH', {
+      url: 'https://example.com/b', image: 'https://example.com/b.png', description: 'Après', price: 30, tags: ['deux'],
+    }, undefined, editIp);
+    expect(restored.status).toBe(200);
+    expect(restored.data).toMatchObject({
+      url: 'https://example.com/b', image: 'https://example.com/b.png', description: 'Après', price: '30.00', tags: ['deux'],
+    });
+    // Invalid values are rejected and leave the wish untouched.
+    expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { price: -1 }, undefined, editIp)).status).toBe(400);
+    expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { price: '20' }, undefined, editIp)).status).toBe(400);
+    expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { price: '' }, undefined, editIp)).status).toBe(400);
+    expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { url: 'ftp://example.com/x' }, undefined, editIp)).status).toBe(400);
+    expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { title: 'Jamais' }, undefined, editIp)).status).toBe(400);
+    expect((await call('bob', `/wishes/${wishId}`, 'PATCH', { somethingElse: true }, undefined, editIp)).status).toBe(400);
+    expect((await call('bob', `/wishes/${wishId}`, 'GET', undefined, undefined, editIp)).data).toMatchObject({ url: 'https://example.com/b', price: '30.00' });
+    // A family member who neither owns nor curates the list cannot edit it: the privacy rule
+    // answers 404, the same as an unknown wish.
+    expect((await call('charlie', `/wishes/${wishId}`, 'PATCH', { price: 99 }, undefined, editIp)).status).toBe(404);
+    // Reserved: editing optional fields never detaches, cancels or alters the reservation.
+    const occasions = await call('alice', `/occasions?recipientId=${bobId}`, 'GET', undefined, undefined, editIp);
+    const choice = occasions.data.find((o: {nextDate:string|null}) => o.nextDate);
+    const reservation = await call('alice', '/reservations', 'POST', {
+      wishId, occasionIds: [{ id: choice.id, year: Number(choice.nextDate.slice(0, 4)) }],
+    }, undefined, editIp);
+    expect(reservation.status).toBe(201);
+    const editedWhileReserved = await call('bob', `/wishes/${wishId}`, 'PATCH', { description: 'Pendant la réservation' }, undefined, editIp);
+    expect(editedWhileReserved.status).toBe(200);
+    expect(editedWhileReserved.data.description).toBe('Pendant la réservation');
+    expect(editedWhileReserved.data.title).toBe('Edition libre');
+    const stillReserved = await call('alice', `/reservations/${reservation.data.id}`, 'GET', undefined, undefined, editIp);
+    expect(stillReserved.status).toBe(200);
+    expect(stillReserved.data.cancelled).toBe(false);
+    expect(stillReserved.data.wishId).toBe(wishId);
+    await call('alice', `/reservations/${reservation.data.id}`, 'DELETE', undefined, undefined, editIp);
+    await call('bob', `/wishes/${wishId}`, 'DELETE', undefined, undefined, editIp);
+    // Managed member: the curating administrators can edit a reserved wish on the child's list
+    // the same way, and someone outside the household still cannot.
+    const mine = (await call('bob', '/households/mine', 'GET', undefined, undefined, editIp)).data;
+    const member = await call('bob', `/households/${mine.id}/members`, 'POST',
+      { firstName: `Kid${Date.now().toString(36)}`, lastName: 'Martin', birthDate: '2017-01-01' }, undefined, editIp);
+    expect(member.status).toBe(201);
+    const kidId = member.data.members.find((m: {firstName:string}) => m.firstName.startsWith('Kid')).id;
+    const kidWish = await call('bob', `/users/${kidId}/wishes`, 'POST',
+      { title: 'Jouet', url: 'https://example.com/jouet', price: 15, tags: [] }, undefined, editIp);
+    expect(kidWish.status).toBe(201);
+    const kidOccasions = await call('alice', `/occasions?recipientId=${kidId}`, 'GET', undefined, undefined, editIp);
+    const kidChoice = kidOccasions.data.find((o: {nextDate:string|null}) => o.nextDate);
+    const kidReservation = await call('alice', '/reservations', 'POST', {
+      wishId: kidWish.data.id, occasionIds: [{ id: kidChoice.id, year: Number(kidChoice.nextDate.slice(0, 4)) }],
+    }, undefined, editIp);
+    expect(kidReservation.status).toBe(201);
+    expect((await call('charlie', `/wishes/${kidWish.data.id}`, 'PATCH', { price: 1 }, undefined, editIp)).status).toBe(404);
+    const curatorEdit = await call('alice', `/wishes/${kidWish.data.id}`, 'PATCH', { price: 18, url: '' }, undefined, editIp);
+    expect(curatorEdit.status).toBe(200);
+    expect(curatorEdit.data).toMatchObject({ title: 'Jouet', price: '18.00', url: null });
+    const kidStillReserved = await call('alice', `/reservations/${kidReservation.data.id}`, 'GET', undefined, undefined, editIp);
+    expect(kidStillReserved.data.cancelled).toBe(false);
+    await call('alice', `/reservations/${kidReservation.data.id}`, 'DELETE', undefined, undefined, editIp);
+    await call('alice', `/wishes/${kidWish.data.id}`, 'DELETE', undefined, undefined, editIp);
+    await call('bob', `/households/${mine.id}/members/${kidId}`, 'DELETE', undefined, undefined, editIp);
   });
 });

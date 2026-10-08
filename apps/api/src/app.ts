@@ -398,6 +398,21 @@ const wishInput = z.object({ title: z.string().trim().min(1).max(200), image: ht
   url: z.url().max(2048), description: z.string().max(5000).nullish(),
   price: z.coerce.number().min(0).max(99999999).nullable().optional(), tags: tags.default([]) });
 
+// The title is never part of this shape: it stays immutable after creation, with or without a
+// reservation, so there is no safe value that would let it through. Every other optional field
+// accepts null (or '' for a URL) to clear it explicitly, while an omitted key leaves the column
+// untouched — the service only writes the keys that are actually present here.
+const wishUpdate = z.strictObject({
+  image: httpUrl.or(z.literal('')).nullable().optional(),
+  url: httpUrl.or(z.literal('')).nullable().optional(),
+  description: z.string().max(5000).nullable().optional(),
+  // No z.coerce here, unlike the creation schema above: a partial update is meant to be
+  // strictly typed, so a stray string price (including '', which coerce would turn into 0)
+  // must be rejected rather than silently accepted or used to clear/zero the field.
+  price: z.number().min(0).max(99999999).nullable().optional(),
+  tags: tags.optional(),
+});
+
 export type Reservation = { id: string; wish_id: string; creator_id: string; status: string; open_to_contributions: boolean; cancelled_at: Date | null; created_at: Date; owner_id: string; deleted_at: Date | null; gifted_at: Date | null; off_list?: boolean };
 const getReservation = async (id: string, viewer: string) => {
   const row = await first<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1`, [id]);
@@ -457,7 +472,7 @@ const withRequestStatus = async (r: Reservation, viewer: string) => ({
   requestStatus: (await first<{status:string}>('SELECT status FROM requests WHERE reservation_id=$1 AND user_id=$2', [r.id, viewer]))?.status ?? null,
 });
 
-const routeDeps = { pool, query, person, fail, uuid, first, visible, ownFamily, birthday, isManaged, publicPerson, requireHouseholdAdmin, requireOwnHouseholdAdmin, managedMember, curates, householdMembers, token, digest, hash, HttpError, nameDay, createDefaultOccasions, occasionData, upcoming, occasionMonthDay, wishFilters, preview, previewLimit, previewErrors, wishInput, tags, httpUrl, getReservation, reservationDetails, occasionInput, setOccasions, setParticipants, giftFields, offListVisibility, withRequestStatus };
+const routeDeps = { pool, query, person, fail, uuid, first, visible, ownFamily, birthday, isManaged, publicPerson, requireHouseholdAdmin, requireOwnHouseholdAdmin, managedMember, curates, householdMembers, token, digest, hash, HttpError, nameDay, createDefaultOccasions, occasionData, upcoming, occasionMonthDay, wishFilters, preview, previewLimit, previewErrors, wishInput, wishUpdate, tags, httpUrl, getReservation, reservationDetails, occasionInput, setOccasions, setParticipants, giftFields, offListVisibility, withRequestStatus };
 export type RouteDeps = typeof routeDeps;
 const wishes = createWishService(routeDeps);
 registerFamilyRoutes(api, routeDeps);

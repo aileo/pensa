@@ -66,9 +66,12 @@ yourself and the wish works just the same.
 someone reading your list narrow it down to the part they were looking for.
 
 ::: warning What stays editable
-Once a wish is saved, only its **tags** can still be changed. The rest is
-frozen, because somebody may already have reserved it and you would be moving
-the ground under their feet. Deleting a wish does not destroy it either: it
+Once a wish is saved, its **name never changes** — not even after it is
+reserved — so nobody checking a reservation finds a different item underneath.
+Everything else — the link, the image, the price, the description and the
+tags — can still be updated or cleared at any time, by you or by whoever
+curates the list on behalf of a managed member. Updating these details never
+touches an existing reservation. Deleting a wish does not destroy it either: it
 disappears from your list while any reservation attached to it keeps working.
 :::
 
@@ -233,7 +236,8 @@ Cancel the reservation; it goes back to available for everyone else, and the
 person concerned never knew either way.
 
 **Someone in the family has no account and never will.**
-Add them as a managed member. Their list works exactly like anyone else's.
+Add them as a managed member. Their list uses the same display and reordering
+controls as *my wishes*, and the rest of the family sees it like anyone else's.
 
 **Is my data safe?**
 Pensa is a personal project, not a commercial service — it is
