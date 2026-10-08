@@ -328,6 +328,19 @@ const english = {
   'Votre demande a été refusée.': 'Your request was declined.', 'Participer': 'Contribute',
   'Hors liste': 'Off-list', 'Visible par la famille': 'Visible to family',
   '{age} ans': '{age} years old',
+  // Routing: permalinks and the safe failures they can land on.
+  'Voir le permalien de {title}': 'View permalink for {title}', 'Chargement du souhait…': 'Loading the wish…',
+  'Souhait introuvable': 'Wish not found',
+  'Ce lien n’est plus valide ou vous n’avez pas accès à ce souhait.': 'This link is no longer valid, or you do not have access to this wish.',
+  'Retour à mes envies': 'Back to my wishes', 'Retour': 'Back', 'Envie de {name}': '{name}’s wish',
+  'Famille introuvable': 'Family not found',
+  'Cette famille n’existe pas ou vous n’y avez plus accès.': 'This family does not exist, or you no longer have access to it.',
+  'Personne introuvable': 'Person not found',
+  'Cette personne n’existe pas ou vous n’avez pas accès à sa liste.': 'This person does not exist, or you do not have access to their list.',
+  'Réservation introuvable ou non accessible.': 'Reservation not found, or not accessible.',
+  'Page introuvable': 'Page not found',
+  'Cette page n’existe pas ou l’adresse est incorrecte.': 'This page does not exist, or the address is incorrect.',
+  'Retour au tableau de bord': 'Back to dashboard',
 } as const
 
 export type TranslationKey = keyof typeof english

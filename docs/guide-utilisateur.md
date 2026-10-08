@@ -80,6 +80,11 @@ continue de fonctionner.
 Notez librement, et à l'avance. Une envie glissée en mars, c'est tout l'intérêt :
 c'est celle dont personne ne se serait souvenu en décembre.
 
+Chaque envie a aussi son propre lien : la petite icône de permalien à côté
+ouvre une page centrée sur cette seule envie, sans rien d'autre. Pratique à
+partager avec quelqu'un qui n'a besoin de voir que cette idée-là ; elle
+n'ouvre jamais plus de droits que l'envie n'en donnait déjà.
+
 ## Les occasions
 
 Les occasions sont les dates auxquelles les cadeaux se rattachent. Vous ne créez

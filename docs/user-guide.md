@@ -75,6 +75,11 @@ disappears from your list while any reservation attached to it keeps working.
 Write freely and in advance. A wish noted in March is the whole point — it is
 the one nobody would have remembered in December.
 
+Each wish also has its own link — the small permalink icon next to it opens a
+focused page for that one wish, with nothing else on it. It is handy to share
+with someone who only needs to see that single idea; it never offers more than
+the wish already allowed.
+
 ## Occasions
 
 Occasions are the dates gifts hang from. You never create the common ones —

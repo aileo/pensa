@@ -354,6 +354,51 @@ Log in as `alice@example.test` (admin of the *Alice & Bob* household).
       household is never left without a member or without an administrator — the button is
       disabled when it would be.
 
+### 3.17 URL-based navigation (clean paths, direct links, back/forward)
+
+Every screen now has its own address (`/dashboard`, `/wishes`, `/families`, `/reservations`,
+`/history`, `/search`, `/profile`, plus `/families/:id`, `/users/:id/wishes`, `/wishes/:id` and
+`/reservations/:id`). The tab bar still works the same, but the address bar is the source of
+truth, not just a mirror of it.
+
+- [ ] **Direct load of each main view:** signed in, paste each of `/dashboard`, `/wishes`,
+      `/families`, `/reservations`, `/history`, `/search` and `/profile` into the address bar
+      and reload. Each one opens the right screen straight away, not the dashboard.
+- [ ] **Direct load of a sub-resource:** with a family's id from *Ma famille*, load
+      `/families/:id` directly — the family page opens, not the family list. Same for a
+      relative's id on `/users/:id/wishes`, a wish's id on `/wishes/:id`, and one of your own
+      reservations' id on `/reservations/:id`.
+- [ ] **Your own id redirects:** open `/users/<your id>/wishes` directly — you land on *Mes
+      envies*, never on a mislabeled "their list" view.
+- [ ] **Delayed data:** throttle the network (or simply reload right as the page loads) and
+      watch a sub-resource URL: nothing flashes a wrong or empty state while the bulk lists are
+      still loading; it either waits or ends on a correct not-found state once loading is done.
+- [ ] **Switching between people:** from *Ma famille*, open one relative's list, then another's
+      via the back button or a second click — the wishes and off-list gifts shown always match
+      the person currently in the address bar, never a flash of the previous person's data.
+- [ ] **Auth and sign-out:** while signed out, paste a direct URL such as `/wishes/:id`; after
+      signing in you land on that exact page, not the dashboard. Sign out from any page; you
+      are returned to the sign-in screen without errors.
+- [ ] **Bad or foreign ids:** edit a sub-resource URL to a made-up id, or to an id that belongs
+      to someone outside your families — each (`/families/:id`, `/users/:id/wishes`,
+      `/wishes/:id`, `/reservations/:id`) shows a plain *not found* message, never an error
+      page, a blank screen, or any detail about why it failed.
+- [ ] **A reservation's beneficiary never sees it this way either:** as the person a
+      reservation is *for*, open `/reservations/:id` with that reservation's own id directly —
+      it is *not found*, exactly as it would be from inside the app.
+- [ ] **Search stays shareable:** type a search term, copy the address bar's `?q=…` value,
+      open it in a fresh tab — the same search re-runs. Clearing the field removes `q` from the
+      address instead of leaving a stale value behind.
+- [ ] **Back and forward:** click through *Tableau de bord → Ma famille → a relative's list →
+      Réservations*, then use the browser's back and forward buttons — each step lands exactly
+      back where you were, including the relative's list.
+- [ ] **Permalink on a wish:** open any wish's permalink icon from a list; it opens
+      `/wishes/:id` with the same reserve/edit/delete actions as the list view — no more, no
+      less — and copying that URL to a fresh tab shows the same thing.
+- [ ] **Production build serves deep links too:** after `docker compose build web` and running
+      the production image, load a sub-resource URL directly (not via a click from `/`) — nginx's
+      SPA fallback serves the app instead of a 404.
+
 ## 4. The name, the AI disclosure and the published images
 ### 4.1 The old name is gone
 

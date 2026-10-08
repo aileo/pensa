@@ -2,7 +2,7 @@ import { money, nameOf, type Wish } from '../../api'
 import { useTranslation } from '../../language-context'
 import { Icon } from '../atoms/Icon'
 
-export function WishCard({ wish, mine, curated, onReserve, onTags, onDelete }: { wish: Wish; mine: boolean; curated?: boolean; onReserve: () => void; onTags?: () => void; onDelete?: () => void }) {
+export function WishCard({ wish, mine, curated, onReserve, onTags, onDelete, onOpen }: { wish: Wish; mine: boolean; curated?: boolean; onReserve: () => void; onTags?: () => void; onDelete?: () => void; onOpen?: () => void }) {
   const { t } = useTranslation()
   return <article className="card group flex h-full flex-col overflow-hidden">
     <div className="relative flex h-44 items-center justify-center bg-surface-soft">
@@ -16,6 +16,7 @@ export function WishCard({ wish, mine, curated, onReserve, onTags, onDelete }: {
       {!mine && wish.reservation && <p className="mt-3 text-xs text-ink-500">{t('Réservé par {name}', { name: nameOf(wish.reservation.creator) })}{wish.reservation.openToContributions ? ` · ${t('Participation possible')}` : ''}</p>}
       <div className="mt-auto flex items-center gap-1 border-t border-line-soft pt-3" style={{ marginTop: 'auto', paddingTop: 12 }}>
         {wish.url && <a className="icon-button" href={wish.url} target="_blank" rel="noopener noreferrer" aria-label={t('Voir {title} sur le site marchand', { title: wish.title })}><Icon name="external" size={17} /></a>}
+        {onOpen && <button className="icon-button" onClick={onOpen} aria-label={t('Voir le permalien de {title}', { title: wish.title })}><Icon name="link" size={17} /></button>}
         {mine || curated ? <div className="ml-auto flex items-center gap-1"><button className="icon-button" onClick={onTags} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button><button className="icon-button hover:!text-red-600" onClick={onDelete} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button>{curated && <button className="secondary !px-3 !py-1.5 text-xs" onClick={onReserve}>{wish.reservation ? t('Voir la réservation') : t('Réserver')} <Icon name="arrow" size={14}/></button>}</div>
           : <button className="secondary ml-auto !px-3 !py-1.5 text-xs" onClick={onReserve}>{wish.reservation ? t('Voir la réservation') : t('Réserver')} <Icon name="arrow" size={14}/></button>}
       </div>

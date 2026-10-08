@@ -6,6 +6,25 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Clean, shareable URLs for every screen.** The dashboard, wish list, families,
+  reservations, history, search and profile each have their own address
+  (`/dashboard`, `/wishes`, `/families`, `/reservations`, `/history`, `/search`,
+  `/profile`), and so do a family (`/families/:id`), a relative's list
+  (`/users/:id/wishes`), a single wish (`/wishes/:id`) and a single reservation
+  (`/reservations/:id`). Direct loads, reloads and the browser's back/forward
+  buttons now go to the right place instead of always landing on the dashboard;
+  a requested address survives signing in, and search keeps its text in the
+  `?q=` query parameter so a search can be bookmarked or shared. Unknown or
+  inaccessible ids resolve to a plain not-found state — never an error, and
+  never a hint about why — preserving the existing rule that a reservation's
+  beneficiary cannot distinguish "does not exist" from "hidden from you" ([#5](https://github.com/aileo/pensa/issues/5)).
+- **A permalink for each wish.** A small icon next to any wish opens a focused,
+  single-wish page at `/wishes/:id` with the same reserve/edit/delete actions
+  already available there — no new permissions, just a narrower view that is
+  easy to share.
+
 ## [0.5.0] — 2026-09-30
 
 ### Added
