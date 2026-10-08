@@ -488,25 +488,37 @@ api.get('/dashboard', async (req, res) => {
   const people = await query<Person>(`SELECT DISTINCT u.id,u.first_name,u.last_name,u.avatar,u.birth_date,u.password_hash IS NULL AS managed FROM users u
     JOIN memberships m ON m.household_id=u.household_id JOIN memberships mine ON mine.family_id=m.family_id
     WHERE mine.household_id=$1 ORDER BY u.first_name`, [actor.household_id]);
-  const reservationsRows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r JOIN wishes w ON w.id=r.wish_id
-    WHERE w.owner_id<>$1 AND r.cancelled_at IS NULL AND r.status!='gifted'
+  // A gift already marked as given early still answers "is there a gift planned for this
+  // occasion?", so the lookup must see completed reservations too — only the list of active
+  // reservations shown to the organiser excludes them (they belong in history, not in a todo).
+  const linkedReservationRows = await query<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r JOIN wishes w ON w.id=r.wish_id
+    WHERE w.owner_id<>$1 AND r.cancelled_at IS NULL
     AND (r.creator_id=$1 OR EXISTS(SELECT 1 FROM participants p WHERE p.reservation_id=r.id AND p.user_id=$1))
     AND EXISTS(SELECT 1 FROM users viewer JOIN memberships mine ON mine.household_id=viewer.household_id
       JOIN users recipient ON recipient.id=w.owner_id JOIN memberships theirs
         ON theirs.household_id=recipient.household_id AND theirs.family_id=mine.family_id
       WHERE viewer.id=$1)`, [actor.id]);
-  const reservations = await Promise.all(reservationsRows.map(r => reservationDetails(r, actor.id)));
+  const linkedReservations = await Promise.all(linkedReservationRows.map(r => reservationDetails(r, actor.id)));
+  const reservations = linkedReservations.filter((_, i) => linkedReservationRows[i].status !== 'gifted');
   const allOccasions = (await Promise.all(people.filter(p => p.id !== actor.id).map(async p => (await upcoming(actor, p.id))
     .filter(o => o.nextDate).map(o => ({ ...o, person: publicPerson(p) })))))
     .flat().sort((a, b) => (a.nextDate ?? '').localeCompare(b.nextDate ?? ''));
   const occasions = allOccasions.slice(0, 12);
   const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
   const daysUntil = (date: string) => Math.round((new Date(date + 'T00:00:00Z').getTime() - today) / 86400_000);
-  const covered = new Set(reservations.map(r => r.recipient.id));
+  // A reservation covers one specific occurrence of one specific occasion for one specific
+  // person: recipient, occasion identity (name + kind, how shared-family duplicates are
+  // deduplicated above) and the year the buyer linked it to. Anything else — another person,
+  // another occasion, another year, a cancelled reservation — must not hide the todo.
+  const coveredOccasions = new Set(linkedReservations.flatMap(r =>
+    (r.occasions as { name: string; kind: string; year: number }[]).map(o =>
+      JSON.stringify([r.recipient.id, o.name, o.kind, o.year]))));
   const todos: Record<string, unknown>[] = [];
   const noGift = new Set<string>();
   for (const o of allOccasions) {
-    if (!o.nextDate || daysUntil(o.nextDate) > 30 || covered.has(o.person.id) || noGift.has(o.person.id)) continue;
+    if (!o.nextDate || daysUntil(o.nextDate) > 30 || noGift.has(o.person.id)) continue;
+    const year = Number(o.nextDate.slice(0, 4));
+    if (coveredOccasions.has(JSON.stringify([o.person.id, o.name, o.kind, year]))) continue;
     noGift.add(o.person.id);
     todos.push({ type: 'occasion_without_gift', date: o.nextDate, person: o.person, occasion: o.name });
   }
