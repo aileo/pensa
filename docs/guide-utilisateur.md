@@ -246,8 +246,9 @@ Annulez la réservation : l'envie redevient disponible pour les autres, et la
 personne concernée n'en aura rien su, ni dans un sens ni dans l'autre.
 
 **Quelqu'un dans la famille n'a pas de compte et n'en aura jamais.**
-Ajoutez-le comme membre géré. Sa liste fonctionne exactement comme celle des
-autres.
+Ajoutez-le comme membre géré. Sa liste utilise les mêmes contrôles d'affichage
+et de réorganisation que *mes envies*, et le reste de la famille la voit comme
+celle de n'importe qui d'autre.
 
 **Mes données sont-elles en sécurité ?**
 Pensa est un projet personnel, pas un service commercial : il a été

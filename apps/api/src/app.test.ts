@@ -520,6 +520,12 @@ describe('permissions métier sur l’API', () => {
       { ids: [second.data.id, wish.data.id] })).status).toBe(200);
     expect((await call('alice', `/users/${nina.id}/wishes`)).data.map((w: {title:string}) => w.title))
       .toEqual(['Casque', 'Patins à roulettes']);
+    // A filtered subset can never be saved as the new order: the hidden wishes would
+    // silently lose their place, so the whole list must be sent back.
+    expect((await call('alice', `/users/${nina.id}/wishes/order`, 'PATCH',
+      { ids: [wish.data.id] }, 'en')).data.error).toBe('Incomplete list');
+    expect((await call('alice', `/users/${nina.id}/wishes`)).data.map((w: {title:string}) => w.title))
+      .toEqual(['Casque', 'Patins à roulettes']);
     // Relatives see the list like any other, through the family they share.
     expect((await call('charlie', `/users/${nina.id}/wishes`)).data).toHaveLength(2);
     // Administration needs someone who can sign in.

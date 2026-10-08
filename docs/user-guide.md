@@ -231,7 +231,8 @@ Cancel the reservation; it goes back to available for everyone else, and the
 person concerned never knew either way.
 
 **Someone in the family has no account and never will.**
-Add them as a managed member. Their list works exactly like anyone else's.
+Add them as a managed member. Their list uses the same display and reordering
+controls as *my wishes*, and the rest of the family sees it like anyone else's.
 
 **Is my data safe?**
 Pensa is a personal project, not a commercial service — it is

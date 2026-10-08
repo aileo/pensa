@@ -72,6 +72,7 @@ const english = {
   'Prix minimum (€)': 'Minimum price (€)', 'Prix maximum (€)': 'Maximum price (€)',
   'Sans limite': 'No limit', 'Aucune envie trouvée': 'No wishes found',
   'Modifiez les filtres pour découvrir d’autres envies.': 'Change the filters to discover more wishes.',
+  'Supprimez les filtres pour réorganiser cette liste.': 'Clear the filters to reorder this list.',
   'LES MEMBRES': 'MEMBERS', 'Découvrez les envies des membres de cette famille.': 'Discover this family’s wishes.',
   'Ajouter une occasion': 'Add an occasion', 'Aucun membre affiché': 'No members to show',
   'Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles.': 'Members of this family will appear here when available.',
