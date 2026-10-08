@@ -45,6 +45,7 @@ export function SortableWishList({ wishes, busy, canReorder, curated, onReorder,
       </div>
       <strong className="hidden text-sm text-brand-600 sm:block">{money(wish.price)}</strong>
       <div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row">
+        {wish.url && <a className="icon-button" href={wish.url} target="_blank" rel="noopener noreferrer" aria-label={t('Voir {title} sur le site marchand', { title: wish.title })}><Icon name="external" size={17}/></a>}
         {canReorder && <><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => onReorder(index, index - 1)} aria-label={t('Monter {title}', { title: wish.title })}><Icon name="arrowUp" size={16}/></button>
         <button className="icon-button !size-7" disabled={index === wishes.length - 1 || busy} onClick={() => onReorder(index, index + 1)} aria-label={t('Descendre {title}', { title: wish.title })}><Icon name="arrowDown" size={16}/></button></>}
         {curated && <button className="secondary !px-3 !py-1.5 text-xs" onClick={() => onReserve?.(wish)}>{wish.reservation ? t('Voir la réservation') : t('Réserver')} <Icon name="arrow" size={14}/></button>}
