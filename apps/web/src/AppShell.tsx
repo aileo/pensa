@@ -102,6 +102,8 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     return () => { active = false; window.clearTimeout(timer) }
   }, [me, page, searchText, revision, handleError])
   const personWishesKey = selectedPerson ? `${String(selectedPerson.id)}|${personFilters.tag}|${personFilters.availability}|${personFilters.minPrice}|${personFilters.maxPrice}|${revision}` : null
+  const personWishesKeyRef = useRef(personWishesKey)
+  useEffect(() => { personWishesKeyRef.current = personWishesKey }, [personWishesKey])
   useEffect(() => {
     if (!selectedPerson) return
     let active = true
@@ -165,10 +167,10 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     const [item] = reordered.splice(from, 1)
     reordered.splice(to, 0, item)
     const previous = personWishes
-    const version = revisionRef.current
+    const version = personWishesKeyRef.current
     setPersonWishes(reordered)
     const ok = await perform(() => api(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes/order`, json('PATCH', { ids: reordered.map(wish => wish.id) })), t('Ordre enregistré.'), false)
-    if (!ok && revisionRef.current === version) setPersonWishes(previous)
+    if (!ok && personWishesKeyRef.current === version) setPersonWishes(previous)
   }
   const myWishes = wishes.filter(wish => String(wish.ownerId) === String(me?.id) || wish.ownerId == null)
   const allPeople = users
