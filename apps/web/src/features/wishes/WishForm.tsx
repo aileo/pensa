@@ -53,3 +53,37 @@ export function WishForm({ owner, busy, perform, handleError }: { owner?: Person
     </div><button disabled={busy} className="primary mt-6 w-full"><Icon name="plus" size={17}/> {owner ? t('Ajouter à sa liste') : t('Ajouter à ma liste')}</button>
   </form>
 }
+
+// The title is immutable, with or without a reservation: it never appears as an input here,
+// only as a read-only reminder, so nobody mistakes this for a way to rename the wish.
+export function WishEditForm({ wish, busy, perform }: { wish: Wish; busy: boolean; perform: (action: () => Promise<unknown>, success: string) => Promise<boolean> }) {
+  const { t } = useTranslation()
+  return <form onSubmit={event => {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    const price = String(data.get('price') || '').trim()
+    const description = String(data.get('description') || '').trim()
+    void perform(() => api(`/wishes/${wish.id}`, json('PATCH', {
+      url: String(data.get('url') || '').trim(),
+      image: String(data.get('image') || '').trim(),
+      description: description || null,
+      price: price ? Number(price) : null,
+      tags: String(data.get('tags') || '').split(',').map(tag => tag.trim()).filter(Boolean),
+    })), t('Envie mise à jour.'))
+  }}>
+    <div className="mb-5 rounded-xl bg-surface-soft px-3 py-2.5">
+      <p className="text-sm font-semibold">{wish.title}</p>
+      <p className="muted mt-0.5 text-xs">{t('Le nom ne peut plus être modifié après la création.')}</p>
+    </div>
+    <div className="space-y-4">
+      <FormField id="edit-url" label={t('Lien du produit')} optional><TextInput id="edit-url" name="url" type="url" defaultValue={wish.url || ''} placeholder="https://…"/></FormField>
+      <FormField id="edit-image" label={t('URL de l’image')} optional><TextInput id="edit-image" name="image" type="url" defaultValue={wish.image || ''} placeholder="https://…"/></FormField>
+      <FormField id="edit-description" label={t('Description')} optional><TextArea className="min-h-20" id="edit-description" name="description" defaultValue={wish.description || ''}/></FormField>
+      <div className="grid grid-cols-2 gap-3">
+        <FormField id="edit-price" label={t('Prix (€)')} optional><TextInput id="edit-price" name="price" type="number" min="0" step="0.01" defaultValue={wish.price ?? ''}/></FormField>
+        <FormField id="edit-tags" label={t('Tags')} optional><TextInput id="edit-tags" name="tags" defaultValue={wish.tags?.join(', ') || ''} placeholder={t('livre, déco')}/></FormField>
+      </div>
+    </div>
+    <button disabled={busy} className="primary mt-6 w-full"><Icon name="edit" size={17}/> {t('Enregistrer les modifications')}</button>
+  </form>
+}

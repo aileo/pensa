@@ -8,6 +8,13 @@ minor bump may change behaviour.
 
 ### Added
 
+- **Editing a wish after it was added.** Only the tags could be changed once a
+  wish existed, so a mistyped link or a product that changed price meant
+  deleting the whole entry and starting over. Wish owners and the curators of
+  a managed list can now update the link, image, description, price and tags
+  from a *Modifier l'envie* form, and clear any of them back to empty. The
+  name stays fixed forever — before and after a reservation — and nothing
+  about an existing reservation changes when the other fields do.
 - **Reordering a managed member's list.** A household admin curating a member
   without an account could only browse that person's wishes as a read-only
   grid — there was no way to put the most wanted gift first the way you can on

@@ -8,9 +8,8 @@ export const registerWishRoutes = (
   deps: RouteDeps,
   wishes = createWishService(deps),
 ) => {
-  const { person, uuid, wishFilters, previewLimit, wishInput, tags } = deps;
+  const { person, uuid, wishFilters, previewLimit, wishInput, wishUpdate } = deps;
   const orderInput = z.object({ ids: z.array(uuid).max(1000) });
-  const updateInput = z.strictObject({ tags });
   api.get('/wishes', async (req, res) =>
     res.json(await wishes.listWishes(person(req).id, person(req).id, wishFilters.parse(req.query))),
   );
@@ -49,7 +48,7 @@ export const registerWishRoutes = (
   });
   api.patch('/wishes/:id', async (req, res) => {
     const wish = await wishes.writableWish(person(req), uuid.parse(req.params.id));
-    const input = updateInput.parse(req.body);
+    const input = wishUpdate.parse(req.body);
     res.json(await wishes.updateWish(person(req), wish, input));
   });
   api.delete('/wishes/:id', async (req, res) => {

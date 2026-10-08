@@ -11,13 +11,13 @@ import { Icon } from '../atoms/Icon'
  * positions. `curated` keeps managed-list reservation visibility/actions available
  * without applying the beneficiary-only hiding rules used elsewhere.
  */
-export function SortableWishList({ wishes, busy, canReorder, curated, onReorder, onTags, onDelete, onReserve }: {
+export function SortableWishList({ wishes, busy, canReorder, curated, onReorder, onEdit, onDelete, onReserve }: {
   wishes: Wish[]
   busy: boolean
   canReorder: boolean
   curated?: boolean
   onReorder: (from: number, to: number) => void
-  onTags: (wish: Wish) => void
+  onEdit: (wish: Wish) => void
   onDelete: (wish: Wish) => void
   onReserve?: (wish: Wish) => void
 }) {
@@ -49,7 +49,7 @@ export function SortableWishList({ wishes, busy, canReorder, curated, onReorder,
         {canReorder && <><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => onReorder(index, index - 1)} aria-label={t('Monter {title}', { title: wish.title })}><Icon name="arrowUp" size={16}/></button>
         <button className="icon-button !size-7" disabled={index === wishes.length - 1 || busy} onClick={() => onReorder(index, index + 1)} aria-label={t('Descendre {title}', { title: wish.title })}><Icon name="arrowDown" size={16}/></button></>}
         {curated && <button className="secondary !px-3 !py-1.5 text-xs" onClick={() => onReserve?.(wish)}>{wish.reservation ? t('Voir la réservation') : t('Réserver')} <Icon name="arrow" size={14}/></button>}
-        <button className="icon-button" onClick={() => onTags(wish)} aria-label={t('Modifier les tags de {title}', { title: wish.title })}><Icon name="edit" size={17}/></button>
+        <button className="icon-button" onClick={() => onEdit(wish)} aria-label={t('Modifier {title}', { title: wish.title })}><Icon name="edit" size={17}/></button>
         <button className="icon-button hover:!text-red-600" onClick={() => onDelete(wish)} aria-label={t('Supprimer {title}', { title: wish.title })}><Icon name="trash" size={17}/></button>
       </div>
     </div>)}
