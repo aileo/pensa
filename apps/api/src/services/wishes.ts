@@ -7,6 +7,7 @@ type WishServiceDeps = Pick<
 >;
 type WishFilters = z.infer<RouteDeps['wishFilters']>;
 type WishInput = z.infer<RouteDeps['wishInput']>;
+type WishUpdate = z.infer<RouteDeps['wishUpdate']>;
 
 export const createWishService = (deps: WishServiceDeps) => {
   const { pool, query, first, fail, visible, curates, publicPerson, preview, previewErrors } = deps;
@@ -155,9 +156,24 @@ export const createWishService = (deps: WishServiceDeps) => {
     return wish;
   };
 
-  // The adapter authorizes before parsing tags to preserve the existing error precedence.
-  const updateWish = async (actor: Person, wish: Wish, input: { tags: string[] }) => {
-    const row = await first<Wish>('UPDATE wishes SET tags=$1 WHERE id=$2 RETURNING *', [input.tags, wish.id]);
+  // The adapter authorizes before parsing the body to preserve the existing error precedence.
+  // The title never appears here: it is immutable, with or without a reservation. Every other
+  // key is optional — omitted means "leave this column alone" — so only the keys the caller
+  // actually sent are written, and a tags-only call behaves exactly as it always has. A column
+  // whose value is set to '' (for a link) or null is cleared rather than left untouched.
+  const updateWish = async (actor: Person, wish: Wish, input: WishUpdate) => {
+    const columns: { column: string; value: unknown }[] = [];
+    if (input.url !== undefined) columns.push({ column: 'url', value: input.url || null });
+    if (input.image !== undefined) columns.push({ column: 'image', value: input.image || null });
+    if (input.description !== undefined) columns.push({ column: 'description', value: input.description });
+    if (input.price !== undefined) columns.push({ column: 'price', value: input.price });
+    if (input.tags !== undefined) columns.push({ column: 'tags', value: input.tags });
+    if (!columns.length) return reservationView(wish, actor.id);
+    const assignments = columns.map((c, i) => `${c.column}=$${i + 1}`).join(',');
+    const row = await first<Wish>(
+      `UPDATE wishes SET ${assignments} WHERE id=$${columns.length + 1} RETURNING *`,
+      [...columns.map((c) => c.value), wish.id],
+    );
     return reservationView(row, actor.id);
   };
 
