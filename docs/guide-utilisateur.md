@@ -162,6 +162,9 @@ Il peut être :
   participer.
 
 Dans les deux cas, la personne qui le recevra ne voit rien.
+Ces choix concernent la préparation. Une fois offert, même un cadeau privé est
+partagé dans l'historique de la famille actuelle du bénéficiaire, toujours sans
+être visible par le bénéficiaire.
 
 Si une envie réservée est supprimée, l'engagement devient un **cadeau hors
 liste privé**. Les détails, participants, occasions et l'avancement sont
@@ -224,7 +227,8 @@ les droits des foyers ne changent pas.
 ## Ce qui a déjà été offert
 
 Une fois marqué comme offert, un cadeau est conservé dans l'**historique**,
-consultable par la personne qui l'a reçu et par tous ceux qui y ont participé.
+consultable par les personnes qui partagent actuellement une famille avec son
+bénéficiaire, **sauf le bénéficiaire**, même s'il était privé pendant sa préparation.
 Il répond à la question qui cause le plus de doublons : *qu'est-ce qu'on lui a
 déjà offert ?*
 
@@ -233,6 +237,16 @@ les participants, l'occasion et la date du cadeau lorsque ces informations
 sont disponibles. Si la date du cadeau n'a pas été conservée, la date
 d'enregistrement est indiquée comme telle. Un bénéficiaire indisponible est
 signalé ; les informations facultatives manquantes ne sont pas devinées.
+
+Choisissez un **Bénéficiaire** pour revoir ses cadeaux accessibles, pour toutes
+les occasions et années enregistrées. Triez par **Plus récents d'abord** (par
+défaut), **Plus anciens d'abord** ou **Bénéficiaire (A-Z)**, avec les cadeaux les
+plus récents en premier pour chaque personne. Le sélecteur ne contient que les
+personnes présentes dans l'historique accessible ; une sélection indisponible
+n'affiche aucun cadeau et peut être effacée en choisissant **Tous les bénéficiaires**.
+Les filtres et le tri restent dans l'adresse lors des retours et avances du navigateur.
+Quitter les familles communes retire cet accès, même si vous avez organisé le
+cadeau ou participé. Le bénéficiaire ne voit jamais ses propres cadeaux dans l'historique.
 
 La **recherche** couvre les personnes et les envies de vos familles communes.
 Chaque résultat d'envie indique la personne à qui appartient la liste.
@@ -266,8 +280,8 @@ car *s'entendre dire qu'on n'a pas le droit* serait déjà un indice. C'est pour
 cela que Pensa peut être partagé avec toute la famille sans que personne n'ait à
 faire attention où il clique.
 
-La seule chose que vous voyez, c'est ce qu'on vous a déjà offert, une fois que
-c'est offert.
+L'historique permet de revoir les cadeaux offerts aux autres membres de vos
+familles actuelles, jamais ceux qui vous sont destinés.
 
 ## Questions fréquentes
 

@@ -113,8 +113,13 @@ inserting after.
 
 **Beneficiaries receive nothing about their own wishes**: reservation endpoints
 answer `404` for them, because a `403` would confirm that a reservation exists.
-Gifted history is a separate snapshot, readable only by the beneficiary and the
-participants.
+Gifted history is a separate snapshot, readable by members currently sharing a
+family with the recipient, **except the recipient**. This deliberately includes
+gifts that were private during preparation. It does not grant reservation detail
+or management access; active private gifts still require organizer/participant
+access. Both the viewer's and recipient's current household memberships are
+checked on every history request, so leaving the shared families revokes access
+even for former organizers or participants.
 
 Deleting a wish with an active reservation atomically clones its gift data
 into a hidden off-list wish and repoints the same reservation. Progress,
@@ -122,12 +127,12 @@ participants, requests and occasions remain; `open_to_contributions` becomes
 `false`. Only the organizer and existing participants can see the private
 gift, including through direct reservation URLs. The organizer may edit it
 through the existing off-list lifecycle. A data migration also repairs legacy
-active reservations attached to deleted wishes. Completion keeps the existing
-beneficiary-and-participants history policy.
+active reservations attached to deleted wishes. Completion shares the snapshot
+with the recipient's current family circle, excluding the recipient.
 
 ## History and search responses
 
-`GET /history` retains the beneficiary-and-participants access policy. Each
+`GET /history` returns only the authorized collection described above. Each
 entry returns `id`, `recipientId`, `created_at` and a normalized `snapshot`
 containing the gift `id` and optional `title`, `recipient`, `creator` and
 `giftedAt`, plus `participants` and `occasions` arrays. Legacy snake_case
@@ -135,6 +140,17 @@ identity fields are normalized to `firstName`, `lastName` and `birthDate`.
 Historical identities contain only those public fields and `id`; arbitrary
 stored user or wish fields are not returned. Missing arrays become empty and
 missing optional context is not inferred from current user records.
+
+Recipient filtering and sorting operate on this collection in the UI; no
+separate recipient lookup is made. `/history?recipient=<id>&sort=oldest` and
+`sort=recipient` preserve selections through browser navigation. The default is
+newest first, using `giftedAt` or, when absent, the explicitly labeled record
+date. Dates are compared as instants, including timezone offsets. Recipient A-Z
+uses the latest snapshot's display name per recipient, then recipient ID, then
+newest date, then history ID. Date sorts also break ties by history ID. Missing
+recipient names are labeled unavailable, not filled from current user data.
+An inaccessible recipient selection produces an empty filter with a generic
+unavailable label, never a lookup that reveals their identity.
 
 `GET /search?q=…` returns `{ people, wishes }`. Each wish includes an `owner`
 public identity so clients can identify its list. Search excludes off-list,

@@ -201,7 +201,7 @@ Log in as **Charlie**.
 
 - [ ] Delete a wish with an open reservation. Its organizer and existing participants retain the same reservation, details, occasions and progress as a private off-list gift.
 - [ ] Uninvolved family members, pending applicants and the recipient cannot read, update, cancel or request participation through its direct reservation URL. It is absent from their off-list and open-gift lists.
-- [ ] Edit, advance and cancel converted gifts using the normal off-list controls. Completing one keeps the existing history access for the beneficiary and participants.
+- [ ] Edit, advance and cancel converted gifts using the normal off-list controls. Completing one shares history with current family members, including nonparticipants, never the beneficiary.
 - [ ] Repeat these checks in French and English.
 
 ### Family administration
@@ -232,8 +232,26 @@ Log in as **Charlie**.
       removes `q` and the results. Back/forward re-runs the query.
 - [ ] Simulate history/search failures: an alert replaces loading; no old
       results or success-shaped empty state hides the error.
-- [ ] Retain completed-history access for the recipient and participants;
-      uninvolved family members do not gain access in this context change.
+- [ ] As Bob, Charlie and David, review *Appareil photo*. As Alice (its recipient)
+      or unrelated Eloise, confirm it is absent, including from recipient options.
+- [ ] Complete a private off-list gift: nonparticipant current family members can
+      see its history, but not its direct reservation URL. Its recipient sees neither.
+- [ ] Filter by recipient across multiple occurrences/years. Check newest/oldest
+      by actual gift date (including differing offsets), with record-date fallback,
+      and recipient A-Z with recipient-ID, newest-date and history-ID tie breaks.
+- [ ] Confirm the latest snapshot name orders all occurrences of one person together;
+      missing names remain unavailable rather than becoming a current-user lookup.
+- [ ] Use back/forward with recipient and sort selections. Delay history requests:
+      no previous entries/options remain visible while rechecking access, and only
+      the latest response appears. Simulate a failure: an alert, not an empty list.
+- [ ] Try an inaccessible recipient URL, an unknown sort and an empty collection.
+      The former is generic/unavailable with a clear filter-reset instruction;
+      unknown sorts display newest first; no-history and no-match states differ.
+- [ ] Remove a viewer's shared-family membership or move the viewer/recipient to
+      an unrelated household. Refresh or navigate back: entries and options disappear,
+      even when the viewer was organizer/participant. Rejoining restores current access.
+- [ ] Repeat filtering, sorting, navigation, loading, errors and missing context
+      in French and English, using the keyboard and a narrow viewport.
 
 ### 3.10 Product copy
 
@@ -253,7 +271,7 @@ stays, but every screen names the task it moves forward rather than the emotion.
 - [ ] **Access:** log in as **Éloïse**; she cannot see Alice's, Bob's, Charlie's or David's lists.
 - [ ] **Participation request:** log in as **Alice**, open *Réservations*; on *Console de jeux*, accept or refuse David's pending request.
 - [ ] **Status flow:** as the organiser, move a reservation *Réservé → Acheté → Emballé → Offert* with the step buttons; once gifted it can no longer be edited and appears in *Historique*.
-- [ ] **History:** log in as **Alice**; *Historique* shows *Appareil photo* (Noël 2025).
+- [ ] **History:** log in as **Bob** or **Charlie**; *Historique* shows *Appareil photo* (Noël 2025). Alice, its recipient, never sees it.
 - [ ] **Custom occasion:** as a family admin, add an occasion in *Ma famille*; it appears in the reservation form for that family's members.
 
 ### 3.12 Link previews when adding a wish

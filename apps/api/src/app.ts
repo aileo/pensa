@@ -484,9 +484,13 @@ registerWishRoutes(api, routeDeps, wishes);
 registerReservationRoutes(api, routeDeps);
 api.get('/history', async (req, res) => {
   const rows = await query<{ id: string; recipient_id: string; snapshot: unknown; created_at: Date }>(
-    `SELECT h.id,h.recipient_id,h.snapshot,h.created_at FROM history h WHERE h.recipient_id=$1 OR EXISTS(
-    SELECT 1 FROM participants p WHERE p.reservation_id=h.reservation_id AND p.user_id=$1)
-    ORDER BY h.created_at DESC`, [person(req).id]);
+    `SELECT h.id,h.recipient_id,h.snapshot,h.created_at FROM history h
+     WHERE h.recipient_id<>$1 AND EXISTS(
+       SELECT 1 FROM users viewer JOIN memberships mine ON mine.household_id=viewer.household_id
+       JOIN users recipient ON recipient.id=h.recipient_id JOIN memberships theirs
+         ON theirs.household_id=recipient.household_id AND theirs.family_id=mine.family_id
+       WHERE viewer.id=$1)
+     ORDER BY h.created_at DESC,h.id`, [person(req).id]);
   res.json(rows.map(historyEntry));
 });
 api.get('/search', async (req, res) => {

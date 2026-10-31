@@ -8,6 +8,9 @@ minor bump may change behaviour.
 
 ### Added
 
+- Recipient-filtered gift history across recorded occurrences, with newest-first,
+  oldest-first and recipient A-Z sorting, persistent URL selections and clear
+  unavailable-recipient, loading, error and empty states ([#14](https://github.com/aileo/pensa/issues/14)).
 - Contextual history entries with recipient, organizer, participants, occasions
   and gift dates when available, with normalized, limited public identities.
 - Wish search results identify their list owner and clear stale results while
@@ -17,6 +20,13 @@ minor bump may change behaviour.
   and loading/error safeguards when switching recipients ([#8](https://github.com/aileo/pensa/issues/8)).
 - Family-admin promotion and demotion controls with account eligibility and
   last-administrator protection.
+
+### Changed
+
+- Completed gift snapshots are deliberately shared with the recipient's current
+  family members, excluding the recipient, including formerly private gifts.
+  Current household/family membership is checked on each request; active private
+  reservation access remains limited to organizers and participants.
 
 ### Fixed
 

@@ -153,6 +153,8 @@ It can be:
 - **visible** to the rest of the family, so that others can ask to join in.
 
 Either way the person receiving it sees nothing.
+These choices apply during preparation. Once given, even a private gift is
+shared in the recipient's current family history, still excluding the recipient.
 
 If a wish is deleted while reserved, the same commitment becomes a **private
 off-list gift**. Details, participants, occasions and progress remain; open
@@ -213,13 +215,23 @@ cannot be removed, and household permissions do not change.
 ## What has already been given
 
 Once a gift is marked as given it is kept in the **history**, readable by the
-person who received it and by everyone who contributed. It answers the question
+people who currently share a family with its recipient, **except the recipient**,
+including gifts that were private while being prepared. It answers the question
 behind most duplicate gifts: *what did we already give them?*
 
 Each entry identifies the gift and its recipient, with the organizer,
 participants, occasion and gift date when available. If the gift date was not
 recorded, the record date is labeled instead. Unavailable recipient details
 are labeled as such; missing optional information is not guessed.
+
+Choose a **Recipient** to review their accessible gifts across all recorded
+occasions and years. Sort **Newest first** (the default), **Oldest first** or
+**Recipient (A-Z)**, with newest gifts first within each person. The recipient
+selector contains only people from accessible history; an unavailable selection
+shows no gifts and can be cleared by choosing **All recipients**. Filters and
+sorting remain in the URL when you use browser back/forward.
+Leaving the shared families removes access, even if you organized or contributed
+to those gifts. The recipient never sees their own gifts in history.
 
 **Search** covers people and wishes in your shared families. Each wish result
 names the person whose list it belongs to. Off-list, deleted and already given
@@ -246,7 +258,8 @@ allowed — it answers as though they did not exist, because *being told you are
 not allowed* would itself be a clue. That is why Pensa can be shared with the
 whole family without anyone having to be careful about what they click.
 
-The only thing you see is what you have already been given, once it is given.
+History helps you review gifts given to others in your current families, never
+gifts meant for you.
 
 ## Questions people ask
 
