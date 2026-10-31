@@ -208,6 +208,11 @@ du cercle des cadeaux. Elle ou un administrateur peut le déclencher. Un foyer n
 perd jamais son dernier membre ni son dernier administrateur, et un membre géré
 n'est jamais administrateur.
 
+Les administrateurs d'une famille peuvent nommer ou retirer d'autres
+administrateurs depuis la gestion de la famille. Seuls les membres avec un
+compte sont éligibles, le dernier administrateur ne peut pas être retiré, et
+les droits des foyers ne changent pas.
+
 ## Ce qui a déjà été offert
 
 Une fois marqué comme offert, un cadeau est conservé dans l'**historique**,

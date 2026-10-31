@@ -77,6 +77,24 @@ export function FamilyManagement({ family, busy, perform, handleError, onRename 
         <FormField id="rename-family" label={t('Renommer la famille')}><div className="flex flex-wrap gap-2"><TextInput key={family.name} className="min-w-0 flex-1" id="rename-family" name="name" defaultValue={family.name} required/><button disabled={busy} className="secondary">{t('Renommer')}</button></div></FormField>
       </form>
     </div>
+    <div className="mt-6">
+      <h4 className="label">{t('Administrateurs de la famille')}</h4>
+      <p className="muted">{t('Ces droits concernent cette famille uniquement, pas les foyers.')}</p>
+      <ul className="divide-y divide-line-soft">{family.members?.map(member => {
+        const lastAdmin = member.familyAdmin && family.members?.filter(person => person.familyAdmin).length === 1
+        return <li key={member.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+          <span>{nameOf(member)} <RoleBadges person={member}/></span>
+          {!member.managed && <button className="secondary text-sm" disabled={busy || lastAdmin} title={lastAdmin ? t('Une famille doit conserver un administrateur') : undefined}
+            onClick={() => {
+              if (!window.confirm(t(member.familyAdmin ? 'Retirer les droits d’admin de la famille à {name} ?' : 'Nommer {name} admin de la famille ?', { name: nameOf(member) }))) return
+              void perform(() => member.familyAdmin
+                ? api(`/families/${family.id}/admins/${member.id}`, { method: 'DELETE' })
+                : api(`/families/${family.id}/admins`, json('POST', { userId: member.id })),
+              t(member.familyAdmin ? 'Droits d’admin de la famille retirés.' : 'Droits d’admin de la famille accordés.'), false)
+            }}>{t(member.familyAdmin ? 'Retirer l’admin de la famille' : 'Nommer admin de la famille')}</button>}
+        </li>
+      })}</ul>
+    </div>
   </section>
 }
 

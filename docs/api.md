@@ -17,7 +17,7 @@ and their text follows `Accept-Language`, French or English.
 | Profile, people | `GET/PATCH /profile`, `GET /users`, `GET /users/:id/wishes`, `POST /users/:id/wishes`, `PATCH /users/:id/wishes/order` |
 | Households, invitations | `GET /households`, `PATCH /households/:id`, `POST /households/:id/invitations` |
 | Managed members | `POST /households/:id/members`, `PATCH/DELETE /households/:id/members/:userId`, `POST /households/:id/members/:userId/invitations`, `POST /households/:id/members/:userId/account`, `POST /households/:id/members/:userId/move-out` |
-| Families | `GET/POST /families`, `PATCH /families/:id`, `POST /families/:id/invitations`, `POST /families/join`, `DELETE /families/:id/households/:householdId`, `POST /families/:id/admins` |
+| Families | `GET/POST /families`, `PATCH /families/:id`, `POST /families/:id/invitations`, `POST /families/join`, `DELETE /families/:id/households/:householdId`, `POST /families/:id/admins`, `DELETE /families/:id/admins/:userId` |
 | Occasions | `GET /occasions?recipientId=…`, `POST /families/:id/occasions`, `PATCH/DELETE /occasions/:id` |
 | Wishes | `GET/POST /wishes`, `POST /wishes/preview`, `GET/PATCH/DELETE /wishes/:id`, `PATCH /wishes/order` |
 | Reservations | `GET/POST /reservations`, `GET/PATCH/DELETE /reservations/:id` |
@@ -126,6 +126,13 @@ active reservations attached to deleted wishes. Completion keeps the existing
 beneficiary-and-participants history policy.
 
 ## Joining a household or a family
+
+Family administrators may promote an account-bearing member using
+`POST /families/:id/admins` with `{ "userId": "uuid" }`, or demote one using
+`DELETE /families/:id/admins/:userId`. Both require current family-admin access
+and target membership. Managed members cannot be promoted; concurrent demotions
+cannot remove the last administrator. These actions never change household roles
+or memberships.
 
 A family administrator creates a temporary invitation code, and **an
 administrator of the invited household** confirms it with

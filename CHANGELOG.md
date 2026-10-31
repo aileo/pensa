@@ -6,6 +6,11 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- Family-admin promotion and demotion controls with account eligibility and
+  last-administrator protection.
+
 ### Fixed
 
 - Deleting a reserved wish preserves the commitment as a private off-list

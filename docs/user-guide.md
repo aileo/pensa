@@ -199,6 +199,10 @@ drop them out of the gift circle. Either they or an administrator can start it.
 A household never loses its last member or its last administrator, and a managed
 member is never an administrator.
 
+Family administrators can appoint or remove other family administrators from
+family management. Only members with accounts are eligible, the last admin
+cannot be removed, and household permissions do not change.
+
 ## What has already been given
 
 Once a gift is marked as given it is kept in the **history**, readable by the

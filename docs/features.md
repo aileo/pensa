@@ -51,6 +51,9 @@ A household involved in active reservations cannot be removed from a family.
 Each family view shows only that family's members — belonging to two families
 never mixes their members together. Family administrators can rename the family
 and generate invitation codes; household administrators accept them.
+They can also appoint and remove family administrators among members with
+accounts, without changing anyone's household role. The last family
+administrator cannot be removed.
 
 ## Members without an account
 
