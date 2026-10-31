@@ -192,14 +192,35 @@ export const createReservationService = (deps: ReservationServiceDeps) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Match creation/deletion's wish-before-reservation lock order.
+      await client.query(
+        'SELECT id FROM wishes WHERE id=(SELECT wish_id FROM reservations WHERE id=$1) FOR UPDATE',
+        [id],
+      );
       const r = (
         await client.query<Reservation>(
           `SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r
-      JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1 FOR UPDATE OF r,w`,
-          [id],
+      JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1 AND EXISTS(
+        SELECT 1 FROM users viewer JOIN memberships mine ON mine.household_id=viewer.household_id
+        JOIN users recipient ON recipient.id=w.owner_id JOIN memberships theirs
+          ON theirs.household_id=recipient.household_id AND theirs.family_id=mine.family_id
+        WHERE viewer.id=$2) FOR UPDATE OF r,w`,
+          [id, actor.id],
         )
       ).rows[0];
       if (!r || r.owner_id === actor.id) fail(404, 'Réservation introuvable');
+      if (
+        r.off_list &&
+        !r.open_to_contributions &&
+        r.creator_id !== actor.id &&
+        !(
+          await client.query('SELECT 1 FROM participants WHERE reservation_id=$1 AND user_id=$2', [
+            id,
+            actor.id,
+          ])
+        ).rowCount
+      )
+        fail(404, 'Réservation introuvable');
       if (r.creator_id !== actor.id) fail(403, 'Créateur requis');
       if (r.cancelled_at || r.status === 'gifted') fail(409, 'Réservation terminée');
       if (r.deleted_at && d.status === 'gifted') fail(409, 'Souhait supprimé');

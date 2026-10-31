@@ -36,6 +36,13 @@
       "when": 1790785651356,
       "tag": "0004_managed_members",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793433600000,
+      "tag": "0005_deleted_wish_private_gifts",
+      "breakpoints": true
     }
   ]
 }

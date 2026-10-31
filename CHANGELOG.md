@@ -6,6 +6,14 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- Deleting a reserved wish preserves the commitment as a private off-list
+  gift, with its progress and participants intact and open contributions
+  disabled. Existing affected commitments are repaired on migration.
+- Direct private off-list reservation URLs no longer expose gifts to
+  uninvolved family members.
+
 ## [0.6.0] — 2026-10-08
 
 ### Added

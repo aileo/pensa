@@ -17,8 +17,9 @@ about what they click.
 A wish is a title, an optional link, an optional price, tags and a description.
 Paste a link and the metadata is fetched automatically: name, image and price
 are filled in, and you can correct them before saving. Once a wish exists only
-its tags remain editable, and deleting is logical, so a reservation attached to
-it is never orphaned.
+its tags remain editable. Deleting a reserved wish keeps the commitment as a
+**private off-list gift**: its details, participants, occasions and progress
+survive, while open contributions are disabled.
 
 Someone else's list can be filtered by tag, availability and price range.
 Availability is never shown to the owner of the list.

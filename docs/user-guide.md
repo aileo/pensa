@@ -142,10 +142,14 @@ on your own.
 
 It can be:
 
-- **private**, visible only to you; or
+- **private**, visible only to you and invited participants while active; or
 - **visible** to the rest of the family, so that others can ask to join in.
 
 Either way the person receiving it sees nothing.
+
+If a wish is deleted while reserved, the same commitment becomes a **private
+off-list gift**. Details, participants, occasions and progress remain; open
+contributions are turned off. Its organizer can edit it and continue preparing it.
 
 ## Several people on one gift
 

@@ -417,6 +417,9 @@ export type Reservation = { id: string; wish_id: string; creator_id: string; sta
 const getReservation = async (id: string, viewer: string) => {
   const row = await first<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1`, [id]);
   if (!row || row.owner_id === viewer || !await visible(viewer, row.owner_id)) fail(404, 'Réservation introuvable');
+  if (row.off_list && !row.open_to_contributions && row.creator_id !== viewer &&
+    !await first('SELECT 1 FROM participants WHERE reservation_id=$1 AND user_id=$2', [id, viewer]))
+    fail(404, 'Réservation introuvable');
   return row;
 };
 const reservationDetails = async (r: Reservation, viewer: string) => {
