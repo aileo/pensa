@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
-import { api, dateOf, json, list, money, nameOf, type Family, type Household, type Id, type Occasion, type Onboarding, type Person, type Reservation, type Todo, type Wish } from './api'
+import { api, dateOf, json, list, nameOf, type Family, type Household, type Id, type Occasion, type Onboarding, type Person, type Reservation, type Todo, type Wish } from './api'
 import { localizeMessage, occasionLabel, type TranslationKey } from './locale'
 import { useTranslation } from './language-context'
 import { familyPath, matchRoute, pagePath, personWishesPath, reservationPath, wishPath } from './routes'
@@ -15,9 +15,11 @@ import { FamilyHouseholds, FamilyManagement, HouseholdCard, HouseholdPanel, Join
 import { Guidance } from './features/dashboard/Guidance'
 import { ProfileForm, ProfileMenu } from './features/profile/ProfileComponents'
 import { OffListForm, OffListGiftCard, ReservationForm, ReservationRow } from './features/reservations/ReservationComponents'
-import { occasionWithYear, statusNotices } from './features/reservations/model'
+import { selectionOf, statusNotices } from './features/reservations/model'
 import { WishDetail } from './features/wishes/WishDetail'
 import { WishEditForm, WishForm } from './features/wishes/WishForm'
+import { HistoryPanel } from './features/history/HistoryPanel'
+import { SearchPanel } from './features/search/SearchPanel'
 
 const nav: { page: Page; label: TranslationKey; icon: IconName }[] = [
   { page: 'dashboard', label: 'Tableau de bord', icon: 'home' },
@@ -104,6 +106,10 @@ function PersonWishesPanel({ person, me, filters, curating, busy, managedMembers
     if (!ok && reorderGuardRef.current === version) setWishesState({ status: 'ready', items: previous, signature })
   }
   return <>
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <p className="font-semibold">{nameOf(person)}</p>
+      <button className="primary" onClick={() => onOpenOffList(person)}><Icon name="gift" size={17}/> {t('Prévoir un cadeau hors liste')}</button>
+    </div>
     {curating && <ManagedListsBar me={me} managed={managedMembers} activeId={person.id} onSelf={onSelf} onPerson={onPerson}/>}
     {curating && <div className="card mb-6 flex flex-wrap items-center justify-between gap-3 border-sage-200 bg-sage-50 p-4"><div><p className="eyebrow">{t('LISTE GÉRÉE PAR VOTRE FOYER')}</p><p className="muted mt-1">{t('{name} n’a pas de compte : vous tenez sa liste à sa place.', { name: nameOf(person) })}</p></div><button className="primary" onClick={() => onOpenWish(person)}><Icon name="plus" size={17}/> {t('Ajouter une envie')}</button></div>}
     <div className="card mb-6 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -135,9 +141,6 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [sharedWishes, setSharedWishes] = useState<Wish[]>([])
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [dashboard, setDashboard] = useState<Record<string, unknown>>({})
-  const [history, setHistory] = useState<unknown[]>([])
-  const [searchResults, setSearchResults] = useState<unknown[]>([])
-  const searchText = route.page === 'search' ? searchParams.get('q') ?? '' : ''
   const routePersonId = route.page === 'personWishes' ? route.personId : undefined
   const isSelfRoute = routePersonId !== undefined && String(routePersonId) === String(me.id)
   const selectedPerson = routePersonId && !isSelfRoute ? users.find(person => String(person.id) === String(routePersonId)) ?? null : null
@@ -170,6 +173,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     }
   }, [revision])
   const [offListRecipient, setOffListRecipient] = useState<Person | null>(null)
+  const [offListOccasion, setOffListOccasion] = useState<import('./api').OccasionSelection | null>(null)
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
   const handleError = useCallback((problem: unknown) => setError(problem instanceof Error ? problem.message : t('Une erreur inattendue est survenue.')), [t])
 
@@ -198,22 +202,6 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     }).catch(problem => { if (active) handleError(problem) }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [me, revision, handleError])
-  useEffect(() => {
-    if (route.page !== 'history') return
-    let active = true
-    api<unknown[]>('/history').then(data => { if (active) setHistory(list(data)) }).catch(problem => { if (active) handleError(problem) })
-    return () => { active = false }
-  }, [me, route.page, revision, handleError])
-  useEffect(() => {
-    if (route.page !== 'search') return
-    let active = true
-    const timer = window.setTimeout(() => {
-      api<unknown>(`/search?q=${encodeURIComponent(searchText.trim())}`).then(data => {
-        if (active) setSearchResults(Array.isArray(data) ? data : data && typeof data === 'object' ? [...list<unknown>((data as Record<string, unknown>).people), ...list<unknown>((data as Record<string, unknown>).wishes)] : [])
-      }).catch(problem => { if (active) handleError(problem) })
-    }, 300)
-    return () => { active = false; window.clearTimeout(timer) }
-  }, [me, route.page, searchText, revision, handleError])
 
   async function perform(action: () => Promise<unknown>, success: string, close = true) {
     setBusy(true); setError('')
@@ -236,7 +224,11 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     api<Occasion[]>(`/occasions?recipientId=${encodeURIComponent(String(wish.ownerId ?? ''))}`).then(data => setOccasions(list(data))).catch(handleError)
   }
   function openOccasion(family: Family) { setOccasionFamily(family); setModal('occasion'); setError('') }
-  function openOffList(person?: Person | null) { setOffListRecipient(person ?? null); setModal('offList'); setError('') }
+  function openOffList(person?: Person | null, occasion?: Occasion | null) {
+    setOffListRecipient(person ?? null)
+    setOffListOccasion(occasion ? selectionOf(occasion) : null)
+    setModal('offList'); setError('')
+  }
   const requestGift = (gift: Reservation) => perform(() => api(`/reservations/${gift.id}/requests`, json('POST', {})), t('Demande de participation envoyée.'), false)
   async function removeWish(wish: Wish) {
     if (window.confirm(t('Supprimer « {title} » de votre liste ?', { title: wish.title }))) await perform(() => api(`/wishes/${wish.id}`, { method: 'DELETE' }), t('Envie supprimée.'))
@@ -319,7 +311,10 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
               const entry = <><span className="rounded-xl bg-brand-50 p-2 text-brand-600"><Icon name="calendar" size={19}/></span><div className="min-w-0 flex-1 text-left"><p className="truncate font-semibold">{label} · {nameOf(occasion.person)}</p><p className="muted">{dateOf(occasion.nextDate)}</p></div></>
               const person = occasion.person
               return person
-                ? <button key={`${occasion.id}-${person.id}`} type="button" className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-brand-50" onClick={() => openPerson(person)} aria-label={t('Voir les envies de {name}', { name: nameOf(person) })}>{entry}<Icon name="chevron" size={17} className="shrink-0 text-ink-400"/></button>
+                ? <div key={`${occasion.id}-${person.id}`} className="flex flex-wrap items-center gap-2 p-4">
+                    <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => openPerson(person)} aria-label={t('Voir les envies de {name}', { name: nameOf(person) })}>{entry}<Icon name="chevron" size={17}/></button>
+                    {String(person.id) !== String(me.id) && <button className="secondary text-xs" onClick={() => openOffList(person, occasion)} aria-label={t('Prévoir un cadeau hors liste pour {name}', { name: nameOf(person) })}><Icon name="gift" size={16}/> {t('Cadeau hors liste')}</button>}
+                  </div>
                 : <div key={occasion.id} className="flex items-center gap-3 p-4">{entry}</div>
             })}</div> : <Empty icon="calendar" title={t('Aucune date à venir')} text={t('Les occasions de vos proches apparaîtront ici.')}/>}</div>
             <div><SectionTitle icon="gift" kicker={t('EN PRÉPARATION')} title={t('Les cadeaux partagés')}/>{dashboardReservations.length || dashboardParticipating.length ? <div className="card p-6"><p className="text-lg font-semibold">{t(dashboardReservations.length === 1 ? '{count} réservation organisée' : '{count} réservations organisées', { count: dashboardReservations.length })}</p><p className="muted mt-2">{t(dashboardParticipating.length === 1 ? '{count} cadeau auquel vous participez' : '{count} cadeaux auxquels vous participez', { count: dashboardParticipating.length })}</p><button className="secondary mt-5" onClick={() => go('reservations')}>{t('Voir les réservations')} <Icon name="arrow" size={16}/></button></div> : <Empty icon="gift" title={t('Encore rien à préparer')} text={t('Réservez une envie pour organiser un cadeau.')}/>}</div>
@@ -334,19 +329,19 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
           {routePersonId ? (selectedPerson
             ? <PersonWishesPanel key={String(selectedPerson.id)} person={selectedPerson} me={me} filters={personFilters} curating={curating} busy={busy} managedMembers={managedMembers} revision={revision} onSelf={() => go('wishes')} onPerson={openPerson} onFilterChange={setPersonFilter} onOpenWish={openWish} onReserve={openReserve} onEdit={wish => { setSelectedWish(wish); setModal('editWish') }} onRemoveWish={wish => void removeWish(wish)} onOpenWishDetail={wish => navigate(wishPath(String(wish.id)))} onOpenOffList={openOffList} onRequestGift={gift => void requestGift(gift)} onOpenReservation={openReservation} onReorderWishes={ids => perform(() => api(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes/order`, json('PATCH', { ids })), t('Ordre enregistré.'), false)}/>
             : !loading ? <Empty icon="users" title={t('Personne introuvable')} text={t('Cette personne n’existe pas ou vous n’avez pas accès à sa liste.')}/> : null)
-          : routeFamilyId ? (activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">{t('LES MEMBRES')}</p><p className="muted mt-1">{t('Découvrez les envies des membres de cette famille.')}</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> {t('Ajouter une occasion')}</button>}</div>{activeFamily.households?.length ? <FamilyHouseholds family={activeFamily} me={me} onPerson={openPerson}/> : activeFamily.members?.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{activeFamily.members.map(person => <button key={person.id} onClick={() => openPerson(person)} className="card flex items-center gap-4 p-5 text-left hover:border-brand-200"><Avatar person={person}/><span className="flex-1 font-semibold">{nameOf(person)}</span><Icon name="chevron" size={17}/></button>)}</div> : <Empty icon="users" title={t('Aucun membre affiché')} text={t('Les membres de cette famille apparaîtront ici dès qu’ils seront disponibles.')}/ >}{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} busy={busy} perform={perform} handleError={handleError} onRename={name => setFamilyNameOverride({ id: activeFamily.id, name })}/>}</>
+          : routeFamilyId ? (activeFamily ? <><div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">{t('LES MEMBRES')}</p><p className="muted mt-1">{t('Découvrez les envies des membres de cette famille.')}</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> {t('Ajouter une occasion')}</button>}</div><FamilyHouseholds family={activeFamily} me={me} onPerson={openPerson} onGift={openOffList}/>{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} busy={busy} perform={perform} handleError={handleError} onRename={name => setFamilyNameOverride({ id: activeFamily.id, name })}/>}</>
             : !loading ? <Empty icon="users" title={t('Famille introuvable')} text={t('Cette famille n’existe pas ou vous n’y avez plus accès.')}/> : null)
           : <>
-              {myHousehold && <HouseholdPanel household={myHousehold} me={me} isAdmin={isHouseholdAdmin} busy={busy} perform={perform} handleError={handleError} onPerson={openPerson}/>}
+              {myHousehold && <HouseholdPanel household={myHousehold} me={me} isAdmin={isHouseholdAdmin} busy={busy} perform={perform} handleError={handleError} onPerson={openPerson} onGift={families.length ? openOffList : undefined}/>}
               <div className="mt-9"><SectionTitle icon="home" kicker={t('LES FAMILLES DE MON FOYER')} title={t('Mes familles')} action={isHouseholdAdmin ? <button className="primary" onClick={() => setModal('family')}><Icon name="plus" size={18}/> {t('Créer une famille')}</button> : undefined}/>
               {families.length ? <div className="grid gap-5 lg:grid-cols-2">{families.map(family => <article className="card flex flex-col p-6" key={family.id}><div className="flex items-start gap-4"><div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="users" size={25}/></div><div className="min-w-0 flex-1"><h3 className="font-['Outfit'] text-xl font-semibold">{family.name}</h3><p className="muted mt-1">{family.admin ? t('Famille administrée') : t('Famille partagée')}</p></div></div>{!!family.households?.length && <ul className="mt-5 space-y-3">{family.households.map(household => <li key={household.id} className="rounded-xl bg-brand-50 p-3"><p className="text-sm font-semibold text-ink-700">{household.name}</p><ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2">{household.members?.map(member => <li key={member.id} className="flex flex-wrap items-center gap-1.5 text-sm"><span>{nameOf(member)}</span><RoleBadges person={member}/></li>)}</ul></li>)}</ul>}<div className="mt-5 flex gap-2"><button className="secondary flex-1 !px-2" onClick={() => navigate(familyPath(String(family.id)))}>{t('Voir la famille')} <Icon name="arrow" size={16}/></button>{family.admin && <button className="icon-button" onClick={() => openOccasion(family)} aria-label={t('Créer une occasion pour {name}', { name: family.name })}><Icon name="calendar" size={19}/></button>}</div></article>)}</div> : <Empty icon="users" title={isHouseholdAdmin ? t('Créez votre première famille') : t('Votre foyer ne fait partie d’aucune famille')} text={isHouseholdAdmin ? t('Réunissez les foyers avec qui vous organisez les cadeaux.') : t('Un admin de votre foyer peut créer une famille ou en rejoindre une.')} action={isHouseholdAdmin ? <button className="primary" onClick={() => setModal('family')}>{t('Créer une famille')}</button> : undefined}/>}
               {isHouseholdAdmin ? <JoinFamily busy={busy} perform={perform}/> : <p className="muted mt-6 rounded-xl bg-brand-50 p-4">{t('Seul un admin du foyer peut rejoindre ou créer une famille.')}</p>}</div>
-              {otherHouseholds.length > 0 && <div className="mt-9"><SectionTitle icon="users" kicker={t('DANS VOS FAMILLES')} title={t('Les autres foyers')}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{otherHouseholds.map(household => <HouseholdCard key={household.id} household={household} me={me} onPerson={openPerson}/>)}</div></div>}
+              {otherHouseholds.length > 0 && <div className="mt-9"><SectionTitle icon="users" kicker={t('DANS VOS FAMILLES')} title={t('Les autres foyers')}/><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{otherHouseholds.map(household => <HouseholdCard key={household.id} household={household} me={me} onPerson={openPerson} onGift={openOffList}/>)}</div></div>}
             </>}
         </>}
         {route.page === 'reservations' && <><SectionTitle icon="gift" kicker={t('CADEAUX EN PRÉPARATION')} title={t('Mes réservations')} action={<button className="secondary" onClick={() => openOffList()}><Icon name="plus" size={17}/> {t('Prévoir un cadeau hors liste')}</button>}/>{route.reservationId && !loading && !reservations.some(reservation => String(reservation.id) === String(route.reservationId)) && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{t('Réservation introuvable ou non accessible.')}</p>}{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform} onStatus={changeStatus} focused={String(route.reservationId) === String(reservation.id)}/>)}</div> : <Empty icon="gift" title={t('Aucune réservation pour le moment')} text={t('Explorez les listes de vos proches pour leur préparer une surprise.')} action={<button className="primary" onClick={() => go('families')}>{t('Découvrir les envies')} <Icon name="arrow" size={17}/></button>}/>}</>}
-        {route.page === 'history' && <><SectionTitle icon="clock" tone="sage" kicker={t('DÉJÀ OFFERT')} title={t('Historique')}/>{history.length ? <div className="card divide-y divide-line-soft">{history.map((entry, index) => { const item = entry as { id?: Id; snapshot?: { title?: string; recipient?: { birthDate?: string; birth_date?: string }; occasions?: { name: string; kind?: Occasion['kind']; year: number }[] }; created_at?: string }; const birthDate = item.snapshot?.recipient?.birthDate ?? item.snapshot?.recipient?.birth_date; return <div className="flex items-start gap-4 p-5" key={String(item.id ?? index)}><span className="rounded-xl bg-brand-50 p-2.5 text-brand-600"><Icon name="clock" size={19}/></span><div><p className="font-semibold">{item.snapshot?.title || t('Un cadeau offert')}</p><p className="muted mt-1">{item.snapshot?.occasions?.map(occasion => occasionWithYear(occasion, locale, birthDate)).join(', ')} · {dateOf(item.created_at)}</p></div></div> })}</div> : <Empty icon="clock" title={t('Rien d’offert pour l’instant')} text={t('Les cadeaux déjà offerts s’afficheront ici, pour éviter d’offrir deux fois la même chose.')}/>}</>}
-        {route.page === 'search' && <><SectionTitle icon="search" kicker={t('RECHERCHE')} title={t('Rechercher')}/><label htmlFor="global-search" className="label">{t('Personnes et envies')}</label><div className="relative mb-7"><Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-500"/><input id="global-search" autoComplete="off" className="field !py-3 !pl-12" placeholder={t('Rechercher une personne, une envie…')} value={searchText} onChange={event => setSearchParams(previous => { const next = new URLSearchParams(previous); const value = event.target.value; if (value) next.set('q', value); else next.delete('q'); return next }, { replace: true })}/></div>{searchResults.length ? <div className="space-y-3">{searchResults.map((result, index) => { const item = result as Record<string, unknown>; const person = item as Person; const wish = item as Wish; const isWish = typeof item.title === 'string'; return <div key={String(item.id ?? index)} className="card flex items-center gap-4 p-4">{isWish ? <span className="rounded-xl bg-brand-50 p-3 text-brand-600"><Icon name="heart"/></span> : <Avatar person={person}/>}<div className="min-w-0 flex-1"><p className="truncate font-semibold">{isWish ? wish.title : nameOf(person)}</p><p className="muted">{isWish ? money(wish.price) || t('Envie cadeau') : t('Personne')}</p></div><button className="secondary !px-3 !py-2 text-sm" onClick={() => isWish ? navigate(wishPath(String(wish.id))) : openPerson(person)}>{t('Voir')} <Icon name="arrow" size={15}/></button></div> })}</div> : <Empty icon="search" title={searchText ? t('Aucun résultat') : t('Que recherchez-vous ?')} text={searchText ? t('Essayez d’autres mots-clés.') : t('Retrouvez une personne ou une idée cadeau en quelques lettres.')}/>}</>}
+        {route.page === 'history' && <HistoryPanel key={String(me.id)} revision={revision}/>}
+        {route.page === 'search' && <SearchPanel key={String(me.id)} revision={revision}/>}
         {route.page === 'profile' && <><SectionTitle icon="user" kicker={t('VOTRE ESPACE')} title={t('Mon profil')}/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-line pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">{t('Votre compte Pensa')}</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">{t('ADRESSE E-MAIL')}</dt><dd>{me.email || t('Non renseignée')}</dd></div><div><dt className="eyebrow mb-1">{t('DATE DE NAISSANCE')}</dt><dd>{dateOf(me.birthDate) || t('Non renseignée')}</dd></div></dl><ProfileForm me={me} busy={busy} perform={perform} onSaved={onProfile}/></div></>}
         {route.page === 'notFound' && <Empty icon="search" title={t('Page introuvable')} text={t('Cette page n’existe pas ou l’adresse est incorrecte.')} action={<button className="primary" onClick={() => go('dashboard')}>{t('Retour au tableau de bord')}</button>}/>}
       </main>
@@ -358,7 +353,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
       {modal === 'occasion' && occasionFamily && <OccasionForm family={occasionFamily} busy={busy} perform={perform}/>}
       {modal === 'editWish' && selectedWish && <WishEditForm wish={selectedWish} busy={busy} perform={perform}/>}
       {modal === 'reservation' && selectedWish && <ReservationForm wish={selectedWish} reservations={reservations} occasions={occasions} people={allPeople} me={me} busy={busy} perform={perform}/>}
-      {modal === 'offList' && <OffListForm recipient={offListRecipient} people={allPeople} me={me} busy={busy} perform={perform}/>}
+      {modal === 'offList' && <OffListForm recipient={offListRecipient} occasion={offListOccasion} people={allPeople} me={me} busy={busy} perform={perform}/>}
     </div></div>}
   </div>
 }

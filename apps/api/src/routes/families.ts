@@ -142,6 +142,11 @@ export const registerFamilyRoutes = (api: Router, deps: RouteDeps) => {
     const data = await parseAuthorized(adminInput, req.body, () => service.authorizeFamilyAdmin(actor, id));
     res.status(201).json(await service.addFamilyAdmin(actor, id, data));
   });
+  api.delete('/families/:id/admins/:userId', async (req, res) => {
+    res.json(
+      await service.removeFamilyAdmin(person(req), uuid.parse(req.params.id), uuid.parse(req.params.userId)),
+    );
+  });
   api.get('/occasions', async (req, res) => {
     const actor = person(req);
     const recipientId = uuid.parse(req.query.recipientId ?? actor.id);

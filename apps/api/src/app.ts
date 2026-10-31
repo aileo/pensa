@@ -11,6 +11,7 @@ import { createWishService } from './services/wishes.js';
 import { pool, query } from './db.js';
 import { createDefaultOccasions } from './family.js';
 import { preview } from './metadata.js';
+import { historyEntry } from './history.js';
 
 export type Person = { id: string; household_id: string; first_name: string; last_name: string; email: string | null; birth_date: Date | string; name_day: string | null; avatar: string | null; household_admin?: boolean; password_hash?: string | null; managed?: boolean };
 type AuthRequest = Request & { person?: Person };
@@ -417,6 +418,9 @@ export type Reservation = { id: string; wish_id: string; creator_id: string; sta
 const getReservation = async (id: string, viewer: string) => {
   const row = await first<Reservation>(`SELECT r.*,w.owner_id,w.deleted_at,w.gifted_at,w.off_list FROM reservations r JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1`, [id]);
   if (!row || row.owner_id === viewer || !await visible(viewer, row.owner_id)) fail(404, 'Réservation introuvable');
+  if (row.off_list && !row.open_to_contributions && row.creator_id !== viewer &&
+    !await first('SELECT 1 FROM participants WHERE reservation_id=$1 AND user_id=$2', [id, viewer]))
+    fail(404, 'Réservation introuvable');
   return row;
 };
 const reservationDetails = async (r: Reservation, viewer: string) => {
@@ -479,9 +483,15 @@ registerFamilyRoutes(api, routeDeps);
 registerWishRoutes(api, routeDeps, wishes);
 registerReservationRoutes(api, routeDeps);
 api.get('/history', async (req, res) => {
-  res.json(await query(`SELECT h.id,h.snapshot,h.created_at FROM history h WHERE h.recipient_id=$1 OR EXISTS(
-    SELECT 1 FROM participants p WHERE p.reservation_id=h.reservation_id AND p.user_id=$1)
-    ORDER BY h.created_at DESC`, [person(req).id]));
+  const rows = await query<{ id: string; recipient_id: string; snapshot: unknown; created_at: Date }>(
+    `SELECT h.id,h.recipient_id,h.snapshot,h.created_at FROM history h
+     WHERE h.recipient_id<>$1 AND EXISTS(
+       SELECT 1 FROM users viewer JOIN memberships mine ON mine.household_id=viewer.household_id
+       JOIN users recipient ON recipient.id=h.recipient_id JOIN memberships theirs
+         ON theirs.household_id=recipient.household_id AND theirs.family_id=mine.family_id
+       WHERE viewer.id=$1)
+     ORDER BY h.created_at DESC,h.id`, [person(req).id]);
+  res.json(rows.map(historyEntry));
 });
 api.get('/search', async (req, res) => {
   const q = z.string().trim().max(100).parse(req.query.q ?? '');
@@ -496,7 +506,10 @@ api.get('/search', async (req, res) => {
     AND (w.title ILIKE $2 OR EXISTS(SELECT 1 FROM unnest(w.tags) tag WHERE tag ILIKE $2)
       OR w.price::text ILIKE $2 OR u.first_name ILIKE $2 OR u.last_name ILIKE $2) LIMIT 100`,
     [person(req).household_id, `%${q}%`]);
-  res.json({ people: people.map(publicPerson), wishes: await Promise.all(wishesRows.map(w => wishes.reservationView(w, person(req).id))) });
+  res.json({ people: people.map(publicPerson), wishes: await Promise.all(wishesRows.map(async w => ({
+    ...await wishes.reservationView(w, person(req).id),
+    owner: publicPerson(await first<Person>('SELECT * FROM users WHERE id=$1', [w.owner_id])),
+  }))) });
 });
 api.get('/dashboard', async (req, res) => {
   const actor = person(req);

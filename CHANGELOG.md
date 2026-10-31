@@ -6,6 +6,29 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- Family-admin promotion and demotion controls with account eligibility and
+  last-administrator protection.
+- Recipient-filtered history with newest/oldest/recipient sorting and gift,
+  organizer, participant and date/occasion context; wish search labels owners.
+- Off-list gift actions above long wish lists and beside member/occasion
+  actions, with editable recipient and occasion prefills.
+
+### Changed
+
+- Completed gifts are now shared with the recipient's current family circle
+  except the recipient, including gifts that were private during preparation.
+  Active private gifts remain restricted to organizers and participants.
+
+### Fixed
+
+- Deleting a reserved wish preserves the commitment as a private off-list
+  gift, with its progress and participants intact and open contributions
+  disabled. Existing affected commitments are repaired on migration.
+- Direct private off-list reservation URLs no longer expose gifts to
+  uninvolved family members.
+
 ## [0.6.0] — 2026-10-08
 
 ### Added

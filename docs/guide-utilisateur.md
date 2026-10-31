@@ -149,7 +149,7 @@ derrière : l'idée que vous avez eue tout seul.
 
 Il peut être :
 
-- **privé**, visible de vous seul ; ou
+- **privé**, visible de vous et des participants invités pendant sa préparation ; ou
 - **visible** par le reste de la famille, pour que d'autres puissent demander à
   participer.
 
@@ -206,11 +206,32 @@ n'est jamais administrateur.
 ## Ce qui a déjà été offert
 
 Une fois marqué comme offert, un cadeau est conservé dans l'**historique**,
-consultable par la personne qui l'a reçu et par tous ceux qui y ont participé.
+consultable par les membres actuels de la famille du bénéficiaire, **sauf le
+bénéficiaire lui-même**, même si le cadeau était privé pendant sa préparation.
 Il répond à la question qui cause le plus de doublons : *qu'est-ce qu'on lui a
 déjà offert ?*
 
-La **recherche** couvre à la fois les personnes, les envies et les occasions.
+Chaque entrée indique le cadeau, le bénéficiaire, l'organisateur, les participants,
+la date de remise et les occasions disponibles. Filtrez par bénéficiaire et
+triez du plus récent au plus ancien, dans l'ordre inverse ou par bénéficiaire
+A-Z pour retrouver les cadeaux sur plusieurs années.
+
+La **recherche** couvre les personnes et les envies, avec le propriétaire de
+chaque liste.
+
+Prévoyez un cadeau hors liste en haut de la liste d'une personne, à côté de
+l'accès aux envies d'un membre ou d'une occasion à venir. Le bénéficiaire et
+l'occasion préremplis restent modifiables ; le cadeau est privé par défaut.
+
+Si une envie réservée est supprimée, l'engagement devient un **cadeau hors
+liste privé**. Les détails, participants, occasions et l'avancement sont
+conservés ; les demandes de participation sont fermées. L'organisateur peut
+modifier le cadeau et poursuivre sa préparation.
+
+Les administrateurs d'une famille peuvent nommer ou retirer d'autres
+administrateurs depuis la gestion de la famille. Seuls les membres avec un
+compte sont éligibles, le dernier administrateur ne peut pas être retiré, et
+les droits des foyers ne changent pas.
 
 ## Français et anglais
 
@@ -237,8 +258,9 @@ car *s'entendre dire qu'on n'a pas le droit* serait déjà un indice. C'est pour
 cela que Pensa peut être partagé avec toute la famille sans que personne n'ait à
 faire attention où il clique.
 
-La seule chose que vous voyez, c'est ce qu'on vous a déjà offert, une fois que
-c'est offert.
+Les cadeaux qui vous sont destinés restent cachés, même après leur remise.
+Les autres cadeaux offerts deviennent visibles dans votre cercle familial
+commun, y compris ceux qui étaient privés.
 
 ## Questions fréquentes
 

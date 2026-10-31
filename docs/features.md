@@ -16,9 +16,10 @@ about what they click.
 
 A wish is a title, an optional link, an optional price, tags and a description.
 Paste a link and the metadata is fetched automatically: name, image and price
-are filled in, and you can correct them before saving. Once a wish exists only
-its tags remain editable, and deleting is logical, so a reservation attached to
-it is never orphaned.
+are filled in, and you can correct them before saving. The title stays immutable;
+other optional details and tags can be edited. Deleting a reserved wish keeps
+the commitment as a **private off-list gift**: its details, participants,
+occasions and progress survive, while open contributions are disabled.
 
 Someone else's list can be filtered by tag, availability and price range.
 Availability is never shown to the owner of the list.
@@ -50,6 +51,9 @@ A household involved in active reservations cannot be removed from a family.
 Each family view shows only that family's members — belonging to two families
 never mixes their members together. Family administrators can rename the family
 and generate invitation codes; household administrators accept them.
+They can also appoint and remove family administrators among members with
+accounts, without changing anyone's household role. The last family
+administrator cannot be removed.
 
 ## Members without an account
 
@@ -128,6 +132,9 @@ A gift that nobody asked for still needs organising. An off-list reservation is
 created for a person and an occasion without any wish behind it. It can be kept
 **private**, or made **visible** to the rest of the family so that others can
 ask to join in — never to the beneficiary.
+Creation is available above a person's wish list and beside family-member
+and upcoming-occasion actions, as well as from reservations. Recipient and
+occasion prefills remain editable. New gifts default to private.
 
 ## Contributions
 
@@ -138,10 +145,14 @@ its history.
 ## History and search
 
 Once given, a gift is kept as an independent snapshot, readable by the
-beneficiary and the participants. It answers the question that causes the most
-duplicates: *what did we already give them?*
+recipient's current family circle **except the recipient**, including gifts
+that were previously private. Active-gift privacy remains unchanged.
+History shows recipient, organizer, participants, delivery date and occasion
+context. Filter by recipient and sort newest first, oldest first or recipient
+A-Z (newest first within a recipient) across all accessible past occurrences.
+It answers the question that causes the most duplicates: *what did we already give them?*
 
-Search covers people, wishes and occasions.
+Search covers people and wishes, and identifies each wish's owner.
 
 ## English and French
 

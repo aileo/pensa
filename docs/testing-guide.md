@@ -173,7 +173,7 @@ To restore the sample data, use *Revenir à …* or reseed.
 
 ### 3.9 Off-list gifts
 
-An off-list gift is planned for an occasion but does not come from the recipient's wish list. The recipient never sees it before it is given. With *Visible et ouvert aux participations*, the recipient's relatives can see it and ask to contribute; otherwise only the organiser and invited participants see it.
+An off-list gift is planned for an occasion but does not come from the recipient's wish list. The recipient never sees it, including in history. With *Visible et ouvert aux participations*, the recipient's relatives can see it and ask to contribute; otherwise only the organiser and invited participants see it while it is active.
 
 Sample data: *Week-end spa* (for Bob, organised by David, visible, Noël 2026) and *Cours de poterie* (for Alice, organised by Charlie, private).
 
@@ -181,15 +181,27 @@ Log in as **Charlie**.
 
 - [ ] The dashboard shows a *Cadeaux ouverts aux participations* section with *Week-end spa* for Bob Martin, organised by David, and a *Participer* button.
 - [ ] *Réservations* shows *Cours de poterie* with the *Hors liste* and *Privé* badges, its price and description, and the usual steps.
-- [ ] On Bob's page (*Ma famille* → Bob), *Cadeaux prévus hors liste* lists *Week-end spa*. *Prévoir un cadeau hors liste* opens the form with Bob preselected.
-- [ ] From *Réservations*, *Prévoir un cadeau hors liste* opens the form with a *Pour qui ?* selector. Occasions load once a person is chosen, and the first one is preselected. Only the title is required.
+- [ ] On Bob's page (*Ma famille* → Bob), *Cadeaux prévus hors liste* lists *Week-end spa*. The top *Prévoir un cadeau hors liste* action opens the form with Bob preselected but editable.
+- [ ] From *Réservations*, *Prévoir un cadeau hors liste* opens the form with a *Pour qui ?* selector. Occasions load once a person is chosen, and the first one is preselected. Recipient, title and at least one occasion are required; other gift details are optional.
 - [ ] Create a visible gift for Bob: it appears in *Réservations* with *Visible par la famille*, and in the À faire list (*Acheter …*).
 - [ ] Click *Participer* on *Week-end spa*: the card shows *Demande envoyée, en attente de réponse.*
 - [ ] Log in as **David**, open *Réservations* and accept Charlie's request. Log back in as **Charlie**: *Week-end spa* is now in his reservations as participant, and no longer in the dashboard section.
 - [ ] As organiser, *Gérer* on an off-list gift allows editing the title, description, price, link and image, as well as toggling visibility. Cancelling the reservation removes the gift entirely.
 - [ ] Log in as **Alice**: she sees *Week-end spa* (she shares family B with Bob and David) but not *Cours de poterie*, which is private and planned for her. Her page shows no off-list section for herself.
 - [ ] Log in as **Bob**: no trace of off-list gifts anywhere (dashboard, his wishes, reservations, search for *spa*).
-- [ ] Once an off-list gift is marked *Offert*, the recipient sees it in *Historique*.
+- [ ] Once an off-list gift is marked *Offert*, current family members except the recipient see it in *Historique*, even if it was private.
+
+### Wish deletion, administration and history
+
+- [ ] Delete a wish with an open reservation. Its organizer and existing participants retain the same reservation, details, occasions and progress as a private off-list gift. Uninvolved family members and the recipient cannot access it, even using its old direct URL.
+- [ ] Edit, advance and cancel converted gifts using the normal off-list controls. Completing one makes it visible in family history, never to its recipient.
+- [ ] In family management, promote an account-bearing member, verify invitation/rename access, then demote them. Household permissions remain unchanged; managed members and the last family administrator have no elevation/demotion action.
+- [ ] On a long wish list, the off-list action is visible at the top. Member cards and upcoming occasions also provide it without losing wishlist navigation.
+- [ ] Open from an occasion, review its recipient/year prefill, then change recipients. Incompatible occasions clear, the new recipient cannot stay a participant, and saving is disabled until the new occasions load.
+- [ ] History identifies gift, recipient, organizer/participants, delivery date and available occasions. Test recipient filters across multiple years, newest/oldest/recipient A-Z sorts, no matches, an empty history and browser back/forward.
+- [ ] Unrelated or removed households see no history for that recipient. A beneficiary never sees their own entry or appears in the accessible-history recipient selector.
+- [ ] Wish search results show the owner's name even when only the gift title matched. The owner's own results do not reveal reservation metadata.
+- [ ] Repeat these checks in French and English, with keyboard navigation and a narrow viewport.
 
 ### 3.10 Product copy
 

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Server } from 'node:http';
+import { readFile } from 'node:fs/promises';
 import { app } from './app.js';
 import { pool } from './db.js';
 
@@ -27,11 +28,186 @@ beforeAll(async () => {
     cookies[name] = login.cookie!.split(';')[0];
   }
 });
+const regressionCall = call;
 afterAll(async () => {
   await new Promise<void>(resolve => server.close(() => resolve()));
   await pool.end();
 });
 describe('permissions métier sur l’API', () => {
+  it('converts a deleted wish into a private, actionable off-list gift', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.1');
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const charlieId = (await call('charlie', '/auth/me')).data.id;
+    const wish = await call('bob', '/wishes', 'POST', {
+      title: 'Preserved commitment', description: 'Keep this description', price: 47,
+      url: 'https://example.com/preserved', image: 'https://example.com/preserved.png', tags: ['preserved'],
+    });
+    const occasion = (await call('alice', `/occasions?recipientId=${bobId}`)).data.find((o: { nextDate?: string }) => o.nextDate);
+    const occasionIds = [{ id: occasion.id, year: Number(occasion.nextDate.slice(0, 4)) }];
+    const reservation = await call('alice', '/reservations', 'POST', {
+      wishId: wish.data.id, occasionIds, participantIds: [charlieId], openToContributions: true,
+    });
+    const id = reservation.data.id;
+    const request = await call('david', `/reservations/${id}/requests`, 'POST', {});
+    expect(request.status).toBe(201);
+    await call('alice', `/reservations/${id}`, 'PATCH', { status: 'purchased' });
+    expect((await call('bob', `/wishes/${wish.data.id}`, 'DELETE')).status).toBe(200);
+    const converted = await call('alice', `/reservations/${id}`);
+    expect(converted.data).toMatchObject({
+      id, offList: true, wishDeleted: false, status: 'purchased', openToContributions: false,
+      wish: { title: 'Preserved commitment', description: 'Keep this description', price: '47.00',
+        url: 'https://example.com/preserved', image: 'https://example.com/preserved.png' },
+      recipient: { id: bobId },
+    });
+    expect(converted.data.wishId).not.toBe(wish.data.id);
+    expect(converted.data.occasions.map((o: { id: string; year: number }) => ({ id: o.id, year: o.year }))).toEqual(occasionIds);
+    expect(converted.data.participants.map((p: { id: string }) => p.id)).toContain(charlieId);
+    expect((await call('alice', `/reservations/${id}/requests`)).data.some((r: { id: string }) => r.id === request.data.id)).toBe(true);
+    for (const actor of ['bob', 'david', 'eloise']) {
+      expect((await call(actor, `/reservations/${id}`)).status).toBe(404);
+      expect((await call(actor, `/reservations/${id}`, 'PATCH', { status: 'wrapped' })).status).toBe(404);
+      expect((await call(actor, `/reservations/${id}/requests`, 'POST', {})).status).toBe(404);
+    }
+    expect((await call('charlie', `/reservations/${id}`)).status).toBe(200);
+    expect((await call('david', `/users/${bobId}/off-list`)).data.some((r: { id: string }) => r.id === id)).toBe(false);
+    expect((await call('bob', `/wishes/${wish.data.id}`)).status).toBe(404);
+    expect((await call('bob', `/wishes/${converted.data.wishId}`)).status).toBe(404);
+    expect((await call('alice', '/search?q=Preserved commitment')).data.wishes).toHaveLength(0);
+    expect((await call('alice', `/reservations/${id}`, 'PATCH', { gift: { title: 'Preserved gift edited', price: 49 } })).status).toBe(200);
+    expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'wrapped' })).status).toBe(200);
+    expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'gifted' })).status).toBe(200);
+    const completed = (await call('david', '/history')).data.find((h: { snapshot: { id: string } }) => h.snapshot.id === converted.data.wishId);
+    expect(completed).toMatchObject({ recipientId: bobId, snapshot: { title: 'Preserved gift edited', recipient: { firstName: 'Bob' } } });
+    expect(completed.snapshot.recipient).not.toHaveProperty('password_hash');
+    expect(completed.snapshot.recipient).not.toHaveProperty('email');
+    expect((await call('bob', '/history')).data.some((h: { id: string }) => h.id === completed.id)).toBe(false);
+    expect((await call('eloise', '/history')).data.some((h: { id: string }) => h.id === completed.id)).toBe(false);
+  });
+  it('repairs legacy deleted wishes without changing reservation identity or progress', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.2');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const bobId = (await call('bob', '/auth/me')).data.id;
+      const aliceId = (await call('alice', '/auth/me')).data.id;
+      const wish = (await client.query<{ id: string }>(
+        "INSERT INTO wishes(owner_id,title,description,deleted_at) VALUES($1,'Legacy gift','Legacy detail',now()) RETURNING id", [bobId],
+      )).rows[0];
+      const reservation = (await client.query<{ id: string }>(
+        "INSERT INTO reservations(wish_id,creator_id,status,open_to_contributions) VALUES($1,$2,'wrapped',true) RETURNING id", [wish.id, aliceId],
+      )).rows[0];
+      await client.query(await readFile(new URL('../drizzle/0005_deleted_wish_private_gifts.sql', import.meta.url), 'utf8'));
+      const fixed = (await client.query(
+        'SELECT r.*,w.title,w.description,w.off_list,w.deleted_at FROM reservations r JOIN wishes w ON w.id=r.wish_id WHERE r.id=$1',
+        [reservation.id],
+      )).rows[0];
+      expect(fixed).toMatchObject({ id: reservation.id, status: 'wrapped', open_to_contributions: false,
+        title: 'Legacy gift', description: 'Legacy detail', off_list: true, deleted_at: null });
+      expect(fixed.wish_id).not.toBe(wish.id);
+      await client.query(await readFile(new URL('../drizzle/0005_deleted_wish_private_gifts.sql', import.meta.url), 'utf8'));
+      expect((await client.query('SELECT wish_id FROM reservations WHERE id=$1', [reservation.id])).rows[0].wish_id).toBe(fixed.wish_id);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  });
+  it('grants and removes only family-admin rights and protects the last administrator', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.3');
+    const family = (await call('alice', '/families')).data.find((f: { name: string }) => f.name === 'Famille A');
+    const alice = (await call('alice', '/auth/me')).data;
+    const bob = (await call('bob', '/auth/me')).data;
+    const david = (await call('david', '/auth/me')).data;
+    expect((await call('bob', `/families/${family.id}/admins`, 'POST', { userId: bob.id })).status).toBe(403);
+    expect((await call('alice', `/families/${family.id}/admins`, 'POST', { userId: david.id })).status).toBe(403);
+    expect((await call('alice', `/families/${family.id}/admins/${alice.id}`, 'DELETE')).status).toBe(409);
+    expect((await call('alice', `/families/${family.id}/admins`, 'POST', { userId: bob.id })).status).toBe(201);
+    expect((await call('bob', '/auth/me')).data).toMatchObject({ householdId: bob.householdId, householdAdmin: bob.householdAdmin });
+    expect((await call('bob', '/families')).data.find((f: { id: string }) => f.id === family.id).admin).toBe(true);
+    expect((await call('bob', `/families/${family.id}/invitations`, 'POST', {})).status).toBe(201);
+    const demotions = await Promise.all([
+      call('alice', `/families/${family.id}/admins/${alice.id}`, 'DELETE'),
+      call('bob', `/families/${family.id}/admins/${bob.id}`, 'DELETE'),
+    ]);
+    expect(demotions.map(result => result.status).sort()).toEqual([200, 409]);
+    const current = (await call('alice', '/families')).data.find((f: { id: string }) => f.id === family.id);
+    expect(current.members.filter((p: { familyAdmin: boolean }) => p.familyAdmin)).toHaveLength(1);
+    if (!current.admin) await call('bob', `/families/${family.id}/admins`, 'POST', { userId: alice.id });
+    expect((await call('alice', `/families/${family.id}/admins/${bob.id}`, 'DELETE')).status).toBe(200);
+    expect((await call('bob', `/families/${family.id}/invitations`, 'POST', {})).status).toBe(403);
+  });
+  it('labels wish search results with their owner without exposing reservation metadata to that owner', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.4');
+    const wish = await call('bob', '/wishes', 'POST', { title: 'Owner context unique', url: 'https://example.com', tags: [] });
+    const result = (await call('alice', '/search?q=Owner context unique')).data.wishes[0];
+    expect(result).toMatchObject({ id: wish.data.id, owner: { firstName: 'Bob' } });
+    expect(result.owner).not.toHaveProperty('email');
+    expect((await call('eloise', '/search?q=Owner context unique')).data.wishes).toHaveLength(0);
+    const bobId = result.owner.id;
+    const occasion = (await call('alice', `/occasions?recipientId=${bobId}`)).data.find((o: { nextDate?: string }) => o.nextDate);
+    const booking = await call('alice', '/reservations', 'POST', { wishId: wish.data.id,
+      occasionIds: [{ id: occasion.id, year: Number(occasion.nextDate.slice(0, 4)) }] });
+    expect((await call('bob', '/search?q=Owner context unique')).data.wishes[0]).not.toHaveProperty('reservation');
+    await call('alice', `/reservations/${booking.data.id}`, 'DELETE');
+    await call('bob', `/wishes/${wish.data.id}`, 'DELETE');
+  });
+  it('does not orphan gifts when deletion races with reservation creation or completion', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.5');
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const occasion = (await call('alice', `/occasions?recipientId=${bobId}`)).data.find((o: { nextDate?: string }) => o.nextDate);
+    const occasionIds = [{ id: occasion.id, year: Number(occasion.nextDate.slice(0, 4)) }];
+    for (let i = 0; i < 3; i++) {
+      const wish = await call('bob', '/wishes', 'POST', { title: `Deletion creation race ${i}`, url: 'https://example.com', tags: [] });
+      const [created, deleted] = await Promise.all([
+        call('alice', '/reservations', 'POST', { wishId: wish.data.id, occasionIds, openToContributions: true }),
+        call('bob', `/wishes/${wish.data.id}`, 'DELETE'),
+      ]);
+      expect(deleted.status).toBe(200);
+      expect([201, 404]).toContain(created.status);
+      if (created.status === 201) {
+        const current = await call('alice', `/reservations/${created.data.id}`);
+        expect(current.data).toMatchObject({ offList: true, wishDeleted: false, openToContributions: false });
+        expect((await call('alice', `/reservations/${created.data.id}`, 'DELETE')).status).toBe(200);
+      }
+    }
+    for (let i = 0; i < 3; i++) {
+      const wish = await call('bob', '/wishes', 'POST', { title: `Deletion completion race ${i}`, url: 'https://example.com', tags: [] });
+      const created = await call('alice', '/reservations', 'POST', { wishId: wish.data.id, occasionIds });
+      await call('alice', `/reservations/${created.data.id}`, 'PATCH', { status: 'purchased' });
+      await call('alice', `/reservations/${created.data.id}`, 'PATCH', { status: 'wrapped' });
+      const [gifted, deleted] = await Promise.all([
+        call('alice', `/reservations/${created.data.id}`, 'PATCH', { status: 'gifted' }),
+        call('bob', `/wishes/${wish.data.id}`, 'DELETE'),
+      ]);
+      expect(gifted.status).toBe(200);
+      expect([200, 404]).toContain(deleted.status);
+      expect((await call('alice', `/reservations/${created.data.id}`)).data.status).toBe('gifted');
+    }
+  });
+  it('revokes completed-history access when a household no longer shares the recipient family', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.6');
+    const family = (await call('alice', '/families')).data.find((f: { name: string }) => f.name === 'Famille A');
+    const account = await call('', '/auth/register', 'POST', {
+      firstName: 'History', lastName: 'Viewer', email: `history-${Date.now()}@example.test`,
+      password: 'LongSecret2026!', birthDate: '2000-01-01',
+    });
+    expect(account.status).toBe(201);
+    cookies.historyViewer = account.cookie!.split(';')[0];
+    expect((await call('historyViewer', '/history')).data).toHaveLength(0);
+    const invite = await call('alice', `/families/${family.id}/invitations`, 'POST', {});
+    expect((await call('historyViewer', '/families/join', 'POST', { code: invite.data.code })).status).toBe(201);
+    const history = (await call('historyViewer', '/history')).data;
+    expect(history.length).toBeGreaterThan(0);
+    expect(history.some((entry: { snapshot: { title: string } }) => entry.snapshot.title === 'Preserved gift edited')).toBe(true);
+    expect((await call('alice', `/families/${family.id}/households/${account.data.householdId}`, 'DELETE')).status).toBe(200);
+    expect((await call('historyViewer', '/history')).data).toHaveLength(0);
+    expect((await call('historyViewer', '/history?recipientId=ignored&sort=oldest')).data).toHaveLength(0);
+  });
   it('localise les erreurs d’authentification et de validation selon Accept-Language', async () => {
     expect(await call('', '/auth/me', 'GET', undefined, 'en-US,en;q=0.9,fr;q=0.5'))
       .toMatchObject({ status: 401, data: { error: 'Authentication required' } });
@@ -263,10 +439,11 @@ describe('permissions métier sur l’API', () => {
     expect((await call('bob', `/reservations/${reservation.id}`)).status).toBe(404);
     expect((await call(loser, `/reservations/${reservation.id}/requests`, 'POST')).status).toBe(winner === 'alice' ? 201 : 409);
     expect((await call('bob', `/wishes/${wishId}`, 'DELETE')).status).toBe(200);
-    expect((await call(winner, '/reservations')).data.find((r: {id:string}) => r.id === reservation.id).wishDeleted).toBe(true);
+    expect((await call(winner, '/reservations')).data.find((r: {id:string}) => r.id === reservation.id))
+      .toMatchObject({ wishDeleted: false, offList: true, openToContributions: false });
     expect((await call(loser, '/reservations', 'POST', { wishId, occasionIds: choices })).status).toBe(404);
     expect((await call(winner, `/reservations/${reservation.id}`, 'DELETE')).status).toBe(200);
-    expect((await call(loser, `/reservations/${reservation.id}/requests`, 'POST')).status).toBe(409);
+    expect((await call(loser, `/reservations/${reservation.id}/requests`, 'POST')).status).toBe(404);
   });
   it('dédoublonne les occasions identiques et exclut celles de l’utilisateur connecté du dashboard', async () => {
     const aliceId = (await call('alice', '/auth/me')).data.id;
@@ -537,7 +714,7 @@ describe('permissions métier sur l’API', () => {
     await call('alice', `/families/${familyA.id}/households/${householdId}`, 'DELETE');
   });
   it('rend le statut offert irréversible et protège l’historique', async () => {
-    const history = await call('alice', '/history');
+    const history = await call('bob', '/history');
     expect(history.data.length).toBeGreaterThan(0);
     expect((await call('eloise', '/history')).data).toHaveLength(0);
     const bobReservations = await call('bob', '/reservations');
@@ -586,11 +763,11 @@ describe('permissions métier sur l’API', () => {
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'gifted' })).status).toBe(200);
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'reserved' })).status).toBe(409);
     expect((await call('bob', '/wishes')).data.some((w: {id:string}) => w.id === wish.data.id)).toBe(false);
-    expect((await call('bob', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(true);
-    expect((await call('bob', '/history')).data.find((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)
-      .snapshot.recipient.first_name).toBe('Bob');
+    expect((await call('bob', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(false);
+    expect((await call('alice', '/history')).data.find((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)
+      .snapshot.recipient.firstName).toBe('Bob');
     expect((await call('charlie', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(true);
-    expect((await call('david', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(false);
+    expect((await call('david', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(true);
   });
   it('gère les cadeaux hors liste sans les révéler au bénéficiaire', async () => {
     const bobId = (await call('bob', '/auth/me')).data.id;
@@ -628,7 +805,7 @@ describe('permissions métier sur l’API', () => {
     expect((await call('alice', '/dashboard')).data.openGifts.some((g: {id:string}) => g.id === open.data.id)).toBe(false);
     expect((await call('charlie', `/reservations/${open.data.id}/requests`, 'POST')).status).toBe(201);
     expect((await call('charlie', `/users/${bobId}/off-list`)).data.find((g: {id:string}) => g.id === open.data.id).requestStatus).toBe('pending');
-    expect((await call('charlie', `/reservations/${hidden.data.id}/requests`, 'POST')).status).toBe(409);
+    expect((await call('charlie', `/reservations/${hidden.data.id}/requests`, 'POST')).status).toBe(404);
     const edited = await call('alice', `/reservations/${open.data.id}`, 'PATCH', { gift: { title: 'Cadeau commun XL', price: 150 } });
     expect(edited.data.wish).toMatchObject({ title: 'Cadeau commun XL', price: '150.00', url: null });
     const consoleRes = (await call('alice', '/reservations')).data.find((r: {wish?:{title:string}}) => r.wish?.title === 'Console de jeux');

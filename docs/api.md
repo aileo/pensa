@@ -17,7 +17,7 @@ and their text follows `Accept-Language`, French or English.
 | Profile, people | `GET/PATCH /profile`, `GET /users`, `GET /users/:id/wishes`, `POST /users/:id/wishes`, `PATCH /users/:id/wishes/order` |
 | Households, invitations | `GET /households`, `PATCH /households/:id`, `POST /households/:id/invitations` |
 | Managed members | `POST /households/:id/members`, `PATCH/DELETE /households/:id/members/:userId`, `POST /households/:id/members/:userId/invitations`, `POST /households/:id/members/:userId/account`, `POST /households/:id/members/:userId/move-out` |
-| Families | `GET/POST /families`, `PATCH /families/:id`, `POST /families/:id/invitations`, `POST /families/join`, `DELETE /families/:id/households/:householdId`, `POST /families/:id/admins` |
+| Families | `GET/POST /families`, `PATCH /families/:id`, `POST /families/:id/invitations`, `POST /families/join`, `DELETE /families/:id/households/:householdId`, `POST /families/:id/admins`, `DELETE /families/:id/admins/:userId` |
 | Occasions | `GET /occasions?recipientId=…`, `POST /families/:id/occasions`, `PATCH/DELETE /occasions/:id` |
 | Wishes | `GET/POST /wishes`, `POST /wishes/preview`, `GET/PATCH/DELETE /wishes/:id`, `PATCH /wishes/order` |
 | Reservations | `GET/POST /reservations`, `GET/PATCH/DELETE /reservations/:id` |
@@ -113,8 +113,28 @@ inserting after.
 
 **Beneficiaries receive nothing about their own wishes**: reservation endpoints
 answer `404` for them, because a `403` would confirm that a reservation exists.
-Gifted history is a separate snapshot, readable only by the beneficiary and the
-participants.
+Gifted history is a separate snapshot, readable by members currently sharing a
+family with the recipient, **except the recipient**. This includes completed
+gifts that were private during preparation; it does not grant reservation
+detail or management access. `GET /history` returns normalized public-person
+context, recipient IDs, gift dates and occasions. Recipient filters and
+newest/oldest/recipient sorting operate on this authorized collection in the UI.
+`GET /search` includes a public `owner` identity with each wish result; it never
+returns off-list, deleted or gifted wishes, or reservation metadata to a wish's owner.
+
+Deleting a wish with an active reservation atomically clones its gift data
+into a hidden off-list wish and repoints the same reservation. Progress,
+participants, requests and occasions remain; `open_to_contributions` becomes
+`false`. Only the organizer and existing participants can see the private
+gift, including through direct reservation URLs. The organizer may edit it
+through the existing off-list lifecycle. A data migration also repairs legacy
+active reservations attached to deleted wishes.
+
+Family administrators may promote an account-bearing member using
+`POST /families/:id/admins` with `{ "userId": "uuid" }`, or demote one using
+`DELETE /families/:id/admins/:userId`. Both require current family-admin access
+and target membership. Managed members cannot be promoted; concurrent demotions
+cannot remove the last administrator. These actions never change household roles.
 
 ## Joining a household or a family
 

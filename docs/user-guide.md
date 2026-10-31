@@ -142,7 +142,7 @@ on your own.
 
 It can be:
 
-- **private**, visible only to you; or
+- **private**, visible only to you and invited participants while active; or
 - **visible** to the rest of the family, so that others can ask to join in.
 
 Either way the person receiving it sees nothing.
@@ -198,10 +198,27 @@ member is never an administrator.
 ## What has already been given
 
 Once a gift is marked as given it is kept in the **history**, readable by the
-person who received it and by everyone who contributed. It answers the question
+recipient's current family members, **except the recipient**. This includes
+gifts that were private while being prepared. It answers the question
 behind most duplicate gifts: *what did we already give them?*
 
-**Search** covers people, wishes and occasions at once.
+Each entry identifies the gift, recipient, organizer, participants, delivery
+date and occasions where available. Filter by recipient and sort newest first,
+oldest first or recipient A-Z to review gifts across several years.
+
+**Search** covers people and wishes and shows whose list each wish belongs to.
+
+Create an off-list gift from the top of a person's wish list, beside a member's
+list action or beside an upcoming occasion. You can change the preselected
+recipient and occasion before saving; gifts are private by default.
+
+If a wish is deleted while reserved, the same commitment becomes a **private
+off-list gift**. Details, participants, occasions and progress remain; open
+contributions are turned off. Its organizer can edit it and continue preparing it.
+
+Family administrators can appoint or remove other family administrators from
+family management. Only members with accounts are eligible, the last admin
+cannot be removed, and household permissions do not change.
 
 ## French and English
 
@@ -223,7 +240,8 @@ allowed — it answers as though they did not exist, because *being told you are
 not allowed* would itself be a clue. That is why Pensa can be shared with the
 whole family without anyone having to be careful about what they click.
 
-The only thing you see is what you have already been given, once it is given.
+Gifts meant for you remain hidden even after delivery. Other completed gifts
+become visible in your shared family circle, including formerly private gifts.
 
 ## Questions people ask
 
