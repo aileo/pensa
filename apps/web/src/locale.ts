@@ -23,6 +23,10 @@ export function saveLocale(locale: Locale) {
 }
 
 const english = {
+  'Vérification de la session impossible': 'Could not check your session',
+  'Réessayer': 'Try again',
+  'Enregistrement de l’ordre…': 'Saving order…',
+  'Ordre non enregistré. Réessayez avant de quitter la page.': 'Order not saved. Try again before leaving the page.',
   'Chargement de l’historique…': 'Loading history…',
   'Les cadeaux offerts sont partagés avec la famille du bénéficiaire, sauf avec le bénéficiaire lui-même, même s’ils étaient privés.': 'Completed gifts are shared with the recipient’s current family, except the recipient, even if they were private.',
   'Bénéficiaire': 'Recipient',

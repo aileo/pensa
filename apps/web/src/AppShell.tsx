@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { api, dateOf, HandledError, json, list, nameOf, type Family, type Household, type Id, type Occasion, type OccasionSelection, type Onboarding, type Person, type Reservation, type Todo, type Wish } from './api'
 import { localizeMessage, occasionLabel, type TranslationKey } from './locale'
@@ -20,6 +20,7 @@ import { HistoryPanel } from './features/history/HistoryPanel'
 import { SearchPanel } from './features/search/SearchPanel'
 import { WishDetail } from './features/wishes/WishDetail'
 import { WishEditForm, WishForm } from './features/wishes/WishForm'
+import { useReorderQueue, type ReorderQueue } from './reorder'
 
 const nav: { page: Page; label: TranslationKey; icon: IconName }[] = [
   { page: 'dashboard', label: 'Tableau de bord', icon: 'home' },
@@ -47,29 +48,17 @@ type PersonGiftsFetchState = { status: 'loading' } | { status: 'ready'; items: R
 // is a separate, smaller-scoped freshness check *within* a single mount — it only tells
 // us whether the currently rendered items match the currently requested filters, so a
 // managed-list reorder is never enabled against a stale, about-to-be-replaced filtered view.
-function PersonWishesPanel({ person, me, filters, curating, busy, managedMembers, revision, onSelf, onPerson, onFilterChange, onOpenWish, onReserve, onEdit, onRemoveWish, onOpenWishDetail, onOpenOffList, onRequestGift, onOpenReservation, onReorderWishes }: {
+function PersonWishesPanel({ person, me, filters, curating, busy, managedMembers, revision, onSelf, onPerson, onFilterChange, onOpenWish, onReserve, onEdit, onRemoveWish, onOpenWishDetail, onOpenOffList, onRequestGift, onOpenReservation, reorderQueue }: {
   person: Person; me: Person; filters: WishFilters; curating: boolean; busy: boolean; managedMembers: Person[]; revision: number
   onSelf: () => void; onPerson: (person: Person) => void; onFilterChange: (key: keyof WishFilters, value: string) => void
   onOpenWish: (owner: Person) => void; onReserve: (wish: Wish) => void; onEdit: (wish: Wish) => void; onRemoveWish: (wish: Wish) => void
   onOpenWishDetail: (wish: Wish) => void; onOpenOffList: (person: Person) => void; onRequestGift: (gift: Reservation) => void; onOpenReservation: (id: Id) => void
-  onReorderWishes: (ids: Id[]) => Promise<boolean>
+  reorderQueue: ReorderQueue
 }) {
   const { t } = useTranslation()
   const signature = `${filters.tag}|${filters.availability}|${filters.minPrice}|${filters.maxPrice}|${revision}`
   const [wishesState, setWishesState] = useState<PersonWishesFetchState>({ status: 'loading' })
   const [giftsState, setGiftsState] = useState<PersonGiftsFetchState>({ status: 'loading' })
-  // Bumped only when the rendered reorder context (filters/revision) actually changes, so an
-  // in-flight managed reorder's failure handler can tell its optimistic snapshot is now stale
-  // and must not roll back over newer data. The whole panel remounts (fresh ref) on a person
-  // switch, so this never needs to track the person itself.
-  const reorderGuardRef = useRef(0)
-  const signatureRef = useRef(signature)
-  useLayoutEffect(() => {
-    if (signatureRef.current !== signature) {
-      signatureRef.current = signature
-      reorderGuardRef.current += 1
-    }
-  }, [signature])
   useEffect(() => {
     let active = true
     const query = new URLSearchParams()
@@ -90,20 +79,13 @@ function PersonWishesPanel({ person, me, filters, curating, busy, managedMembers
   const wishesReady = wishesState.status === 'ready' && wishesState.signature === signature
   const wishesDenied = wishesState.status === 'denied' && wishesState.signature === signature
   if (wishesDenied) return <Empty icon="users" title={t('Personne introuvable')} text={t('Cette personne n’existe pas ou vous n’avez pas accès à sa liste.')}/>
-  const personWishes = wishesReady ? wishesState.items : []
+  const personWishes = wishesReady ? reorderQueue.arrange(String(person.id), wishesState.items) : []
   const personGifts = giftsState.status === 'ready' ? giftsState.items : []
   const filtersActive = !!(filters.tag.trim() || filters.availability || filters.minPrice.trim() || filters.maxPrice.trim())
   const canReorder = curating && !filtersActive && wishesReady
-  async function reorderWishes(from: number, to: number) {
+  function reorderWishes(from: number, to: number) {
     if (!wishesReady || busy || from === to || from < 0 || to < 0 || from >= personWishes.length || to >= personWishes.length) return
-    const reordered = [...personWishes]
-    const [item] = reordered.splice(from, 1)
-    reordered.splice(to, 0, item)
-    const previous = personWishes
-    const version = reorderGuardRef.current
-    setWishesState({ status: 'ready', items: reordered, signature })
-    const ok = await onReorderWishes(reordered.map(wish => wish.id))
-    if (!ok && reorderGuardRef.current === version) setWishesState({ status: 'ready', items: previous, signature })
+    reorderQueue.move(String(person.id), personWishes, from, to)
   }
   return <>
     {curating && <ManagedListsBar me={me} managed={managedMembers} activeId={person.id} onSelf={onSelf} onPerson={onPerson}/>}
@@ -154,21 +136,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
-  // Bumped automatically (not by any call site) whenever the data revision actually changes, so
-  // an in-flight "my wishes" reorder's failure handler can tell its optimistic snapshot is now
-  // stale and must not roll back over newer data. Deriving this from render output (rather than
-  // requiring every state-changing call site to remember to bump a ref) keeps it correct for any
-  // future navigation source — including router-driven history changes that bypass our own
-  // handlers — without needing those call sites to know about the reorder guard at all. The
-  // managed-list reorder guard lives inside `PersonWishesPanel`, which remounts per person.
-  const reorderGuardRef = useRef(0)
-  const revisionRef = useRef(revision)
-  useLayoutEffect(() => {
-    if (revisionRef.current !== revision) {
-      revisionRef.current = revision
-      reorderGuardRef.current += 1
-    }
-  }, [revision])
+  const reorderQueue = useReorderQueue(me.id)
   const [offListRecipient, setOffListRecipient] = useState<Person | null>(null)
   const [offListOccasion, setOffListOccasion] = useState<OccasionSelection | null>(null)
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
@@ -203,7 +171,10 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   async function perform(action: () => Promise<unknown>, success: string, close = true) {
     setBusy(true); setError('')
     try {
+      await reorderQueue.flush()
       await action()
+      setWishes(current => reorderQueue.arrange(String(me.id), current))
+      reorderQueue.reset()
       if (close) setModal(null)
       setNotice(success); refresh()
       return true
@@ -229,18 +200,11 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   async function removeWish(wish: Wish) {
     if (window.confirm(t('Supprimer « {title} » de votre liste ?', { title: wish.title }))) await perform(() => api(`/wishes/${wish.id}`, { method: 'DELETE' }), t('Envie supprimée.'))
   }
-  async function reorder(from: number, to: number) {
+  function reorder(from: number, to: number) {
     if (busy || from === to || from < 0 || to < 0 || from >= myWishes.length || to >= myWishes.length) return
-    const reordered = [...myWishes]
-    const [item] = reordered.splice(from, 1)
-    reordered.splice(to, 0, item)
-    const previous = wishes
-    const version = reorderGuardRef.current
-    setWishes([...reordered, ...wishes.filter(wish => String(wish.ownerId) !== String(me?.id))])
-    const ok = await perform(() => api('/wishes/order', json('PATCH', { ids: reordered.map(wish => wish.id) })), t('Ordre enregistré.'), false)
-    if (!ok && reorderGuardRef.current === version) setWishes(previous)
+    reorderQueue.move(String(me.id), myWishes, from, to)
   }
-  const myWishes = wishes.filter(wish => String(wish.ownerId) === String(me?.id) || wish.ownerId == null)
+  const myWishes = reorderQueue.arrange(String(me.id), wishes.filter(wish => String(wish.ownerId) === String(me?.id) || wish.ownerId == null))
   const allPeople = users
   const activeFamilyRaw = routeFamilyId ? families.find(family => String(family.id) === String(routeFamilyId)) ?? null : null
   const activeFamily = activeFamilyRaw && familyNameOverride && String(familyNameOverride.id) === String(activeFamilyRaw.id) ? { ...activeFamilyRaw, name: familyNameOverride.name } : activeFamilyRaw
@@ -289,6 +253,8 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
         <div className="flex shrink-0 items-center gap-1 lg:gap-3"><button className="icon-button" aria-label={t('Rechercher')} onClick={() => go('search')}><Icon name="search"/></button><span className="hidden h-7 w-px bg-line sm:block"/><ProfileMenu me={me} busy={busy} onProfile={() => go('profile')} onLogout={() => void logout()}/></div>
       </header>
       <main className="mx-auto max-w-[1300px] px-3 pb-10 pt-5 sm:px-5 lg:px-9 lg:pb-16 lg:pt-10">
+        {!!reorderQueue.error && <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p>{t('Ordre non enregistré. Réessayez avant de quitter la page.')}</p><p>{localizeMessage(reorderQueue.error instanceof Error ? reorderQueue.error.message : t('Une erreur inattendue est survenue.'), locale)}</p><button className="secondary mt-3" disabled={busy} onClick={() => { setError(''); setBusy(true); void reorderQueue.flush(true).catch(handleError).finally(() => setBusy(false)) }}>{t('Réessayer')}</button></div>}
+        {!reorderQueue.error && reorderQueue.touched && <p role="status" className="muted mb-3">{t(reorderQueue.pending ? 'Enregistrement de l’ordre…' : 'Ordre enregistré.')}</p>}
         {error && <div role="alert" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{localizeMessage(error, locale)}<button aria-label={t('Masquer l’erreur')} onClick={() => setError('')}><Icon name="close" size={16}/></button></div>}
         {notice && <div role="status" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{localizeMessage(notice, locale)}<button aria-label={t('Masquer la notification')} onClick={() => setNotice('')}><Icon name="close" size={16}/></button></div>}
         {loading && <p role="status" className="muted mb-3">{t('Actualisation des données…')}</p>}
@@ -320,7 +286,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
           : <><ManagedListsBar me={me} managed={managedMembers} activeId={null} onSelf={() => go('wishes')} onPerson={openPerson}/><div className="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-2">{t('VOTRE LISTE PERSONNELLE')}</p><h1 className="font-['Outfit'] text-3xl font-bold">{t('Mes envies')} <span className="text-brand-500">({myWishes.length})</span></h1><p className="muted mt-2">{t('Notez vos idées une fois : vos proches sauront quoi offrir.')}</p></div><button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button></div>{myWishes.length ? <><p className="muted mb-4">{t('Glissez les envies ou utilisez les flèches pour changer leur priorité.')}</p><SortableWishList wishes={myWishes} busy={busy} canReorder onReorder={reorder} onEdit={wish => { setSelectedWish(wish); setModal('editWish') }} onDelete={wish => void removeWish(wish)} onOpen={wish => navigate(wishPath(String(wish.id)))}/></> : <Empty icon="heart" title={t('Votre liste est encore vide')} text={t('Collez le lien d’un produit et nous vous aiderons à l’ajouter.')} action={<button className="primary" onClick={() => openWish()}><Icon name="plus" size={18}/> {t('Ajouter une envie')}</button>}/>}</>)}
         {(route.page === 'families' || route.page === 'personWishes') && <><SectionTitle icon="users" kicker={t('VOS PROCHES')} title={selectedPerson ? t('Les envies de {name}', { name: nameOf(selectedPerson) }) : activeFamily ? activeFamily.name : routePersonId ? t('Personne introuvable') : routeFamilyId ? t('Famille introuvable') : t('Ma famille')} action={routePersonId || routeFamilyId ? <button className="secondary" onClick={() => go('families')}><Icon name="arrowLeft" size={16}/> {t('Retour aux familles')}</button> : undefined}/>
           {routePersonId ? (selectedPerson
-            ? <PersonWishesPanel key={String(selectedPerson.id)} person={selectedPerson} me={me} filters={personFilters} curating={curating} busy={busy} managedMembers={managedMembers} revision={revision} onSelf={() => go('wishes')} onPerson={openPerson} onFilterChange={setPersonFilter} onOpenWish={openWish} onReserve={openReserve} onEdit={wish => { setSelectedWish(wish); setModal('editWish') }} onRemoveWish={wish => void removeWish(wish)} onOpenWishDetail={wish => navigate(wishPath(String(wish.id)))} onOpenOffList={openOffList} onRequestGift={gift => void requestGift(gift)} onOpenReservation={openReservation} onReorderWishes={ids => perform(() => api(`/users/${encodeURIComponent(String(selectedPerson.id))}/wishes/order`, json('PATCH', { ids })), t('Ordre enregistré.'), false)}/>
+            ? <PersonWishesPanel key={String(selectedPerson.id)} person={selectedPerson} me={me} filters={personFilters} curating={curating} busy={busy} managedMembers={managedMembers} revision={revision} onSelf={() => go('wishes')} onPerson={openPerson} onFilterChange={setPersonFilter} onOpenWish={openWish} onReserve={openReserve} onEdit={wish => { setSelectedWish(wish); setModal('editWish') }} onRemoveWish={wish => void removeWish(wish)} onOpenWishDetail={wish => navigate(wishPath(String(wish.id)))} onOpenOffList={openOffList} onRequestGift={gift => void requestGift(gift)} onOpenReservation={openReservation} reorderQueue={reorderQueue}/>
             : !loading ? <Empty icon="users" title={t('Personne introuvable')} text={t('Cette personne n’existe pas ou vous n’avez pas accès à sa liste.')}/> : null)
           : routeFamilyId ? (activeFamily ? <><div className="compact-panel card mb-6 flex flex-wrap items-center justify-between gap-3 p-5"><div><p className="eyebrow">{t('LES MEMBRES')}</p><p className="muted mt-1">{t('Découvrez les envies des membres de cette famille.')}</p></div>{activeFamily.admin && <button className="secondary" onClick={() => openOccasion(activeFamily)}><Icon name="calendar" size={18}/> {t('Ajouter une occasion')}</button>}</div><FamilyHouseholds family={activeFamily} me={me} onPerson={openPerson} onGift={openOffList}/>{activeFamily.admin && <FamilyManagement key={activeFamily.id} family={activeFamily} busy={busy} perform={perform} handleError={handleError} onRename={name => setFamilyNameOverride({ id: activeFamily.id, name })}/>}</>
             : !loading ? <Empty icon="users" title={t('Famille introuvable')} text={t('Cette famille n’existe pas ou vous n’y avez plus accès.')}/> : null)

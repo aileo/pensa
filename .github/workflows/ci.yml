@@ -26,6 +26,7 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       # The build is also the translation check: TranslationKey is derived from the
       # French strings, so a missing English counterpart fails type checking here.
       - run: npm run build

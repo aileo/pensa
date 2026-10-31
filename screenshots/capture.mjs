@@ -121,6 +121,11 @@ for (const locale of ['fr', 'en']) {
 
   await bob.goto(`${BASE_URL}/wishes`);
   await shot(bob, locale, 'my-wishes');
+  await step(bob, locale, 'wishlist-saving', async () => {
+    await bob.getByRole('button', { name: locale === 'fr' ? /^Descendre / : /^Move .* down$/ }).first().click();
+    await bob.getByRole('status').filter({ hasText: locale === 'fr' ? 'Ordre enregistré.' : 'Order saved.' }).waitFor();
+    await shot(bob, locale, 'wishlist-saving');
+  });
 
   await step(bob, locale, 'duplicate-warning', async () => {
     // The preview would fetch a real page; answer it here so the shot never depends on a shop.
