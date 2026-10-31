@@ -6,9 +6,12 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-10-31
+
 ### Fixed
 
-- Dragging a wish works again in every desktop browser. The row now follows
+- Wishlist dragging now uses pointer events instead of native drag-and-drop.
+  The row follows
   the cursor and the other wishes make room. Releasing the mouse drops it, and
   *Escape* cancels. Dragging no longer uses the browser's native drag-and-drop,
   which could leave a picked-up row stuck until the page was reloaded.
