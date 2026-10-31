@@ -73,6 +73,24 @@ saisissez le titre vous-même, l'envie fonctionnera exactement pareil.
 
 ![Une liste d'envies, avec étiquettes, prix et réordonnancement](images/fr/my-wishes.png)
 
+Glissez une envie ou utilisez ses flèches pour changer sa priorité, sur votre
+liste ou celle d'un membre géré par votre foyer. Les déplacements apparaissent
+immédiatement ; Pensa enregistre automatiquement l'ordre final après une courte
+pause, sans recharger les autres listes. Attendez **Ordre enregistré** avant de
+fermer la page. Vous pouvez visiter un autre écran de Pensa pendant
+l'enregistrement. En cas d'échec, le nouvel ordre reste visible avec un
+avertissement **Ordre non enregistré** : utilisez **Réessayer** lorsque la
+connexion ou la limite de requêtes le permet. Les déplacements suivants ne
+provoquent pas de nouvelles tentatives répétées.
+
+![Ordre de la liste enregistré après réorganisation](images/fr/wishlist-saving.png)
+
+Si une erreur temporaire ou un excès de requêtes empêche Pensa de vérifier
+votre session, l'application affiche **Vérification de la session impossible**,
+pas le formulaire de connexion. Utilisez **Réessayer** une fois le problème
+résolu ; une nouvelle connexion n'est nécessaire que si la session a
+réellement expiré.
+
 Les **étiquettes** sont du texte libre : *livres*, *vélo*, *petites choses*.
 Ce sont elles qui permettront à quelqu'un qui lit votre liste de n'en garder que
 la partie qui l'intéresse.

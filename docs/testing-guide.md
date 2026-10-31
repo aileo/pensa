@@ -38,6 +38,35 @@ Open http://localhost:5173 (API: http://localhost:3000/api).
 
 Stop with `docker compose down` (keeps data) or `docker compose down -v` (deletes data).
 
+## Wishlist reorder request regression
+
+After the initial data load, clear the browser's Network log and open your own
+wishlist. Repeat on a household-managed member's unfiltered list.
+
+- [ ] Move one wish ten places using the arrows, keeping each move within
+      500 ms of the previous one. Movement is immediate; after the last move,
+      one PATCH saves the complete final order and no unrelated GETs run.
+- [ ] Drag and drop a wish: one PATCH after the pause. Undo a move before the
+      pause ends: no PATCH for an unchanged order.
+- [ ] Throttle a PATCH, make more moves, then let it finish: writes for the same
+      owner never overlap, and only the latest follow-up order is saved.
+- [ ] Navigate to another person's list while a save is pending. The original
+      owner's save completes; returning shows the saved order.
+- [ ] Filter a managed list: reorder controls disappear. Clear filters to
+      restore them, without losing a pending save for the full list.
+- [ ] Return 429 for a save: the order remains visible with an unsaved warning,
+      no automatic retry storm occurs, and the account remains signed in.
+      Restore the endpoint and choose **Try again** to save. Closing the page
+      with unsaved changes requests confirmation.
+- [ ] Return 429, 500, or a network failure for the initial `/auth/me` request:
+      show a recoverable session-check error, not login. Restore the endpoint
+      and retry to recover the existing session. A genuine 401 still shows login.
+- [ ] Repeat saving and session recovery in French and English.
+
+The web regression suite covers these request counts and session states:
+`docker compose run --rm web npm test`. Run it against an isolated Compose
+project when another development stack is in use.
+
 ## 2. Sample data
 
 All accounts use the password **`PensaDemo2026!`**.

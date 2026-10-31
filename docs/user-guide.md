@@ -70,6 +70,21 @@ yourself and the wish works just the same.
 
 ![A wish list, with tags, prices and reorder controls](images/en/my-wishes.png)
 
+Drag a wish or use its arrows to change its priority, on your own list or a
+list your household manages. Moves appear immediately; Pensa saves the final
+order automatically after a short pause, without reloading the other lists.
+Wait for **Order saved** before closing the page. You can visit another screen
+in Pensa while it saves. If saving fails, the new order stays visible with an
+**Order not saved** warning: use **Try again** once the connection or request
+limit allows it. Further moves do not trigger repeated retries.
+
+![Wishlist order saved after rearranging](images/en/wishlist-saving.png)
+
+If Pensa cannot check your session because of a temporary error or too many
+requests, it shows **Could not check your session**, not the sign-in form.
+Use **Try again** after the problem clears; you only need to sign in again
+when the session really has expired.
+
 **Tags** are free text: *books*, *cycling*, *small things*. They are what lets
 someone reading your list narrow it down to the part they were looking for.
 

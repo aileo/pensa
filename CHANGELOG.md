@@ -6,6 +6,18 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-10-31
+
+### Fixed
+
+- Personal and household-managed wishlist reordering now saves the latest order
+  after a short pause, instead of reloading the entire application after every
+  move. Writes are serialized, failed saves stay visible with an explicit retry,
+  and pending changes survive in-app navigation ([#31](https://github.com/aileo/pensa/issues/31)).
+- A rate-limited or temporarily unavailable session check now offers recovery
+  instead of showing the sign-in form. Only a confirmed expired session is
+  treated as signed out.
+
 ## [0.8.0] — 2026-10-31
 
 ### Added
