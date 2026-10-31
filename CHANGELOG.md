@@ -6,6 +6,21 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-31
+
+### Added
+
+- Wishlist rows have *move to top* and *move to bottom* buttons next to the
+  up/down arrows, on your own list and on household-managed lists.
+
+### Fixed
+
+- Dragging a wish is more reliable: images and links inside a row no longer
+  take over the drag, and the dragged row and drop target are highlighted.
+- Editing quickly no longer runs into *Too many requests*: the general API
+  limit is now 600 requests per minute instead of 300 per 15 minutes.
+  Authentication routes keep their strict limit.
+
 ## [0.8.1] — 2026-10-31
 
 ### Fixed

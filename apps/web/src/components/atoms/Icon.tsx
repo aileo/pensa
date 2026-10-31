@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type IconName = 'home' | 'heart' | 'users' | 'gift' | 'clock' | 'search' | 'user' | 'plus' | 'arrow' | 'arrowLeft' | 'arrowUp' | 'arrowDown' | 'link' | 'calendar' | 'trash' | 'edit' | 'check' | 'close' | 'menu' | 'logout' | 'spark' | 'grip' | 'chevron' | 'external' | 'cart' | 'box' | 'party'
+export type IconName = 'home' | 'heart' | 'users' | 'gift' | 'clock' | 'search' | 'user' | 'plus' | 'arrow' | 'arrowLeft' | 'arrowUp' | 'arrowDown' | 'arrowTop' | 'arrowBottom' | 'link' | 'calendar' | 'trash' | 'edit' | 'check' | 'close' | 'menu' | 'logout' | 'spark' | 'grip' | 'chevron' | 'external' | 'cart' | 'box' | 'party'
 
 const paths: Record<IconName, ReactNode> = {
   home: <><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></>,
@@ -15,6 +15,8 @@ const paths: Record<IconName, ReactNode> = {
   arrowLeft: <path d="M19 12H5m6 6-6-6 6-6"/>,
   arrowUp: <path d="M12 19V5m-6 6 6-6 6 6"/>,
   arrowDown: <path d="M12 5v14m6-6-6 6-6-6"/>,
+  arrowTop: <path d="M5 4h14M12 20V9m-6 6 6-6 6 6"/>,
+  arrowBottom: <path d="M5 20h14M12 4v11m6-6-6 6-6-6"/>,
   link: <><path d="M10 13a5 5 0 0 0 7.1 0l2.1-2.1a5 5 0 0 0-7.1-7.1L11 5"/><path d="M14 11a5 5 0 0 0-7.1 0l-2.1 2.1a5 5 0 0 0 7.1 7.1L13 19"/></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/></>,
   trash: <><path d="M4 7h16M9 7V4h6v3m4 0-1 14H6L5 7"/><path d="M10 11v6m4-6v6"/></>,

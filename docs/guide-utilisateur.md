@@ -74,7 +74,8 @@ saisissez le titre vous-même, l'envie fonctionnera exactement pareil.
 ![Une liste d'envies, avec étiquettes, prix et réordonnancement](images/fr/my-wishes.png)
 
 Glissez une envie ou utilisez ses flèches pour changer sa priorité, sur votre
-liste ou celle d'un membre géré par votre foyer. Les déplacements apparaissent
+liste ou celle d'un membre géré par votre foyer. Les flèches surmontées d'une
+barre placent directement une envie en premier ou en dernier. Les déplacements apparaissent
 immédiatement ; Pensa enregistre automatiquement l'ordre final après une courte
 pause, sans recharger les autres listes. Attendez **Ordre enregistré** avant de
 fermer la page. Vous pouvez visiter un autre écran de Pensa pendant
