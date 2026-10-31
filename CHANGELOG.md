@@ -8,6 +8,10 @@ minor bump may change behaviour.
 
 ### Added
 
+- Contextual history entries with recipient, organizer, participants, occasions
+  and gift dates when available, with normalized, limited public identities.
+- Wish search results identify their list owner and clear stale results while
+  searching, with explicit loading and error states.
 - Off-list gift actions above long wish lists and beside member/occasion
   navigation, with editable recipient and occasion prefills, private defaults,
   and loading/error safeguards when switching recipients ([#8](https://github.com/aileo/pensa/issues/8)).

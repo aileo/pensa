@@ -23,6 +23,11 @@ export function saveLocale(locale: Locale) {
 }
 
 const english = {
+  'Chargement de l’historique…': 'Loading history…',
+  'Recherche en cours…': 'Searching…',
+  'Bénéficiaire indisponible': 'Recipient unavailable',
+  'Offert le {date}': 'Given on {date}',
+  'Enregistré le {date}': 'Recorded on {date}',
   'Administrateurs de la famille': 'Family administrators',
   'Ces droits concernent cette famille uniquement, pas les foyers.': 'These permissions apply only to this family, not to households.',
   'Une famille doit conserver un administrateur': 'A family must retain an administrator',
