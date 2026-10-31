@@ -137,6 +137,8 @@ A gift that nobody asked for still needs organising. An off-list reservation is
 created for a person and an occasion without any wish behind it. It can be kept
 **private**, or made **visible** to the rest of the family so that others can
 ask to join in — never to the beneficiary.
+These choices concern preparation only. Once given, even a private gift enters
+the recipient's current family history, still excluding the recipient.
 
 ## Contributions
 
@@ -147,14 +149,25 @@ its history.
 ## History and search
 
 Once given, a gift is kept as an independent snapshot, readable by the
-beneficiary and the participants. It answers the question that causes the most
-duplicates: *what did we already give them?*
+recipient's current family circle, **except the recipient**, even if the gift
+was private during preparation. Former organizers and participants lose history
+access when they no longer share a family with the recipient. This deliberately
+expands completed-history visibility, not active reservation access. It answers
+the question that causes the most duplicates: *what did we already give them?*
 
 History entries identify the gift and recipient, and show the organizer,
 participants, occasion and gift date when recorded. Missing details are
 omitted or labeled unavailable; when the gift date is unknown, the entry
 labels its record date instead. Historical identities expose only limited
 public fields, including for older snapshots.
+
+Choose a recipient from accessible history entries to review all their recorded
+occurrences. Sort newest first (default), oldest first or recipient A-Z.
+Recipient order uses the latest snapshot name, then recipient ID, newest date
+and history ID; date sorts use history ID for ties. Filtering never looks up
+people outside authorized history. URL selections survive back/forward, which
+rechecks access rather than reusing stale history. Loading, errors, no history
+and no matching gifts are distinct states.
 
 Search covers people and wishes in shared families. Wish results identify
 both the wish and the person whose list it belongs to. Hidden off-list,
