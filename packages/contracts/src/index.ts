@@ -60,7 +60,8 @@ export type Wish = {
   reservation?: Reservation
 }
 export type SearchWish = Wish & { owner: Pick<PersonView, 'id' | 'firstName' | 'lastName' | 'birthDate' | 'avatar' | 'managed'> }
-export type SearchResults = { people: PersonView[]; wishes: SearchWish[] }
+export type SearchResults = { people: PersonView[]; wishes: SearchWish[]; history: HistoryEntry[] }
+export type DuplicateWishError = { error: string; duplicates: Wish[] }
 export type HistoryPerson = Pick<PersonView, 'id' | 'firstName' | 'lastName' | 'birthDate'>
 export type HistoryEntry = {
   id: string

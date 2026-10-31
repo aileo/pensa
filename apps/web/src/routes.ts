@@ -49,3 +49,5 @@ export const wishPath = (id: string) => `/wishes/${encodeURIComponent(id)}`
 export const familyPath = (id: string) => `/families/${encodeURIComponent(id)}`
 export const personWishesPath = (id: string) => `/users/${encodeURIComponent(id)}/wishes`
 export const reservationPath = (id: string) => `/reservations/${encodeURIComponent(id)}`
+export const historyEntryPath = (recipientId: string, entryId: string) =>
+  `/history?${new URLSearchParams({ recipient: recipientId, entry: entryId })}`

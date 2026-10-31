@@ -1,13 +1,17 @@
 import { formatDate, formatMoney, getLocale, translate } from './locale'
 import type { Family, Household, Id, Occasion, OccasionSelection, Onboarding, ParticipationRequest, Person, Reservation, Todo, Wish } from '../../../packages/contracts/src/index'
 
-export type { HistoryEntry, SearchResults, SearchWish } from '../../../packages/contracts/src/index'
+export type { DuplicateWishError, HistoryEntry, SearchResults, SearchWish } from '../../../packages/contracts/src/index'
 export type { Family, Household, Id, Occasion, OccasionSelection, Onboarding, ParticipationRequest, Person, Reservation, Todo, Wish }
 
 export class ApiError extends Error {
   status: number
-  constructor(message: string, status: number) { super(message); this.status = status }
+  body: unknown
+  constructor(message: string, status: number, body?: unknown) { super(message); this.status = status; this.body = body }
 }
+
+// Thrown by an action whose form already shows the problem in place, so no banner repeats it.
+export class HandledError extends Error {}
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response
@@ -28,7 +32,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     const detail = body && typeof body === 'object'
       ? body.message || body.error
       : null
-    throw new ApiError(typeof detail === 'string' ? detail : translate('Une erreur est survenue ({status}).', getLocale(), { status: response.status }), response.status)
+    throw new ApiError(typeof detail === 'string' ? detail : translate('Une erreur est survenue ({status}).', getLocale(), { status: response.status }), response.status, body)
   }
   if (response.status === 204) return undefined as T
   const text = await response.text()

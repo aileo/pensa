@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
-import { api, dateOf, json, list, nameOf, type Family, type Household, type Id, type Occasion, type OccasionSelection, type Onboarding, type Person, type Reservation, type Todo, type Wish } from './api'
+import { api, dateOf, HandledError, json, list, nameOf, type Family, type Household, type Id, type Occasion, type OccasionSelection, type Onboarding, type Person, type Reservation, type Todo, type Wish } from './api'
 import { localizeMessage, occasionLabel, type TranslationKey } from './locale'
 import { useTranslation } from './language-context'
 import { familyPath, matchRoute, pagePath, personWishesPath, reservationPath, wishPath } from './routes'
@@ -172,7 +172,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [offListRecipient, setOffListRecipient] = useState<Person | null>(null)
   const [offListOccasion, setOffListOccasion] = useState<OccasionSelection | null>(null)
   const refresh = () => { setLoading(true); setRevision(value => value + 1) }
-  const handleError = useCallback((problem: unknown) => setError(problem instanceof Error ? problem.message : t('Une erreur inattendue est survenue.')), [t])
+  const handleError = useCallback((problem: unknown) => setError(problem instanceof HandledError ? '' : problem instanceof Error ? problem.message : t('Une erreur inattendue est survenue.')), [t])
 
   // The root path and a logged-out person's own `/users/:id/wishes` URL are not real
   // destinations; redirect them without ever flashing a "not found" state.
@@ -341,7 +341,7 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     </div>
     {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 p-2 lg:p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModal(null) }}><div role="dialog" aria-modal="true" aria-labelledby="modal-title" className="max-h-[calc(100dvh-1rem)] w-full max-w-lg overflow-y-auto rounded-[24px] bg-white p-4 shadow-2xl lg:max-h-[90vh] lg:p-8"><div className="mb-4 flex items-start justify-between gap-3 lg:mb-6"><div className="min-w-0 [overflow-wrap:anywhere]"><p className="eyebrow mb-1">{t('PENSA')}</p><h2 id="modal-title" className="font-['Outfit'] text-2xl font-bold">{t(modal === 'wish' ? 'Ajouter une envie' : modal === 'family' ? 'Créer une famille' : modal === 'occasion' ? 'Nouvelle occasion' : modal === 'editWish' ? 'Modifier l’envie' : modal === 'offList' ? 'Prévoir un cadeau hors liste' : 'Réserver une envie')}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label={t('Fermer')}><Icon name="close"/></button></div>
       {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {modal === 'wish' && <WishForm owner={wishOwner} busy={busy} perform={perform} handleError={handleError}/>}
+      {modal === 'wish' && <WishForm owner={wishOwner} busy={busy} perform={perform} handleError={handleError} onClose={() => setModal(null)}/>}
       {modal === 'family' && <form onSubmit={event => { event.preventDefault(); const name = String(new FormData(event.currentTarget).get('name')).trim(); if (name) void perform(() => api('/families', json('POST', { name })), t('Famille créée.')) }}><label className="label" htmlFor="family-name">{t('Nom de la famille')}</label><input className="field" id="family-name" name="name" placeholder={t('Ex. : La famille Martin')} required/><button disabled={busy} className="primary mt-5 w-full">{t('Créer la famille')}</button></form>}
       {modal === 'occasion' && occasionFamily && <OccasionForm family={occasionFamily} busy={busy} perform={perform}/>}
       {modal === 'editWish' && selectedWish && <WishEditForm wish={selectedWish} busy={busy} perform={perform}/>}
