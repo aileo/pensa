@@ -1,0 +1,76 @@
+# Screenshots for the user guides, taken from a throwaway instance.
+#
+#   docker compose -f compose.screenshots.yaml run --rm --build screenshots
+#   docker compose -f compose.screenshots.yaml down -v
+#
+# It is a project of its own, so it never touches the development database or
+# its ports: the database lives in memory, is migrated and seeded on start, and
+# nothing is published on the host. The images land in docs/images/{en,fr}/.
+name: pensa-screenshots
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: pensa
+      POSTGRES_PASSWORD: pensa
+      POSTGRES_DB: pensa
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pensa"]
+      interval: 2s
+      retries: 30
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        APP_DIR: apps/api
+    working_dir: /app
+    # The API only listens once the seed is in, so reaching it means the demo data is there.
+    command: sh -c "npm run migrate && npm run seed && npm run dev"
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+      - ./packages:/packages:ro
+    environment:
+      DATABASE_URL: postgres://pensa:pensa@db:5432/pensa
+      PORT: 3000
+      WEB_ORIGIN: http://localhost:5173
+    depends_on:
+      db:
+        condition: service_healthy
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        APP_DIR: apps/web
+    working_dir: /app
+    command: npm run dev -- --host 0.0.0.0
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - ./packages:/packages:ro
+    environment:
+      VITE_API_PROXY_TARGET: http://api:3000
+    depends_on:
+      - api
+  screenshots:
+    # Keep the tag in step with the playwright version in screenshots/package.json.
+    image: mcr.microsoft.com/playwright:v1.64.1-noble
+    # Sharing the web container's network lets the browser use localhost, the
+    # only host the Vite dev server and the API's origin check accept.
+    network_mode: service:web
+    working_dir: /app
+    command: sh -c "npm ci --no-audit --no-fund && node capture.mjs"
+    volumes:
+      - ./screenshots:/app
+      - /app/node_modules
+      - ./docs/images:/images
+    environment:
+      BASE_URL: http://localhost:5173
+      OUT_DIR: /images
+    depends_on:
+      - web

@@ -226,7 +226,11 @@ Log in as **Charlie**.
       labeled record date instead.
 - [ ] Search identifies each wish's list owner. Alice can find Bob's active
       list wishes, but Bob sees no reservation metadata in his own results.
-      Off-list, deleted, gifted and inaccessible wishes never appear.
+      Off-list, deleted, gifted and inaccessible wishes never appear as wishes.
+- [ ] As Bob, Charlie or David, search *photo*, *Alice*, *David* or *Noël*: the
+      *Appareil photo* history entry appears as *Already given*. *View* opens
+      the history filtered on Alice, scrolled to the entry, which is highlighted.
+      As Alice or Eloise, the same searches show no history result.
 - [ ] Type quickly while a previous response is delayed: input focus stays
       put and only the latest query's results appear. Clearing the query
       removes `q` and the results. Back/forward re-runs the query.
@@ -289,6 +293,8 @@ Paste a product URL in *Mes envies → Ajouter une envie*. There is no button: t
 - [ ] **Unknown domain:** a link to a domain that does not exist is refused with *Site introuvable* and fills nothing.
 - [ ] **Rejected addresses:** a URL pointing to a local address (`http://localhost:3000`) is refused with *Adresse non autorisée*.
 - [ ] **No lockout:** after several failed previews you can still sign out and sign back in — previews have their own rate limit.
+- [ ] **Duplicate warning:** as Bob, add *console de jeux* (any link), or a wish whose link equals an existing one up to `https`/`http`, `www.`, a trailing slash or `utm_*` parameters. The form shows both wishes side by side instead of saving. *Voir l’envie existante* opens it, *Annuler l’ajout* closes the form, *Ajouter quand même* saves the copy. Editing any field hides the warning. Repeat for a managed member's list (the message names them) and in English.
+- [ ] **No duplicate leak:** as Bob, add *Week-end spa* — an off-list gift being planned for him. It is saved without any warning, so nothing hints at the surprise.
 
 ### 3.13 Landing page
 
@@ -629,6 +635,12 @@ docker compose up site -d
 - [ ] Local search works in narrow and short landscape viewports: its input
       uses 16px text, its actions have 44px touch targets, and results scroll
       inside the dialog. Repeat with keyboard navigation and light/dark mode.
+- [ ] Both user guides show their screenshots, in their own language, on the
+      site and on GitHub.
+- [ ] `docker compose -f compose.screenshots.yaml run --rm --build screenshots`
+      rewrites every image in `docs/images/en/` and `docs/images/fr/` and exits
+      0, while the development stack keeps running and its data is untouched.
+      Then `docker compose -f compose.screenshots.yaml down -v`.
 
 After a push to `main`, the *Pages* workflow publishes
 https://aileo.github.io/pensa/. It fails until GitHub Pages is set to deploy

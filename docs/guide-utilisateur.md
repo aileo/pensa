@@ -33,6 +33,8 @@ Trois portes, selon ce qu'on vous a donné :
 Si vous êtes la toute première personne sur une instance neuve, l'inscription
 est ouverte sans aucun code. Après vous, elle se referme.
 
+![L'écran de connexion](images/fr/sign-in.png)
+
 ::: tip Foyer ou famille ?
 Un **foyer**, ce sont les personnes qui vivent ensemble. Une **famille** relie
 plusieurs foyers : le vôtre, celui de vos parents, celui de votre belle-famille.
@@ -43,6 +45,8 @@ elles : chaque vue de famille n'affiche que les membres de cette famille-là.
 Votre foyer a des **administrateurs**. Ce sont eux qui acceptent les invitations
 de famille, ajoutent les membres qui ne peuvent pas se connecter et renomment
 les choses. La première personne d'un foyer l'est automatiquement.
+
+![L'écran des familles, avec leurs foyers et leurs membres](images/fr/families.png)
 
 ## Votre profil
 
@@ -55,6 +59,8 @@ Deux champs de votre profil travaillent en arrière-plan :
 
 Le reste — nom, e-mail, mot de passe — est ce à quoi vous vous attendez.
 
+![La page de profil](images/fr/profile.png)
+
 ## Écrire sa liste d'envies
 
 Votre liste est une liste d'**envies**. Une envie, c'est un titre, et
@@ -65,9 +71,24 @@ remplit le nom, l'image et le prix pour vous ; corrigez ce qu'elle a mal compris
 avant d'enregistrer. Si le site refuse de se laisser lire — certains refusent —
 saisissez le titre vous-même, l'envie fonctionnera exactement pareil.
 
+![Une liste d'envies, avec étiquettes, prix et réordonnancement](images/fr/my-wishes.png)
+
 Les **étiquettes** sont du texte libre : *livres*, *vélo*, *petites choses*.
 Ce sont elles qui permettront à quelqu'un qui lit votre liste de n'en garder que
 la partie qui l'intéresse.
+
+::: tip Déjà sur la liste ?
+Si la liste contient déjà une envie avec le même lien ou le même nom — sans tenir
+compte des majuscules, des accents, des espaces ni des paramètres de suivi du
+lien — Pensa montre les deux côte à côte avant d'enregistrer. **Annuler l'ajout**
+laisse la liste telle quelle, **Voir l'envie existante** ouvre celle qui y est déjà, et
+**Ajouter quand même** enregistre la nouvelle lorsqu'il s'agit vraiment d'une
+autre envie, une autre taille par exemple. Seule la liste visible de cette
+personne est comparée : la même idée sur la liste de quelqu'un d'autre n'est
+jamais signalée.
+:::
+
+![L'alerte de doublon, qui compare l'envie existante et la nouvelle](images/fr/duplicate-warning.png)
 
 ::: warning Ce qui reste modifiable
 Une fois l'envie enregistrée, son **nom ne change plus jamais** — même après
@@ -116,6 +137,8 @@ Ouvrez la liste de quelqu'un et vous voyez ses envies. Vous pouvez la réduire
 par étiquette, par tranche de prix et par disponibilité — ce dernier filtre,
 elle ne le verra jamais sur sa propre liste.
 
+![La liste d'envies de quelqu'un d'autre, avec ses filtres](images/fr/person-wishes.png)
+
 **Réserver** une envie le signale au reste de la famille, et ne dit strictement
 rien à la personne concernée. Elle ne verra ni qui a réservé, ni que quelque
 chose a été réservé.
@@ -123,6 +146,8 @@ chose a été réservé.
 Une réservation se rattache à une ou plusieurs **occurrences** : le prochain
 anniversaire, le Noël suivant, ou les deux à la fois quand un seul cadeau couvre
 deux occasions. Le formulaire propose la prochaine occurrence et celle d'après.
+
+![Réserver une envie pour une ou plusieurs occasions](images/fr/reserve.png)
 
 ::: tip Impossible de réserver deux fois le même cadeau par accident
 Deux personnes qui cliquent à la même seconde ne peuvent pas l'obtenir toutes
@@ -140,6 +165,10 @@ Cochez-les au fur et à mesure. Ce qu'il vous reste à faire remonte sur votre
 tableau de bord, avec sa date : l'application est une liste de choses à faire
 plutôt qu'une étagère d'étiquettes. À la dernière étape cochée, le cadeau bascule
 dans l'historique.
+
+![Le tableau de bord : les prochaines occasions et ce qu'il reste à faire](images/fr/dashboard.png)
+
+![Les réservations et leur avancement](images/fr/reservations.png)
 
 ## Les cadeaux que personne n'a demandés
 
@@ -205,6 +234,8 @@ listes que tient votre foyer apparaissent sur votre tableau de bord, et une
 rangée de raccourcis est posée en haut de *Mes envies*. Un clic passe de votre
 liste à la sienne, et inversement.
 
+![La liste d'un membre géré, tenue par le foyer](images/fr/managed-list.png)
+
 Personne ne reste géré pour toujours. Deux sorties :
 
 - **Un code de récupération.** Générez-le, remettez-le, et la personne ouvre son
@@ -248,12 +279,21 @@ Les filtres et le tri restent dans l'adresse lors des retours et avances du navi
 Quitter les familles communes retire cet accès, même si vous avez organisé le
 cadeau ou participé. Le bénéficiaire ne voit jamais ses propres cadeaux dans l'historique.
 
-La **recherche** couvre les personnes et les envies de vos familles communes.
-Chaque résultat d'envie indique la personne à qui appartient la liste.
-Les cadeaux hors liste, les envies supprimées et les cadeaux déjà offerts
-n'apparaissent pas, et vos propres résultats ne révèlent jamais les réservations.
+![L'historique, filtré et trié](images/fr/history.png)
+
+La **recherche** couvre les personnes, les envies et les cadeaux déjà offerts de
+vos familles communes. Chaque résultat d'envie indique la personne à qui
+appartient la liste. Les cadeaux hors liste, les envies supprimées et les
+cadeaux déjà offerts n'apparaissent pas comme envies, et vos propres résultats ne
+révèlent jamais les réservations. Les cadeaux déjà offerts apparaissent comme
+résultats **Déjà offert** — retrouvés par leur nom, leur bénéficiaire, leur
+organisateur, leurs participants ou leur occasion — selon exactement la même
+règle que l'historique : jamais pour leur bénéficiaire. **Voir** ouvre
+l'historique sur ce bénéficiaire, avec le cadeau mis en évidence.
 Pendant la recherche, les anciens résultats disparaissent et le chargement
 ou les erreurs sont affichés.
+
+![La recherche qui retrouve un cadeau déjà offert](images/fr/search-history.png)
 
 ## Français et anglais
 

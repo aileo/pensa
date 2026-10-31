@@ -89,6 +89,33 @@ Adding a page means three edits: the file in `docs/`, a row in
 docker compose run --rm site npm run build
 ```
 
+### Screenshots in the user guides
+
+The guides embed screenshots from `docs/images/en/` and `docs/images/fr/`, with
+the same file names in both. They are taken by a Playwright script,
+`screenshots/capture.mjs`, against a throwaway instance described in
+`compose.screenshots.yaml`: its own project, a database in memory that is
+migrated and seeded on start, and nothing published on the host — so it never
+touches your development data and can run while the development stack is up.
+
+```sh
+docker compose -f compose.screenshots.yaml run --rm --build screenshots
+docker compose -f compose.screenshots.yaml down -v
+```
+
+The script signs in as the seeded demo users, switches the language through the
+same browser preference the interface uses, and writes each image under both
+language folders. Commit the results: they are what GitHub renders. The *Pages*
+workflow retakes them before every site build, so the published guides always
+show the current interface. A failed step leaves `docs/images/failed-*.png`,
+which is ignored by git and by the site.
+
+Adding a screenshot means adding a shot to `capture.mjs` and embedding it in
+**both** guides. Labels the script clicks are listed per language at the top of
+the script; keep them in step with `apps/web/src/locale.ts`. The Playwright
+image tag in `compose.screenshots.yaml` must match the `playwright` version in
+`screenshots/package.json`.
+
 ## Commands
 
 | Command | Purpose |
@@ -101,6 +128,7 @@ docker compose run --rm site npm run build
 | `docker compose run --rm web npm run lint` | interface lint |
 | `docker compose run --rm web npm run build` | build the interface |
 | `docker compose run --rm site npm run build` | build the documentation site, failing on dead links |
+| `docker compose -f compose.screenshots.yaml run --rm --build screenshots` | retake the user-guide screenshots in `docs/images/` |
 | `docker compose down` | stop, keep the data |
 | `docker compose down -v` | stop and delete the data |
 
@@ -152,7 +180,10 @@ apps/web/            React + Vite + Tailwind
 packages/contracts/ shared API data types imported by both apps
 compose.yaml         development stack
 compose.prod.yaml    stack using the published images
+compose.screenshots.yaml  throwaway instance for the user-guide screenshots
 docs/                this documentation
+  images/            user-guide screenshots, en/ and fr/, generated
+screenshots/         Playwright script taking those screenshots
 site/                the documentation site (home page, theme, VitePress config)
 ```
 
