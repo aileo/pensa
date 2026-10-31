@@ -116,6 +116,15 @@ answer `404` for them, because a `403` would confirm that a reservation exists.
 Gifted history is a separate snapshot, readable only by the beneficiary and the
 participants.
 
+Deleting a wish with an active reservation atomically clones its gift data
+into a hidden off-list wish and repoints the same reservation. Progress,
+participants, requests and occasions remain; `open_to_contributions` becomes
+`false`. Only the organizer and existing participants can see the private
+gift, including through direct reservation URLs. The organizer may edit it
+through the existing off-list lifecycle. A data migration also repairs legacy
+active reservations attached to deleted wishes. Completion keeps the existing
+beneficiary-and-participants history policy.
+
 ## Joining a household or a family
 
 A family administrator creates a temporary invitation code, and **an

@@ -149,11 +149,16 @@ derrière : l'idée que vous avez eue tout seul.
 
 Il peut être :
 
-- **privé**, visible de vous seul ; ou
+- **privé**, visible de vous et des participants invités pendant sa préparation ; ou
 - **visible** par le reste de la famille, pour que d'autres puissent demander à
   participer.
 
 Dans les deux cas, la personne qui le recevra ne voit rien.
+
+Si une envie réservée est supprimée, l'engagement devient un **cadeau hors
+liste privé**. Les détails, participants, occasions et l'avancement sont
+conservés ; les demandes de participation sont fermées. L'organisateur peut
+modifier le cadeau et poursuivre sa préparation.
 
 ## À plusieurs sur un même cadeau
 

@@ -191,6 +191,13 @@ Log in as **Charlie**.
 - [ ] Log in as **Bob**: no trace of off-list gifts anywhere (dashboard, his wishes, reservations, search for *spa*).
 - [ ] Once an off-list gift is marked *Offert*, the recipient sees it in *Historique*.
 
+### Wish deletion
+
+- [ ] Delete a wish with an open reservation. Its organizer and existing participants retain the same reservation, details, occasions and progress as a private off-list gift.
+- [ ] Uninvolved family members, pending applicants and the recipient cannot read, update, cancel or request participation through its direct reservation URL. It is absent from their off-list and open-gift lists.
+- [ ] Edit, advance and cancel converted gifts using the normal off-list controls. Completing one keeps the existing history access for the beneficiary and participants.
+- [ ] Repeat these checks in French and English.
+
 ### 3.10 Product copy
 
 The wording is built around one promise: **organizing gifts without the mental load**. Warmth

@@ -178,9 +178,51 @@ export const createWishService = (deps: WishServiceDeps) => {
   };
 
   const deleteWish = async (actor: Person, id: string) => {
-    const wish = await writableWish(actor, id);
-    await query('UPDATE wishes SET deleted_at=now() WHERE id=$1', [wish.id]);
-    return { ok: true };
+    await writableWish(actor, id);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const wish = (await client.query<Wish>('SELECT * FROM wishes WHERE id=$1 FOR UPDATE', [id])).rows[0];
+      if (!wish || wish.deleted_at || wish.gifted_at || wish.off_list) fail(404, 'Souhait introuvable');
+      if (
+        wish.owner_id !== actor.id &&
+        !(
+          await client.query(
+            `SELECT 1 FROM users owner JOIN users actor ON actor.id=$1 AND actor.household_admin
+         WHERE owner.id=$2 AND owner.password_hash IS NULL AND owner.household_id=actor.household_id`,
+            [actor.id, wish.owner_id],
+          )
+        ).rowCount
+      )
+        fail(404, 'Souhait introuvable');
+      const reservation = (
+        await client.query<{ id: string; creator_id: string }>(
+          "SELECT id,creator_id FROM reservations WHERE wish_id=$1 AND cancelled_at IS NULL AND status<>'gifted' FOR UPDATE",
+          [id],
+        )
+      ).rows[0];
+      if (reservation) {
+        const gift = (
+          await client.query<{ id: string }>(
+            `INSERT INTO wishes(owner_id,title,description,url,image,price,tags,off_list,created_by)
+           SELECT owner_id,title,description,url,image,price,tags,true,$2 FROM wishes WHERE id=$1 RETURNING id`,
+            [id, reservation.creator_id],
+          )
+        ).rows[0];
+        await client.query('UPDATE reservations SET wish_id=$1,open_to_contributions=false WHERE id=$2', [
+          gift.id,
+          reservation.id,
+        ]);
+      }
+      await client.query('UPDATE wishes SET deleted_at=now() WHERE id=$1', [id]);
+      await client.query('COMMIT');
+      return { ok: true };
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   };
 
   return {
