@@ -216,7 +216,15 @@ Once a gift is marked as given it is kept in the **history**, readable by the
 person who received it and by everyone who contributed. It answers the question
 behind most duplicate gifts: *what did we already give them?*
 
-**Search** covers people, wishes and occasions at once.
+Each entry identifies the gift and its recipient, with the organizer,
+participants, occasion and gift date when available. If the gift date was not
+recorded, the record date is labeled instead. Unavailable recipient details
+are labeled as such; missing optional information is not guessed.
+
+**Search** covers people and wishes in your shared families. Each wish result
+names the person whose list it belongs to. Off-list, deleted and already given
+wishes do not appear, and your own results never reveal reservations.
+While searching, previous results clear and loading or errors are shown.
 
 ## French and English
 

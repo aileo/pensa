@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
-import { api, dateOf, json, list, money, nameOf, type Family, type Household, type Id, type Occasion, type OccasionSelection, type Onboarding, type Person, type Reservation, type Todo, type Wish } from './api'
+import { api, dateOf, json, list, nameOf, type Family, type Household, type Id, type Occasion, type OccasionSelection, type Onboarding, type Person, type Reservation, type Todo, type Wish } from './api'
 import { localizeMessage, occasionLabel, type TranslationKey } from './locale'
 import { useTranslation } from './language-context'
 import { familyPath, matchRoute, pagePath, personWishesPath, reservationPath, wishPath } from './routes'
@@ -15,7 +15,9 @@ import { FamilyHouseholds, FamilyManagement, HouseholdCard, HouseholdPanel, Join
 import { Guidance } from './features/dashboard/Guidance'
 import { ProfileForm, ProfileMenu } from './features/profile/ProfileComponents'
 import { OffListForm, OffListGiftCard, ReservationForm, ReservationRow } from './features/reservations/ReservationComponents'
-import { occasionWithYear, selectionOf, statusNotices } from './features/reservations/model'
+import { selectionOf, statusNotices } from './features/reservations/model'
+import { HistoryPanel } from './features/history/HistoryPanel'
+import { SearchPanel } from './features/search/SearchPanel'
 import { WishDetail } from './features/wishes/WishDetail'
 import { WishEditForm, WishForm } from './features/wishes/WishForm'
 
@@ -136,9 +138,6 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
   const [sharedWishes, setSharedWishes] = useState<Wish[]>([])
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [dashboard, setDashboard] = useState<Record<string, unknown>>({})
-  const [history, setHistory] = useState<unknown[]>([])
-  const [searchResults, setSearchResults] = useState<unknown[]>([])
-  const searchText = route.page === 'search' ? searchParams.get('q') ?? '' : ''
   const routePersonId = route.page === 'personWishes' ? route.personId : undefined
   const isSelfRoute = routePersonId !== undefined && String(routePersonId) === String(me.id)
   const selectedPerson = routePersonId && !isSelfRoute ? users.find(person => String(person.id) === String(routePersonId)) ?? null : null
@@ -200,22 +199,6 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
     }).catch(problem => { if (active) handleError(problem) }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [me, revision, handleError])
-  useEffect(() => {
-    if (route.page !== 'history') return
-    let active = true
-    api<unknown[]>('/history').then(data => { if (active) setHistory(list(data)) }).catch(problem => { if (active) handleError(problem) })
-    return () => { active = false }
-  }, [me, route.page, revision, handleError])
-  useEffect(() => {
-    if (route.page !== 'search') return
-    let active = true
-    const timer = window.setTimeout(() => {
-      api<unknown>(`/search?q=${encodeURIComponent(searchText.trim())}`).then(data => {
-        if (active) setSearchResults(Array.isArray(data) ? data : data && typeof data === 'object' ? [...list<unknown>((data as Record<string, unknown>).people), ...list<unknown>((data as Record<string, unknown>).wishes)] : [])
-      }).catch(problem => { if (active) handleError(problem) })
-    }, 300)
-    return () => { active = false; window.clearTimeout(timer) }
-  }, [me, route.page, searchText, revision, handleError])
 
   async function perform(action: () => Promise<unknown>, success: string, close = true) {
     setBusy(true); setError('')
@@ -350,8 +333,8 @@ export function AuthenticatedApp({ me, onLogout, onProfile }: { me: Person; onLo
             </>}
         </>}
         {route.page === 'reservations' && <><SectionTitle icon="gift" kicker={t('CADEAUX EN PRÉPARATION')} title={t('Mes réservations')} action={<button className="secondary" onClick={() => openOffList()}><Icon name="plus" size={17}/> {t('Prévoir un cadeau hors liste')}</button>}/>{route.reservationId && !loading && !reservations.some(reservation => String(reservation.id) === String(route.reservationId)) && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{t('Réservation introuvable ou non accessible.')}</p>}{reservations.length ? <div className="space-y-4">{reservations.map(reservation => <ReservationRow key={reservation.id} reservation={reservation} me={me} users={allPeople} busy={busy} perform={perform} onStatus={changeStatus} focused={String(route.reservationId) === String(reservation.id)}/>)}</div> : <Empty icon="gift" title={t('Aucune réservation pour le moment')} text={t('Explorez les listes de vos proches pour leur préparer une surprise.')} action={<button className="primary" onClick={() => go('families')}>{t('Découvrir les envies')} <Icon name="arrow" size={17}/></button>}/>}</>}
-        {route.page === 'history' && <><SectionTitle icon="clock" tone="sage" kicker={t('DÉJÀ OFFERT')} title={t('Historique')}/>{history.length ? <div className="card divide-y divide-line-soft">{history.map((entry, index) => { const item = entry as { id?: Id; snapshot?: { title?: string; recipient?: { birthDate?: string; birth_date?: string }; occasions?: { name: string; kind?: Occasion['kind']; year: number }[] }; created_at?: string }; const birthDate = item.snapshot?.recipient?.birthDate ?? item.snapshot?.recipient?.birth_date; return <div className="flex items-start gap-4 p-5" key={String(item.id ?? index)}><span className="rounded-xl bg-brand-50 p-2.5 text-brand-600"><Icon name="clock" size={19}/></span><div><p className="font-semibold">{item.snapshot?.title || t('Un cadeau offert')}</p><p className="muted mt-1">{item.snapshot?.occasions?.map(occasion => occasionWithYear(occasion, locale, birthDate)).join(', ')} · {dateOf(item.created_at)}</p></div></div> })}</div> : <Empty icon="clock" title={t('Rien d’offert pour l’instant')} text={t('Les cadeaux déjà offerts s’afficheront ici, pour éviter d’offrir deux fois la même chose.')}/>}</>}
-        {route.page === 'search' && <><SectionTitle icon="search" kicker={t('RECHERCHE')} title={t('Rechercher')}/><label htmlFor="global-search" className="label">{t('Personnes et envies')}</label><div className="relative mb-7"><Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-500"/><input id="global-search" autoComplete="off" className="field !py-3 !pl-12" placeholder={t('Rechercher une personne, une envie…')} value={searchText} onChange={event => setSearchParams(previous => { const next = new URLSearchParams(previous); const value = event.target.value; if (value) next.set('q', value); else next.delete('q'); return next }, { replace: true })}/></div>{searchResults.length ? <div className="space-y-3">{searchResults.map((result, index) => { const item = result as Record<string, unknown>; const person = item as Person; const wish = item as Wish; const isWish = typeof item.title === 'string'; return <div key={String(item.id ?? index)} className="card flex items-center gap-4 p-4">{isWish ? <span className="rounded-xl bg-brand-50 p-3 text-brand-600"><Icon name="heart"/></span> : <Avatar person={person}/>}<div className="min-w-0 flex-1"><p className="truncate font-semibold">{isWish ? wish.title : nameOf(person)}</p><p className="muted">{isWish ? money(wish.price) || t('Envie cadeau') : t('Personne')}</p></div><button className="secondary !px-3 !py-2 text-sm" onClick={() => isWish ? navigate(wishPath(String(wish.id))) : openPerson(person)}>{t('Voir')} <Icon name="arrow" size={15}/></button></div> })}</div> : <Empty icon="search" title={searchText ? t('Aucun résultat') : t('Que recherchez-vous ?')} text={searchText ? t('Essayez d’autres mots-clés.') : t('Retrouvez une personne ou une idée cadeau en quelques lettres.')}/>}</>}
+        {route.page === 'history' && <HistoryPanel key={String(me.id)} revision={revision}/>}
+        {route.page === 'search' && <SearchPanel key={String(me.id)} revision={revision}/>}
         {route.page === 'profile' && <><SectionTitle icon="user" kicker={t('VOTRE ESPACE')} title={t('Mon profil')}/><div className="card max-w-2xl p-6 sm:p-8"><div className="flex items-center gap-4 border-b border-line pb-6"><Avatar person={me} size="lg"/><div><h2 className="font-['Outfit'] text-xl font-semibold">{nameOf(me)}</h2><p className="muted">{t('Votre compte Pensa')}</p></div></div><dl className="space-y-5 py-6"><div><dt className="eyebrow mb-1">{t('ADRESSE E-MAIL')}</dt><dd>{me.email || t('Non renseignée')}</dd></div><div><dt className="eyebrow mb-1">{t('DATE DE NAISSANCE')}</dt><dd>{dateOf(me.birthDate) || t('Non renseignée')}</dd></div></dl><ProfileForm me={me} busy={busy} perform={perform} onSaved={onProfile}/></div></>}
         {route.page === 'notFound' && <Empty icon="search" title={t('Page introuvable')} text={t('Cette page n’existe pas ou l’adresse est incorrecte.')} action={<button className="primary" onClick={() => go('dashboard')}>{t('Retour au tableau de bord')}</button>}/>}
       </main>

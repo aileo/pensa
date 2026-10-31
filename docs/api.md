@@ -125,6 +125,23 @@ through the existing off-list lifecycle. A data migration also repairs legacy
 active reservations attached to deleted wishes. Completion keeps the existing
 beneficiary-and-participants history policy.
 
+## History and search responses
+
+`GET /history` retains the beneficiary-and-participants access policy. Each
+entry returns `id`, `recipientId`, `created_at` and a normalized `snapshot`
+containing the gift `id` and optional `title`, `recipient`, `creator` and
+`giftedAt`, plus `participants` and `occasions` arrays. Legacy snake_case
+identity fields are normalized to `firstName`, `lastName` and `birthDate`.
+Historical identities contain only those public fields and `id`; arbitrary
+stored user or wish fields are not returned. Missing arrays become empty and
+missing optional context is not inferred from current user records.
+
+`GET /search?q=…` returns `{ people, wishes }`. Each wish includes an `owner`
+public identity so clients can identify its list. Search excludes off-list,
+deleted and gifted wishes, and uses the same reservation projection as wish
+details: the owner never receives reservation metadata. Empty queries return
+empty arrays; queries longer than 100 characters return a validation error.
+
 ## Joining a household or a family
 
 Family administrators may promote an account-bearing member using

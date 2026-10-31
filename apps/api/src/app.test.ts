@@ -34,6 +34,62 @@ afterAll(async () => {
   await pool.end();
 });
 describe('permissions métier sur l’API', () => {
+  it('identifies wish owners in search without exposing hidden gifts or beneficiary reservations', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.10');
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const wish = await call('bob', '/wishes', 'POST', { title: 'Search context regression', url: 'https://example.com', tags: [] });
+    expect(wish.status).toBe(201);
+    const occasion = (await call('alice', `/occasions?recipientId=${bobId}`)).data.find((o: { nextDate?: string }) => o.nextDate);
+    const occasionIds = [{ id: occasion.id, year: Number(occasion.nextDate.slice(0, 4)) }];
+    const reservation = await call('alice', '/reservations', 'POST', { wishId: wish.data.id, occasionIds });
+    expect(reservation.status).toBe(201);
+    const result = (await call('alice', '/search?q=Search context regression')).data.wishes;
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: wish.data.id, title: 'Search context regression', owner: { id: bobId, firstName: 'Bob' } });
+    expect(Object.keys(result[0].owner).sort()).toEqual(['avatar', 'birthDate', 'firstName', 'id', 'lastName', 'managed']);
+    expect(result[0].reservation).toEqual((await call('alice', `/wishes/${wish.data.id}`)).data.reservation);
+    const ownResult = (await call('bob', '/search?q=Search context regression')).data.wishes;
+    expect(ownResult[0].owner.id).toBe(bobId);
+    expect(ownResult[0]).not.toHaveProperty('reservation');
+    expect((await call('eloise', '/search?q=Search context regression')).data.wishes).toEqual([]);
+    for (const status of ['purchased', 'wrapped', 'gifted']) {
+      expect((await call('alice', `/reservations/${reservation.data.id}`, 'PATCH', { status })).status).toBe(200);
+    }
+    expect((await call('alice', `/wishes/${wish.data.id}`)).status).toBe(404);
+    expect((await call('bob', '/search?q=Search context regression')).data.wishes).toEqual([]);
+    const deleted = await call('bob', '/wishes', 'POST', { title: 'Search context deleted', url: 'https://example.com', tags: [] });
+    expect((await call('bob', `/wishes/${deleted.data.id}`, 'DELETE')).status).toBe(200);
+    const hidden = await call('alice', '/reservations/off-list', 'POST', {
+      recipientId: bobId, title: 'Search context hidden', occasionIds, openToContributions: true,
+    });
+    expect(hidden.status).toBe(201);
+    for (const actor of ['alice', 'bob', 'charlie', 'eloise']) {
+      expect((await call(actor, '/search?q=Search context')).data.wishes).toEqual([]);
+    }
+    expect((await call('alice', `/reservations/${hidden.data.id}`, 'DELETE')).status).toBe(200);
+    expect((await call('alice', '/search?q=')).data).toEqual({ people: [], wishes: [] });
+    expect((await call('alice', `/search?q=${'x'.repeat(101)}`, 'GET', undefined, 'en')).status).toBe(400);
+  });
+  it('returns contextual history while preserving recipient and participant access', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.11');
+    const entry = (await call('alice', '/history')).data.find((h: { snapshot: { title: string } }) => h.snapshot.title === 'Appareil photo');
+    expect(entry).toMatchObject({
+      snapshot: { title: 'Appareil photo', recipient: { firstName: 'Alice' }, creator: { firstName: 'Bob' },
+        occasions: [{ name: 'Noël', year: 2025 }] },
+    });
+    expect(entry.snapshot.participants.map((p: { firstName: string }) => p.firstName).sort()).toEqual(['Bob', 'David']);
+    expect(entry.snapshot.giftedAt).toBeTruthy();
+    expect(entry.recipientId).toBe(entry.snapshot.recipient.id);
+    expect((await call('bob', '/history')).data.some((h: { id: string }) => h.id === entry.id)).toBe(true);
+    expect((await call('david', '/history')).data.some((h: { id: string }) => h.id === entry.id)).toBe(true);
+    expect((await call('charlie', '/history')).data.some((h: { id: string }) => h.id === entry.id)).toBe(false);
+    expect((await call('eloise', '/history')).data).toEqual([]);
+    for (const person of [entry.snapshot.recipient, entry.snapshot.creator, ...entry.snapshot.participants]) {
+      expect(Object.keys(person).sort()).toEqual(person.birthDate ? ['birthDate', 'firstName', 'id', 'lastName'] : ['firstName', 'id', 'lastName']);
+    }
+  });
   it('grants and removes only family-admin rights and protects the last administrator', async () => {
     const call: typeof regressionCall = (as, path, method, body, language) =>
       regressionCall(as, path, method, body, language, '127.0.1.3');
@@ -125,7 +181,7 @@ describe('permissions métier sur l’API', () => {
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'wrapped' })).status).toBe(200);
     expect((await call('alice', `/reservations/${id}`, 'PATCH', { status: 'gifted' })).status).toBe(200);
     const completed = (await call('bob', '/history')).data.find((h: { snapshot: { id: string } }) => h.snapshot.id === converted.data.wishId);
-    expect(completed).toMatchObject({ snapshot: { title: 'Preserved gift edited', recipientId: bobId, recipient: { first_name: 'Bob' } } });
+    expect(completed).toMatchObject({ recipientId: bobId, snapshot: { title: 'Preserved gift edited', recipient: { firstName: 'Bob' } } });
     expect((await call('alice', '/history')).data.some((h: { id: string }) => h.id === completed.id)).toBe(true);
     expect((await call('charlie', '/history')).data.some((h: { id: string }) => h.id === completed.id)).toBe(true);
     expect((await call('david', '/history')).data.some((h: { id: string }) => h.id === completed.id)).toBe(false);
@@ -752,7 +808,7 @@ describe('permissions métier sur l’API', () => {
     expect((await call('bob', '/wishes')).data.some((w: {id:string}) => w.id === wish.data.id)).toBe(false);
     expect((await call('bob', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(true);
     expect((await call('bob', '/history')).data.find((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)
-      .snapshot.recipient.first_name).toBe('Bob');
+      .snapshot.recipient.firstName).toBe('Bob');
     expect((await call('charlie', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(true);
     expect((await call('david', '/history')).data.some((h: {snapshot:{id:string}}) => h.snapshot.id === wish.data.id)).toBe(false);
   });

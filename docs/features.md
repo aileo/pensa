@@ -150,7 +150,17 @@ Once given, a gift is kept as an independent snapshot, readable by the
 beneficiary and the participants. It answers the question that causes the most
 duplicates: *what did we already give them?*
 
-Search covers people, wishes and occasions.
+History entries identify the gift and recipient, and show the organizer,
+participants, occasion and gift date when recorded. Missing details are
+omitted or labeled unavailable; when the gift date is unknown, the entry
+labels its record date instead. Historical identities expose only limited
+public fields, including for older snapshots.
+
+Search covers people and wishes in shared families. Wish results identify
+both the wish and the person whose list it belongs to. Hidden off-list,
+deleted and gifted wishes are excluded, and reservation details stay hidden
+from the wish owner. Loading and errors are explicit, and changing a query
+clears previous results without moving focus out of the input.
 
 ## English and French
 

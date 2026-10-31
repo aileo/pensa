@@ -228,7 +228,18 @@ consultable par la personne qui l'a reçu et par tous ceux qui y ont participé.
 Il répond à la question qui cause le plus de doublons : *qu'est-ce qu'on lui a
 déjà offert ?*
 
-La **recherche** couvre à la fois les personnes, les envies et les occasions.
+Chaque entrée indique le cadeau et son bénéficiaire, avec l'organisateur,
+les participants, l'occasion et la date du cadeau lorsque ces informations
+sont disponibles. Si la date du cadeau n'a pas été conservée, la date
+d'enregistrement est indiquée comme telle. Un bénéficiaire indisponible est
+signalé ; les informations facultatives manquantes ne sont pas devinées.
+
+La **recherche** couvre les personnes et les envies de vos familles communes.
+Chaque résultat d'envie indique la personne à qui appartient la liste.
+Les cadeaux hors liste, les envies supprimées et les cadeaux déjà offerts
+n'apparaissent pas, et vos propres résultats ne révèlent jamais les réservations.
+Pendant la recherche, les anciens résultats disparaissent et le chargement
+ou les erreurs sont affichés.
 
 ## Français et anglais
 

@@ -59,3 +59,20 @@ export type Wish = {
   ownerId?: Id
   reservation?: Reservation
 }
+export type SearchWish = Wish & { owner: Pick<PersonView, 'id' | 'firstName' | 'lastName' | 'birthDate' | 'avatar' | 'managed'> }
+export type SearchResults = { people: PersonView[]; wishes: SearchWish[] }
+export type HistoryPerson = Pick<PersonView, 'id' | 'firstName' | 'lastName' | 'birthDate'>
+export type HistoryEntry = {
+  id: string
+  recipientId: string
+  created_at: string
+  snapshot: {
+    id: string
+    title?: string | null
+    recipient?: HistoryPerson | null
+    creator?: HistoryPerson | null
+    participants: HistoryPerson[]
+    occasions: { name: string; kind?: Occasion['kind']; year?: number }[]
+    giftedAt?: string | null
+  }
+}

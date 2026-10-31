@@ -215,6 +215,26 @@ Log in as **Charlie**.
   while saving. Refreshed family badges and management access reflect the new role.
 - [ ] Repeat in French and English, with keyboard navigation and a narrow viewport.
 
+### Contextual history and search
+
+- [ ] In history, the seeded *Appareil photo* identifies Alice as recipient,
+      Bob as organizer, Bob and David as participants, Noël 2025 and its gift
+      date. Check the same context in French and English.
+- [ ] Legacy snake_case identities display their names; missing optional
+      context adds no stray separators, invented age or date. A missing
+      recipient is labeled unavailable. A missing gift date uses a clearly
+      labeled record date instead.
+- [ ] Search identifies each wish's list owner. Alice can find Bob's active
+      list wishes, but Bob sees no reservation metadata in his own results.
+      Off-list, deleted, gifted and inaccessible wishes never appear.
+- [ ] Type quickly while a previous response is delayed: input focus stays
+      put and only the latest query's results appear. Clearing the query
+      removes `q` and the results. Back/forward re-runs the query.
+- [ ] Simulate history/search failures: an alert replaces loading; no old
+      results or success-shaped empty state hides the error.
+- [ ] Retain completed-history access for the recipient and participants;
+      uninvolved family members do not gain access in this context change.
+
 ### 3.10 Product copy
 
 The wording is built around one promise: **organizing gifts without the mental load**. Warmth

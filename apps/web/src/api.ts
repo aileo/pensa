@@ -1,6 +1,7 @@
 import { formatDate, formatMoney, getLocale, translate } from './locale'
 import type { Family, Household, Id, Occasion, OccasionSelection, Onboarding, ParticipationRequest, Person, Reservation, Todo, Wish } from '../../../packages/contracts/src/index'
 
+export type { HistoryEntry, SearchResults, SearchWish } from '../../../packages/contracts/src/index'
 export type { Family, Household, Id, Occasion, OccasionSelection, Onboarding, ParticipationRequest, Person, Reservation, Todo, Wish }
 
 export class ApiError extends Error {
