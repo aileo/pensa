@@ -1,7 +1,38 @@
-import { useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { money, nameOf, type Wish } from '../../api'
 import { useTranslation } from '../../language-context'
 import { Icon } from '../atoms/Icon'
+
+const DRAG_THRESHOLD = 5
+const SCROLL_EDGE = 60
+const SCROLL_SPEED = 14
+
+type Drag = { from: number, to: number, dy: number, shift: number }
+type Session = {
+  pointerId: number
+  startY: number
+  clientY: number
+  started: boolean
+  centers: number[]
+  frame: number
+  cleanup: () => void
+}
+
+const pageY = (clientY: number) => clientY + window.scrollY
+
+const targetIndex = (centers: number[], from: number, center: number) => {
+  let to = from
+  while (to < centers.length - 1 && center > centers[to + 1]) to++
+  while (to > 0 && center < centers[to - 1]) to--
+  return to
+}
+
+const rowShift = (index: number, drag: Drag | null) => {
+  if (!drag || index === drag.from) return 0
+  if (drag.from < index && index <= drag.to) return -drag.shift
+  if (drag.to <= index && index < drag.from) return drag.shift
+  return 0
+}
 
 /**
  * Shared draggable/arrow-reorderable wish list, used both for the signed-in user's
@@ -23,36 +54,113 @@ export function SortableWishList({ wishes, busy, canReorder, curated, onReorder,
   onOpen?: (wish: Wish) => void
 }) {
   const { t } = useTranslation()
-  const [dragging, setDragging] = useState<number | null>(null)
-  const [over, setOver] = useState<number | null>(null)
-  const draggedId = useRef<string | null>(null)
-  const dragFrom = (event: DragEvent) => {
-    const id = draggedId.current ?? event.dataTransfer?.getData('text/plain')
-    return wishes.findIndex(wish => String(wish.id) === id)
+  const [drag, setDrag] = useState<Drag | null>(null)
+  const rows = useRef<(HTMLDivElement | null)[]>([])
+  const session = useRef<Session | null>(null)
+  const latest = useRef({ busy, onReorder })
+  useEffect(() => { latest.current = { busy, onReorder } })
+  useEffect(() => () => session.current?.cleanup(), [])
+
+  const startDrag = (event: ReactPointerEvent<HTMLDivElement>, index: number) => {
+    const target = event.target as Element
+    if (!canReorder || busy || session.current || event.button !== 0) return
+    if (target.closest('button, a, input, textarea, select')) return
+    if (event.pointerType === 'touch' && !target.closest('[data-drag-handle]')) return
+    let to = index
+    let shift = 0
+    const update = () => {
+      const current = session.current
+      if (!current) return
+      if (!current.started) {
+        if (Math.abs(pageY(current.clientY) - current.startY) < DRAG_THRESHOLD) return
+        const rects = rows.current.slice(0, wishes.length).map(row => row?.getBoundingClientRect() ?? new DOMRect())
+        current.centers = rects.map(rect => pageY(rect.top) + rect.height / 2)
+        current.started = true
+        document.body.style.userSelect = 'none'
+        document.body.style.cursor = 'grabbing'
+        window.getSelection()?.removeAllRanges()
+        const gap = rects.length > 1 ? Math.max(0, rects[1].top - rects[0].bottom) : 0
+        shift = rects[index].height + gap
+        const scroll = () => {
+          if (!session.current) return
+          if (current.clientY < SCROLL_EDGE) window.scrollBy(0, -SCROLL_SPEED)
+          else if (current.clientY > window.innerHeight - SCROLL_EDGE) window.scrollBy(0, SCROLL_SPEED)
+          move()
+          current.frame = requestAnimationFrame(scroll)
+        }
+        current.frame = requestAnimationFrame(scroll)
+      }
+      move()
+    }
+    const move = () => {
+      const current = session.current
+      if (!current) return
+      const dy = pageY(current.clientY) - current.startY
+      to = targetIndex(current.centers, index, current.centers[index] + dy)
+      setDrag(previous => previous && previous.dy === dy && previous.to === to ? previous : { from: index, to, dy, shift })
+    }
+    const finish = (commit: boolean) => {
+      const current = session.current
+      if (!current) return
+      current.cleanup()
+      session.current = null
+      if (!current.started) return
+      setDrag(null)
+      if (commit && !latest.current.busy && to !== index) latest.current.onReorder(index, to)
+    }
+    const onMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== session.current?.pointerId) return
+      session.current.clientY = moveEvent.clientY
+      update()
+    }
+    const onUp = (upEvent: PointerEvent) => { if (upEvent.pointerId === session.current?.pointerId) finish(true) }
+    const onCancel = () => finish(false)
+    const onKey = (keyEvent: KeyboardEvent) => { if (keyEvent.key === 'Escape') finish(false) }
+    const onSelect = (selectEvent: Event) => { if (session.current?.started) selectEvent.preventDefault() }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+    window.addEventListener('blur', onCancel)
+    window.addEventListener('keydown', onKey)
+    document.addEventListener('selectstart', onSelect)
+    session.current = {
+      pointerId: event.pointerId,
+      startY: pageY(event.clientY),
+      clientY: event.clientY,
+      started: false,
+      centers: [],
+      frame: 0,
+      cleanup: () => {
+        const current = session.current
+        if (current) cancelAnimationFrame(current.frame)
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        window.removeEventListener('pointercancel', onCancel)
+        window.removeEventListener('blur', onCancel)
+        window.removeEventListener('keydown', onKey)
+        document.removeEventListener('selectstart', onSelect)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+      },
+    }
   }
-  const endDrag = () => { draggedId.current = null; setDragging(null); setOver(null) }
-  const allowDrop = (event: DragEvent, index: number) => {
-    event.preventDefault()
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-    if (over !== index) setOver(index)
+
+  const rowStyle = (index: number): CSSProperties | undefined => {
+    if (!drag) return undefined
+    if (index === drag.from) return { transform: `translateY(${drag.dy}px)`, transition: 'none', position: 'relative', zIndex: 10 }
+    return { transform: `translateY(${rowShift(index, drag)}px)`, transition: 'transform 150ms ease' }
   }
+
   return <div className="space-y-3">
     {wishes.map((wish, index) => <div
       key={wish.id}
-      draggable={canReorder}
-      onDragStart={canReorder ? event => {
-        draggedId.current = String(wish.id)
-        event.dataTransfer.effectAllowed = 'move'
-        event.dataTransfer.setData('text/plain', String(wish.id))
-        setDragging(index)
-      } : undefined}
-      onDragEnter={canReorder ? event => allowDrop(event, index) : undefined}
-      onDragOver={canReorder ? event => allowDrop(event, index) : undefined}
-      onDragEnd={canReorder ? endDrag : undefined}
-      onDrop={canReorder ? event => { event.preventDefault(); const from = dragFrom(event); endDrag(); if (busy) return; if (from !== -1) onReorder(from, index) } : undefined}
-      className={`card grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 p-3 transition lg:flex lg:gap-5 lg:p-4 ${canReorder ? 'cursor-grab active:cursor-grabbing' : ''} ${dragging === index ? 'opacity-50' : ''} ${over === index && dragging !== null && dragging !== index ? 'ring-2 ring-brand-400' : ''}`}
+      ref={row => { rows.current[index] = row }}
+      data-sortable={canReorder ? 'true' : undefined}
+      onPointerDown={canReorder ? event => startDrag(event, index) : undefined}
+      style={rowStyle(index)}
+      className={`card grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 p-3 lg:flex lg:gap-5 lg:p-4 ${canReorder ? 'lg:cursor-grab' : ''} ${drag?.from === index ? 'shadow-xl ring-2 ring-brand-400' : ''}`}
     >
-      {canReorder && <span className="hidden text-ink-400 lg:block" title={t('Glisser pour déplacer {title}', { title: wish.title })}><Icon name="grip"/></span>}
+      {canReorder && <span data-drag-handle className="hidden touch-none text-ink-400 lg:block" title={t('Glisser pour déplacer {title}', { title: wish.title })}><Icon name="grip"/></span>}
       <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-soft lg:size-20">{wish.image ? <img src={wish.image} alt="" draggable={false} className="h-full w-full object-cover"/> : <Icon name="gift" className="text-brand-300"/>}</div>
       <div className="min-w-0 flex-1">
         <h2 className="truncate font-['Outfit'] font-semibold">{wish.title}</h2>
