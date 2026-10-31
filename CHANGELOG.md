@@ -6,6 +6,8 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-31
+
 ### Added
 
 - Wishlist rows have *move to top* and *move to bottom* buttons next to the
