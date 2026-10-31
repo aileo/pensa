@@ -86,6 +86,8 @@ const english = {
   'Glissez les envies ou utilisez les flèches pour changer leur priorité.': 'Drag wishes or use the arrows to change their priority.',
   'Sans description': 'No description', 'Monter {title}': 'Move {title} up',
   'Descendre {title}': 'Move {title} down',
+  'Mettre {title} en premier': 'Move {title} to the top', 'Mettre {title} en dernier': 'Move {title} to the bottom',
+  'Glisser pour déplacer {title}': 'Drag to move {title}',
   'Modifier {title}': 'Edit {title}', 'Supprimer {title}': 'Delete {title}',
   'Voir {title} sur le site marchand': 'View {title} on the store website',
   'Votre liste est encore vide': 'Your list is still empty',

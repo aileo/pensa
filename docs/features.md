@@ -75,7 +75,8 @@ wishes*, so switching from your own list to a child's takes one click instead of
 a detour through the family screen.
 
 A managed member's list uses the same display and ordering controls as *my
-wishes*: drag a wish or use the up/down arrows, and the order persists the next
+wishes*: drag a wish, use the up/down arrows or move it straight to the top or
+bottom, and the order persists the next
 time anyone opens the list. Reordering only changes priority — it never touches
 a wish's details, its reservations or what the rest of the family is allowed to
 see. The controls step aside while a filter narrows the list to a subset, since

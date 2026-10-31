@@ -234,7 +234,11 @@ app.get('/api/config', async (_req, res) => {
 });
 app.use('/api', api);
 const rateLimitError = (_req: Request, _res: Response, next: NextFunction) => next(new HttpError(429, 'Trop de requêtes'));
-api.use(rateLimit({ windowMs: 15 * 60_000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError }));
+// A short window with a generous ceiling: one save reloads the dashboard, lists and every
+// relative's wishes, so quick editing (pasting tags into wish after wish) easily makes a few
+// hundred requests in a few minutes. Floods are still cut off within seconds, and the routes
+// worth guessing at keep their own strict budgets below.
+api.use(rateLimit({ windowMs: 60_000, limit: 600, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError }));
 const strictLimit = rateLimit({ windowMs: 15 * 60_000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError });
 // Previews get their own budget so retrying a stubborn link never locks anyone out of signing in.
 const previewLimit = rateLimit({ windowMs: 15 * 60_000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false, handler: rateLimitError });

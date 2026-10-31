@@ -71,7 +71,8 @@ yourself and the wish works just the same.
 ![A wish list, with tags, prices and reorder controls](images/en/my-wishes.png)
 
 Drag a wish or use its arrows to change its priority, on your own list or a
-list your household manages. Moves appear immediately; Pensa saves the final
+list your household manages. The arrows with a bar move a wish straight to the
+top or bottom of the list. Moves appear immediately; Pensa saves the final
 order automatically after a short pause, without reloading the other lists.
 Wait for **Order saved** before closing the page. You can visit another screen
 in Pensa while it saves. If saving fails, the new order stays visible with an

@@ -24,7 +24,7 @@ and their text follows `Accept-Language`, French or English.
 | Contributions | `GET/POST /reservations/:id/requests`, `PATCH /reservations/:id/requests/:requestId` |
 | Overview | `GET /dashboard`, `GET /history`, `GET /search?q=…` |
 
-Rate limiting applies to `/api`: 300 requests per 15 minutes, and 20 on
+Rate limiting applies to `/api`: 600 requests per minute, and 20 per 15 minutes on
 sensitive authentication routes. Limits are counted per visitor, which behind a
 reverse proxy requires `TRUST_PROXY` to match the number of proxies in front of
 the API. `GET /api/health` and `GET /api/config` are registered before the

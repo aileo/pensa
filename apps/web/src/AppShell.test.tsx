@@ -81,6 +81,39 @@ it('saves a drag/drop once and retains a pending save across list navigation', a
   expect(JSON.parse(requests[0].body!).ids.slice(0, 3)).toEqual(['wish-1', 'wish-2', 'wish-0'])
 })
 
+it.each(['/wishes', '/users/child/wishes'])('moves a wish to the top or bottom with one PATCH on %s', async path => {
+  await render(path)
+  requests = []
+  const prefix = path === '/wishes' ? 'wish' : 'child-wish'
+  expect(host.querySelector<HTMLButtonElement>('button[aria-label="Move Wish 0 to the top"]')!.disabled).toBe(true)
+  await click('Move Wish 3 to the top')
+  await click('Move Wish 1 to the bottom')
+  await settleSave()
+  expect(requests).toHaveLength(1)
+  const ids: string[] = JSON.parse(requests[0].body!).ids
+  expect(ids.slice(0, 2)).toEqual([`${prefix}-3`, `${prefix}-0`])
+  expect(ids.at(-1)).toBe(`${prefix}-1`)
+  expect(host.querySelector<HTMLButtonElement>('button[aria-label="Move Wish 1 to the bottom"]')!.disabled).toBe(true)
+})
+
+it('reorders through a full drag sequence even when drop data is unavailable', async () => {
+  await render('/wishes')
+  requests = []
+  const rows = host.querySelectorAll('[draggable="true"]')
+  const dragEvent = (type: string) => {
+    const event = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', { value: { setData: () => {}, getData: () => '', effectAllowed: '', dropEffect: '' } })
+    return event
+  }
+  await act(async () => rows[0].dispatchEvent(dragEvent('dragstart')))
+  await act(async () => rows[2].dispatchEvent(dragEvent('dragover')))
+  await act(async () => rows[2].dispatchEvent(dragEvent('drop')))
+  await act(async () => rows[0].dispatchEvent(dragEvent('dragend')))
+  await settleSave()
+  expect(requests).toHaveLength(1)
+  expect(JSON.parse(requests[0].body!).ids.slice(0, 3)).toEqual(['wish-1', 'wish-2', 'wish-0'])
+})
+
 it('disables managed-list reordering when filters are active', async () => {
   await render('/users/child/wishes?tag=books')
   expect(host.querySelectorAll('[draggable="true"]')).toHaveLength(0)
