@@ -6,6 +6,8 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-31
+
 ### Added
 
 - Recipient-filtered gift history across recorded occurrences, with newest-first,
