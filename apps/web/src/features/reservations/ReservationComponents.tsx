@@ -8,21 +8,21 @@ import { backActions, nextActions, occurrences, occasionWithYear, requestLabels,
 
 function OccasionPicker({ options, selected, person, onToggle }: { options: OccasionOption[]; selected: OccasionSelection[]; person?: Person | null; onToggle: (selection: OccasionSelection) => void }) {
   const { locale, t } = useTranslation()
-  return <div className="max-h-36 space-y-2 overflow-y-auto">{options.map(({ occasion, selection, date }) => <label key={`${selection.id}-${selection.year}`} className="flex items-center gap-2 text-sm">
-    <input type="checkbox" className="accent-brand-600" checked={selected.some(value => sameSelection(value, selection))} onChange={() => onToggle(selection)}/>
-    {occasionLabel(occasion.name || occasion.title, locale, { kind: occasion.kind, year: selection.year, birthDate: person?.birthDate }) || t('Occasion')} <span className="text-ink-500">{date ? dateOf(date) : t('année {year}', { year: selection.year })}</span>
+  return <div className="max-h-36 space-y-2 overflow-y-auto">{options.map(({ occasion, selection, date }) => <label key={`${selection.id}-${selection.year}`} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0">
+    <input type="checkbox" className="shrink-0 accent-brand-600" checked={selected.some(value => sameSelection(value, selection))} onChange={() => onToggle(selection)}/>
+    <span className="min-w-0 [overflow-wrap:anywhere]">{occasionLabel(occasion.name || occasion.title, locale, { kind: occasion.kind, year: selection.year, birthDate: person?.birthDate }) || t('Occasion')} <span className="text-ink-500">{date ? dateOf(date) : t('année {year}', { year: selection.year })}</span></span>
   </label>)}</div>
 }
 function StatusStepper({ status, cancelled }: { status: string; cancelled?: boolean }) {
   const { t } = useTranslation()
   const current = Math.max(0, statusOrder.indexOf(status as ReservationStatus))
-  return <ol className={`flex items-center gap-1 ${cancelled ? 'opacity-50' : ''}`} aria-label={t('Avancement du cadeau')}>
+  return <ol className={`grid grid-cols-2 gap-3 lg:flex lg:items-center lg:gap-1 ${cancelled ? 'opacity-50' : ''}`} aria-label={t('Avancement du cadeau')}>
     {statusOrder.map((step, index) => {
       const done = index < current || (index === current && step === 'gifted'), active = index === current
-      return <li key={step} className="flex flex-1 items-center gap-1" aria-current={active ? 'step' : undefined}>
+      return <li key={step} className="flex min-w-0 flex-1 items-center gap-2 lg:gap-1" aria-current={active ? 'step' : undefined}>
         <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${done ? 'bg-sage-600 text-white' : active ? 'bg-brand-600 text-white ring-4 ring-brand-100' : 'border-2 border-brand-400 text-ink-500'}`}>{done ? <Icon name="check" size={13}/> : index + 1}</span>
-        <span className={`truncate text-xs ${active ? 'font-bold text-ink-700' : done ? 'text-sage-600' : 'text-ink-500'}`}>{t(statusLabels[step])}</span>
-        {index < statusOrder.length - 1 && <span aria-hidden="true" className={`mx-1 h-0.5 min-w-3 flex-1 rounded-full ${index < current ? 'bg-sage-600' : 'bg-line'}`}/>}
+        <span className={`text-xs lg:truncate ${active ? 'font-bold text-ink-700' : done ? 'text-sage-600' : 'text-ink-500'}`}>{t(statusLabels[step])}</span>
+        {index < statusOrder.length - 1 && <span aria-hidden="true" className={`mx-1 hidden h-0.5 min-w-3 flex-1 rounded-full lg:block ${index < current ? 'bg-sage-600' : 'bg-line'}`}/>}
       </li>
     })}
   </ol>
@@ -66,7 +66,7 @@ function GiftFields({ gift }: { gift?: Wish }) {
   return <div className="space-y-4">
     <div><label className="label" htmlFor={`${id}-title`}>{t('Nom du cadeau')}</label><input className="field" id={`${id}-title`} name="title" defaultValue={gift?.title ?? ''} maxLength={200} placeholder={t('Ex. : Un week-end surprise')} required/></div>
     <div><label className="label" htmlFor={`${id}-description`}>{t('Description')} <span className="font-normal">{t('(facultatif)')}</span></label><textarea className="field min-h-20" id={`${id}-description`} name="description" defaultValue={gift?.description ?? ''}/></div>
-    <div className="grid grid-cols-2 gap-3"><div><label className="label" htmlFor={`${id}-price`}>{t('Prix (€)')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id={`${id}-price`} name="price" type="number" min="0" step="0.01" defaultValue={gift?.price ?? ''}/></div><div><label className="label" htmlFor={`${id}-url`}>{t('Lien')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id={`${id}-url`} name="url" type="url" defaultValue={gift?.url ?? ''} placeholder="https://…"/></div></div>
+    <div className="grid gap-3 lg:grid-cols-2"><div><label className="label" htmlFor={`${id}-price`}>{t('Prix (€)')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id={`${id}-price`} name="price" type="number" min="0" step="0.01" defaultValue={gift?.price ?? ''}/></div><div><label className="label" htmlFor={`${id}-url`}>{t('Lien')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id={`${id}-url`} name="url" type="url" defaultValue={gift?.url ?? ''} placeholder="https://…"/></div></div>
     <div><label className="label" htmlFor={`${id}-image`}>{t('URL de l’image')} <span className="font-normal">{t('(facultatif)')}</span></label><input className="field" id={`${id}-image`} name="image" type="url" defaultValue={gift?.image ?? ''} placeholder="https://…"/></div>
   </div>
 }
@@ -113,7 +113,7 @@ export function OffListForm({ recipient, occasion, people, me, busy, perform }: 
 export function OffListGiftCard({ gift, me, busy, showRecipient, onRequest, onOpen, onRecipient }: { gift: Reservation; me: Person; busy: boolean; showRecipient?: boolean; onRequest: () => void; onOpen: () => void; onRecipient?: () => void }) {
   const { locale, t } = useTranslation()
   const involved = String(gift.creator?.id) === String(me.id) || !!gift.participants?.some(person => String(person.id) === String(me.id))
-  return <article className="card flex flex-col p-5">
+  return <article className="compact-panel card flex flex-col p-5">
     <div className="flex items-start gap-3">{gift.wish?.image ? <img src={gift.wish.image} alt="" className="size-12 shrink-0 rounded-xl object-cover"/> : <span className="rounded-xl bg-clay-50 p-2.5 text-clay-500"><Icon name="gift" size={21}/></span>}<div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-['Outfit'] font-semibold">{gift.wish?.title}</h3>{!gift.openToContributions && <span className="chip">{t('Privé')}</span>}</div>{showRecipient && gift.recipient && <p className="text-sm font-medium text-ink-700">{t('Pour')} {onRecipient ? <button className="font-semibold text-brand-600 hover:underline" onClick={onRecipient}>{nameOf(gift.recipient)}</button> : nameOf(gift.recipient)}</p>}{gift.wish?.price != null && <p className="text-sm font-semibold text-brand-600">{money(gift.wish.price)}</p>}</div></div>
     {gift.wish?.description && <p className="muted mt-3 line-clamp-3">{gift.wish.description}</p>}
     {gift.wish?.url && <a className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline" href={gift.wish.url} target="_blank" rel="noreferrer"><Icon name="external" size={14}/> {t('Voir le lien')}</a>}
@@ -167,7 +167,7 @@ export function ReservationRow({ reservation, users, me, busy, perform, onStatus
   const options = occurrences(available, reservation.occasions)
   const recipient = reservation.recipient ?? users.find(person => String(person.id) === String(recipientId))
   const occasionSummary = (items: Occasion[] = []) => items.map(item => occasionWithYear(item, locale, recipient?.birthDate)).join(', ')
-  return <article ref={card} id={`reservation-${reservation.id}`} className={`card scroll-mt-24 p-5 ${focused ? 'ring-2 ring-brand-600' : ''}`}>
+  return <article ref={card} id={`reservation-${reservation.id}`} className={`compact-panel card scroll-mt-24 p-5 ${focused ? 'ring-2 ring-brand-600' : ''}`}>
     <div className="flex flex-wrap items-start gap-4">{reservation.wish?.image ? <img src={reservation.wish.image} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover"/> : <span className="rounded-2xl bg-brand-50 p-3 text-brand-600"><Icon name="gift" size={23}/></span>}<div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-['Outfit'] text-lg font-semibold">{reservation.wish?.title || t('Réservation #{id}', { id: String(reservation.id).slice(0, 8) })}</h3>{reservation.offList && <span className="chip !bg-clay-50 !text-clay-600">{t('Hors liste')}</span>}{reservation.offList && <span className="chip">{reservation.openToContributions ? t('Visible par la famille') : t('Privé')}</span>}</div>{reservation.recipient && <p className="mt-1 text-sm font-medium text-ink-700">{t('Pour')} {nameOf(reservation.recipient)}{reservation.offList && reservation.wish?.price != null && <> · {money(reservation.wish.price)}</>}</p>}{reservation.offList && reservation.wish?.description && <p className="muted mt-1">{reservation.wish.description}</p>}{reservation.offList && reservation.wish?.url && <a className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline" href={reservation.wish.url} target="_blank" rel="noreferrer"><Icon name="external" size={14}/> {t('Voir le lien')}</a>}<p className="muted mt-1">{occasionSummary(reservation.occasions) || t('Cadeau en préparation')} · {reservation.cancelled ? t('Annulé') : statusText(reservation.status || 'reserved')}</p><p className="muted mt-1">{t('Organisé par')} {nameOf(reservation.creator)} · {t('Participants :')} {reservation.participants?.map(nameOf).join(', ') || t('Aucun')}</p>{reservation.wishDeleted && !reservation.offList && <p className="muted">{t('L’envie a été supprimée.')}</p>}</div>{editable && <button className="secondary text-sm" onClick={() => void openEditor()}><Icon name="edit" size={16}/> {editing ? t('Fermer') : t('Gérer')}</button>}</div>
     {!reservation.cancelled && reservation.status && <div className="mt-4 space-y-3 rounded-2xl bg-brand-50 p-4">
       <StatusStepper status={current}/>

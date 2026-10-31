@@ -34,18 +34,18 @@ export function SortableWishList({ wishes, busy, canReorder, curated, onReorder,
       onDragStart={canReorder ? event => event.dataTransfer.setData('text/plain', String(wish.id)) : undefined}
       onDragOver={canReorder ? event => event.preventDefault() : undefined}
       onDrop={canReorder ? event => { event.preventDefault(); if (busy) return; const from = dragFrom(event); if (from !== -1) onReorder(from, index) } : undefined}
-      className="card flex items-center gap-3 p-3 sm:gap-5 sm:p-4"
+      className="card grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 p-3 lg:flex lg:gap-5 lg:p-4"
     >
-      {canReorder && <span className="hidden cursor-grab text-ink-400 sm:block"><Icon name="grip"/></span>}
-      <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-soft sm:size-20">{wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" className="text-brand-300"/>}</div>
+      {canReorder && <span className="hidden cursor-grab text-ink-400 lg:block"><Icon name="grip"/></span>}
+      <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-soft lg:size-20">{wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" className="text-brand-300"/>}</div>
       <div className="min-w-0 flex-1">
         <h2 className="truncate font-['Outfit'] font-semibold">{wish.title}</h2>
         <p className="muted mt-1 truncate">{wish.description || wish.url || t('Sans description')}</p>
         {curated && wish.reservation && <p className="mt-1 text-xs text-ink-500">{t('Réservé par {name}', { name: nameOf(wish.reservation.creator) })}{wish.reservation.openToContributions ? ` · ${t('Participation possible')}` : ''}</p>}
         <div className="mt-1 flex flex-wrap gap-1">{wish.tags?.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div>
       </div>
-      <strong className="hidden text-sm text-brand-600 sm:block">{money(wish.price)}</strong>
-      <div className="flex shrink-0 flex-col items-center gap-1 sm:flex-row">
+      <strong className="hidden text-sm text-brand-600 lg:block">{money(wish.price)}</strong>
+      <div className="col-span-2 flex flex-wrap items-center gap-1 border-t border-line-soft pt-2 lg:shrink-0 lg:border-0 lg:pt-0">
         {wish.url && <a className="icon-button" href={wish.url} target="_blank" rel="noopener noreferrer" aria-label={t('Voir {title} sur le site marchand', { title: wish.title })}><Icon name="external" size={17}/></a>}
         {onOpen && <button className="icon-button" onClick={() => onOpen(wish)} aria-label={t('Voir le permalien de {title}', { title: wish.title })}><Icon name="link" size={17}/></button>}
         {canReorder && <><button className="icon-button !size-7" disabled={index === 0 || busy} onClick={() => onReorder(index, index - 1)} aria-label={t('Monter {title}', { title: wish.title })}><Icon name="arrowUp" size={16}/></button>

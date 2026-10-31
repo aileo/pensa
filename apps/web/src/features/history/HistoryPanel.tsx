@@ -47,7 +47,7 @@ export function HistoryPanel({ revision }: { revision: number }) {
     <SectionTitle icon="clock" tone="sage" kicker={t('DÉJÀ OFFERT')} title={t('Historique')}/>
     <p className="muted mb-4">{t('Les cadeaux offerts sont partagés avec la famille du bénéficiaire, sauf avec le bénéficiaire lui-même, même s’ils étaient privés.')}</p>
     {!items ? state.revision === revision && state.error ? <p role="alert">{state.error}</p> : <p role="status">{t('Chargement de l’historique…')}</p> : <>
-      <div className="card mb-5 grid gap-4 p-4 sm:grid-cols-2">
+      <div className="card mb-5 grid gap-4 p-4 lg:grid-cols-2">
         <div><label className="label" htmlFor="history-recipient">{t('Bénéficiaire')}</label><select className="field" id="history-recipient" value={recipient} onChange={event => update('recipient', event.target.value)}>
           <option value="">{t('Tous les bénéficiaires')}</option>{recipientOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           {recipient && !recipients.has(recipient) && <option value={recipient}>{t('Bénéficiaire indisponible')}</option>}
@@ -56,7 +56,7 @@ export function HistoryPanel({ revision }: { revision: number }) {
           <option value="newest">{t('Plus récents d’abord')}</option><option value="oldest">{t('Plus anciens d’abord')}</option><option value="recipient">{t('Bénéficiaire (A–Z)')}</option>
         </select></div>
       </div>
-      {filtered.length ? <div className="card divide-y divide-line-soft">{filtered.map(entry => <article key={entry.id} className="p-5">
+      {filtered.length ? <div className="card divide-y divide-line-soft">{filtered.map(entry => <article key={entry.id} className="compact-panel p-5">
         <h3 className="font-semibold">{entry.snapshot.title || t('Un cadeau offert')}</h3>
         <p className="mt-1 text-sm">{t('Pour')} <strong>{recipientName(entry)}</strong></p>
         {entry.snapshot.creator && <p className="muted mt-1">{t('Organisé par')} {nameOf(entry.snapshot.creator)}</p>}

@@ -52,9 +52,9 @@ export function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login'
   // stuck to the side on wide screens and sits right under the hero on narrow ones: reading
   // further is a choice, never a detour to sign in.
   return <div className="mx-auto grid max-w-[1500px] lg:grid-cols-[minmax(0,1fr)_minmax(390px,460px)]">
-    <div className="flex flex-col bg-brand-100 p-7 sm:p-12 lg:col-start-1 lg:row-start-1 lg:min-h-screen">
+    <div className="flex min-w-0 flex-col bg-brand-100 p-4 sm:p-6 lg:col-start-1 lg:row-start-1 lg:min-h-screen lg:p-12">
       <div className="flex items-center justify-between gap-2.5"><div className="flex items-center gap-2.5"><span className="flex size-10 items-center justify-center rounded-2xl bg-brand-600 text-white"><Icon name="gift"/></span><span className="font-['Outfit'] text-[27px] font-extrabold tracking-tight">pensa.</span></div><LanguageControl/></div>
-      <div className="my-auto max-w-lg py-14">
+      <div className="my-auto max-w-lg py-6 lg:py-14">
         <span className="eyebrow">{t('FINI LA CHARGE MENTALE DES CADEAUX')}</span>
         <h1 className="mt-5 font-['Outfit'] text-4xl font-bold leading-[1.13] tracking-tight text-ink-900 sm:text-6xl">{t('Organisez les cadeaux,')} <span className="text-brand-600">{t('l’esprit tranquille.')}</span></h1>
         <p className="mt-6 max-w-md text-lg leading-relaxed text-ink-500">{t('Les envies de chacun, les dates qui arrivent, qui offre quoi : tout est au même endroit, et personne n’a à tout retenir.')}</p>
@@ -63,14 +63,14 @@ export function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login'
       </div>
     </div>
     <div id="auth-panel" className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
-      <div className="flex items-center justify-center px-6 py-12 lg:sticky lg:top-0 lg:h-screen lg:flex-col lg:justify-start lg:overflow-y-auto"><div className="w-full max-w-[420px] lg:my-auto">
+      <div className="flex items-center justify-center px-4 py-6 lg:sticky lg:top-0 lg:h-screen lg:flex-col lg:justify-start lg:overflow-y-auto lg:px-6 lg:py-12"><div className="w-full min-w-0 max-w-[420px] lg:my-auto">
       <p className="eyebrow mb-3">{t('BIENVENUE SUR PENSA')}</p>
       <h2 className="font-['Outfit'] text-3xl font-bold">{claiming ? t('Reprenez votre liste en main') : mode === 'login' ? t('Reprenez où vous en étiez') : t('Créons votre compte')}</h2>
       <p className="muted mb-8 mt-2">{claiming ? t('Votre foyer tenait votre liste : ce code vous donne votre propre compte, avec vos envies déjà dedans.') : mode === 'login' ? t('Connectez-vous pour retrouver vos listes et vos cadeaux en cours.') : t('Quelques informations suffisent pour commencer.')}</p>
       {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{localizeMessage(error, locale)}</p>}
       <form onSubmit={submit} className="space-y-4">
         {mode === 'register' && !claiming && <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 lg:grid-cols-2">
             <FormField id="firstName" label={t('Prénom')}><TextInput id="firstName" name="firstName" autoComplete="given-name" required/></FormField>
             <FormField id="lastName" label={t('Nom')}><TextInput id="lastName" name="lastName" autoComplete="family-name" required/></FormField>
           </div>
@@ -85,7 +85,7 @@ export function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login'
       <p className="mt-7 text-center text-sm text-ink-500">{mode === 'login' ? t('Pas encore de compte ?') : t('Déjà un compte ?')} <button className="font-bold text-brand-600 hover:underline" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setClaiming(false); setError('') }}>{mode === 'login' ? t('S’inscrire') : t('Se connecter')}</button></p>
       <p className="mt-2 text-center text-sm text-ink-500"><button className="font-bold text-brand-600 hover:underline" onClick={() => { setClaiming(!claiming); setError('') }}>{claiming ? t('Revenir à la connexion classique') : t('J’ai un code de rattachement')}</button></p>
     </div></div></div>
-    <div className="px-7 pb-14 sm:px-12 lg:col-start-1 lg:row-start-2">
+    <div className="min-w-0 px-4 pb-8 sm:px-6 lg:col-start-1 lg:row-start-2 lg:px-12 lg:pb-14">
       <LandingSection id="landing-load" kicker={t('CE QUE PERSONNE NE COMPTE')} title={t('Organiser des cadeaux, c’est un travail invisible.')} intro={t('Ce n’est pas l’achat qui pèse. C’est tout ce qu’il faut garder en tête avant.')}>
         <div className="grid gap-7 sm:grid-cols-3">
           <LandingPoint icon="spark" title={t('Les idées arrivent au mauvais moment')} text={t('Une envie glissée dans une conversation en mars est oubliée en décembre.')}/>
@@ -124,7 +124,7 @@ export function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login'
           <LandingPoint icon="clock" title={t('À garder en tête')} text={t('C’est un projet personnel, pas un service commercial avec des garanties. N’y mettez que des données que vous pourriez perdre.')}/>
         </div>
       </LandingSection>
-      <div className="mt-4 rounded-[26px] bg-brand-100 px-7 py-9 sm:px-10">
+      <div className="compact-panel mt-4 rounded-[26px] bg-brand-100 px-7 py-9 sm:px-10">
         <h2 className="font-['Outfit'] text-2xl font-bold tracking-tight text-ink-900">{t('Prêt à vous libérer la tête ?')}</h2>
         <p className="mt-3 max-w-md leading-relaxed text-ink-500">{t('Créez votre compte, ajoutez une première envie, invitez vos proches. Le reste suit tout seul.')}</p>
         <a className="primary mt-6" href="#auth-panel">{t('Commencer maintenant')} <Icon name="arrow" size={17}/></a>
@@ -136,7 +136,7 @@ export function Auth({ mode, setMode, onAuth, error, setError }: { mode: 'login'
 }
 
 function LandingSection({ id, kicker, title, intro, children }: { id: string; kicker: string; title: string; intro?: string; children: ReactNode }) {
-  return <section aria-labelledby={id} className="border-t border-line py-12 sm:py-14">
+  return <section aria-labelledby={id} className="border-t border-line py-8 lg:py-14">
     <p className="eyebrow">{kicker}</p>
     <h2 id={id} className="mt-3 max-w-xl font-['Outfit'] text-2xl font-bold leading-snug tracking-tight text-ink-900 sm:text-[32px]">{title}</h2>
     {intro && <p className="mt-4 max-w-xl leading-relaxed text-ink-500">{intro}</p>}
@@ -145,8 +145,8 @@ function LandingSection({ id, kicker, title, intro, children }: { id: string; ki
 }
 
 function LandingPoint({ icon, step, title, text }: { icon?: IconName; step?: number; title: string; text: string }) {
-  return <div className="flex gap-4">
+  return <div className="flex min-w-0 gap-3 lg:gap-4">
     <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-brand-100 font-['Outfit'] font-bold text-brand-600">{step ?? (icon && <Icon name={icon}/>)}</span>
-    <div><h3 className="font-['Outfit'] font-semibold text-ink-900">{title}</h3><p className="muted mt-1.5 leading-relaxed">{text}</p></div>
+    <div className="min-w-0 [overflow-wrap:anywhere]"><h3 className="font-['Outfit'] font-semibold text-ink-900">{title}</h3><p className="muted mt-1.5 leading-relaxed">{text}</p></div>
   </div>
 }

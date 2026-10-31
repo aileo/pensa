@@ -23,6 +23,10 @@ minor bump may change behaviour.
 
 ### Changed
 
+- Phone and tablet layouts use single-column form fields, tighter field/card
+  padding and touch-friendly actions. Navigation, wish lists and reservation
+  progress adapt to narrow screens; the documentation website has compact
+  home/document spacing and a viewport-aware search dialog.
 - Completed gift snapshots are deliberately shared with the recipient's current
   family members, excluding the recipient, including formerly private gifts.
   Current household/family membership is checked on each request; active private

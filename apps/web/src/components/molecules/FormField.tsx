@@ -13,7 +13,7 @@ export function FormField({ id, label, optional, optionalText, labelClassName, c
   children: ReactNode
 }) {
   const { t } = useTranslation()
-  return <div className={className}>
+  return <div className={`min-w-0 ${className ?? ''}`.trim()}>
     <FormLabel htmlFor={id} className={labelClassName}>{label}{(optional || optionalText) && <> <span className="font-normal">{optionalText ?? t('(facultatif)')}</span></>}</FormLabel>
     {children}
     {hint && <p className="muted mt-1.5">{hint}</p>}

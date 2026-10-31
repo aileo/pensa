@@ -51,9 +51,9 @@ export function WishDetail({ id, me, users, busy, curates, onReserve, onEdit, on
       <div className="relative flex h-60 items-center justify-center bg-surface-soft">
         {wish.image ? <img src={wish.image} alt="" className="h-full w-full object-cover"/> : <Icon name="gift" size={60} className="text-brand-300"/>}
       </div>
-      <div className="p-6">
+      <div className="compact-panel p-6">
         {!mine && owner && <p className="eyebrow mb-2">{t('Envie de {name}', { name: nameOf(owner) })}</p>}
-        <div className="flex items-start justify-between gap-3"><h1 className="font-['Outfit'] text-2xl font-bold">{wish.title}</h1>{wish.price !== undefined && wish.price !== null && <strong className="shrink-0 text-brand-600">{money(wish.price)}</strong>}</div>
+        <div className="flex flex-col items-start gap-3 lg:flex-row lg:justify-between"><h1 className="min-w-0 font-['Outfit'] text-2xl font-bold">{wish.title}</h1>{wish.price !== undefined && wish.price !== null && <strong className="text-brand-600">{money(wish.price)}</strong>}</div>
         {wish.description && <p className="muted mt-3">{wish.description}</p>}
         {!!wish.tags?.length && <div className="mt-3 flex flex-wrap gap-1.5">{wish.tags.map(tag => <span className="chip" key={tag}>#{tag}</span>)}</div>}
         {!mine && wish.reservation && <p className="muted mt-3">{t('Réservé par {name}', { name: nameOf(wish.reservation.creator) })}{wish.reservation.openToContributions ? ` · ${t('Participation possible')}` : ''}</p>}

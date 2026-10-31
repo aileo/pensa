@@ -85,3 +85,122 @@
   outline: 3px solid var(--pensa-brand-500);
   outline-offset: 2px;
 }
+
+@media (width < 1024px) {
+  .VPHome .VPHero {
+    padding: calc(var(--vp-nav-height) + 24px) 16px 32px;
+  }
+
+  .VPHome .VPHero .actions {
+    gap: 12px;
+    padding-top: 24px;
+  }
+
+  .VPHome .VPHero .action {
+    padding: 0;
+    max-width: 100%;
+  }
+
+  .VPHome .VPHero .VPButton {
+    min-height: 44px;
+    white-space: normal;
+  }
+
+  .VPHome .VPFeatures,
+  .VPHome .VPHomeContent {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .VPHome .VPFeature .box {
+    padding: 16px;
+  }
+
+  .VPDoc {
+    padding: 24px 16px 32px;
+  }
+
+  .vp-doc,
+  .VPHome .VPHero .main,
+  .VPHome .VPFeature {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .vp-doc table,
+  .vp-doc div[class*='language-'] {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .VPLocalSearchBox .shell {
+    margin: 16px auto;
+    width: calc(100% - 32px);
+    max-height: calc(100dvh - 32px);
+    min-height: 0;
+  }
+
+  .VPLocalSearchBox .search-bar,
+  .VPLocalSearchBox .search-input {
+    min-width: 0;
+  }
+
+  .VPLocalSearchBox .search-input {
+    min-height: 44px;
+    padding: 8px;
+    font-size: 16px;
+  }
+
+  .VPLocalSearchBox .search-actions button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+  }
+
+  .VPLocalSearchBox .search-actions {
+    flex-shrink: 0;
+  }
+
+  .VPLocalSearchBox .results {
+    min-height: 0;
+  }
+
+  .VPNavBar .VPNavBarMenu {
+    display: none;
+  }
+
+  .VPNavBar .VPNavBarHamburger {
+    display: flex;
+  }
+
+  .VPNav #VPNavScreen {
+    display: block;
+  }
+
+  .VPNavBarHamburger,
+  .VPNavBarSearch .DocSearch-Button,
+  .VPLocalNav .menu {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (width < 640px) {
+  .VPHome .VPHero .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .VPHome .VPHero .VPButton {
+    width: 100%;
+  }
+
+  .VPLocalSearchBox .shell {
+    margin: 0;
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    gap: 12px;
+    padding: 8px;
+  }
+}
