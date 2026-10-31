@@ -128,6 +128,11 @@ a row lock on the wish make the race impossible, not merely unlikely.
 
 ## Off-list gifts
 
+Start from the action above a person's wish list, beside a household or family
+member's list action, beside an upcoming occasion, or from Reservations. Recipient
+and occasion prefills remain editable, including the selected occurrence year.
+New gifts default to private; opening contributions is an explicit choice.
+
 A gift that nobody asked for still needs organising. An off-list reservation is
 created for a person and an occasion without any wish behind it. It can be kept
 **private**, or made **visible** to the rest of the family so that others can

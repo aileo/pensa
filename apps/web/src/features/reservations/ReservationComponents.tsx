@@ -71,11 +71,12 @@ function GiftFields({ gift }: { gift?: Wish }) {
   </div>
 }
 
-export function OffListForm({ recipient, people, me, busy, perform }: { recipient: Person | null; people: Person[]; me: Person; busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
+export function OffListForm({ recipient, occasion, people, me, busy, perform }: { recipient: Person | null; occasion?: OccasionSelection | null; people: Person[]; me: Person; busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
   const { locale, t } = useTranslation()
   const [recipientId, setRecipientId] = useState(recipient ? String(recipient.id) : '')
   const [occasions, setOccasions] = useState<Occasion[]>([])
   const [loadError, setLoadError] = useState('')
+  const [loadedRecipient, setLoadedRecipient] = useState('')
   const [selectedOccasions, setSelectedOccasions] = useState<OccasionSelection[]>([])
   const [selectedParticipants, setSelectedParticipants] = useState<Id[]>([])
   const [open, setOpen] = useState(false)
@@ -86,23 +87,25 @@ export function OffListForm({ recipient, people, me, busy, perform }: { recipien
       if (!active) return
       const loaded = list<Occasion>(data)
       setOccasions(loaded); setLoadError('')
-      const first = loaded.map(selectionOf).find((item): item is OccasionSelection => item !== null)
-      setSelectedOccasions(first ? [first] : [])
-    }).catch(problem => { if (active) setLoadError(problem instanceof Error ? problem.message : t('Occasions indisponibles.')) })
+      const options = occurrences(loaded)
+      const first = options[0]?.selection
+      const preset = recipientId === String(recipient?.id) && occasion && options.some(item => sameSelection(item.selection, occasion)) ? occasion : first
+      setSelectedOccasions(preset ? [preset] : []); setLoadedRecipient(recipientId)
+    }).catch(problem => { if (active) { setLoadedRecipient(''); setLoadError(problem instanceof Error ? problem.message : t('Occasions indisponibles.')) } })
     return () => { active = false }
-  }, [recipientId, t])
+  }, [recipientId, recipient?.id, occasion, t])
   const candidates = people.filter(person => String(person.id) !== String(me.id))
   const options = recipientId ? occurrences(occasions) : []
   const toggle = <T,>(values: T[], value: T, same: (a: T, b: T) => boolean) => values.some(item => same(item, value)) ? values.filter(item => !same(item, value)) : [...values, value]
-  return <form onSubmit={event => { event.preventDefault(); const body = { recipientId, ...giftBody(new FormData(event.currentTarget)), occasionIds: selectedOccasions, participantIds: selectedParticipants, openToContributions: open }; void perform(() => api('/reservations/off-list', json('POST', body)), t('Cadeau hors liste prévu !')) }}>
+  const canSave = !busy && !!recipientId && loadedRecipient === recipientId && !loadError && selectedOccasions.length > 0 && selectedOccasions.every(selection => options.some(item => sameSelection(item.selection, selection)))
+  return <form onSubmit={event => { event.preventDefault(); if (!canSave) return; const body = { recipientId, ...giftBody(new FormData(event.currentTarget)), occasionIds: selectedOccasions, participantIds: selectedParticipants, openToContributions: open }; void perform(() => api('/reservations/off-list', json('POST', body)), t('Cadeau hors liste prévu !')) }}>
     <p className="muted mb-5">{t('Un cadeau qui n’est pas sur la liste : le bénéficiaire ne le verra jamais avant qu’il soit offert.')}</p>
-    {recipient ? <p className="mb-5 text-sm">{t('Pour')} <strong className="text-ink-700">{nameOf(recipient)}</strong></p>
-      : <div className="mb-5"><label className="label" htmlFor="off-list-recipient">{t('Pour qui ?')}</label><select className="field" id="off-list-recipient" value={recipientId} onChange={event => { setRecipientId(event.target.value); setOccasions([]); setSelectedOccasions([]); setSelectedParticipants(values => values.filter(value => String(value) !== event.target.value)) }} required><option value="">{t('Choisir une personne')}</option>{candidates.map(person => <option key={person.id} value={String(person.id)}>{nameOf(person)}</option>)}</select></div>}
+    <div className="mb-5"><label className="label" htmlFor="off-list-recipient">{t('Pour qui ?')}</label><select className="field" id="off-list-recipient" value={recipientId} onChange={event => { setRecipientId(event.target.value); setOccasions([]); setSelectedOccasions([]); setLoadedRecipient(''); setLoadError(''); setSelectedParticipants(values => values.filter(value => String(value) !== event.target.value)) }} required><option value="">{t('Choisir une personne')}</option>{candidates.map(person => <option key={person.id} value={String(person.id)}>{nameOf(person)}</option>)}</select></div>
     <GiftFields/>
-    <fieldset className="my-5"><legend className="label">{t('Occasions (au moins une)')}</legend>{!recipientId ? <p className="muted">{t('Choisissez d’abord une personne.')}</p> : loadError ? <p role="alert" className="text-sm text-red-700">{localizeMessage(loadError, locale)}</p>     : options.length ? <OccasionPicker options={options} selected={selectedOccasions} person={people.find(person => String(person.id) === recipientId) ?? recipient} onToggle={selection => setSelectedOccasions(values => toggle(values, selection, sameSelection))}/> : <p className="muted">{t('Aucune occasion datée pour cette personne. Créez une occasion dans une famille commune avant de réserver.')}</p>}</fieldset>
+    <fieldset className="my-5"><legend className="label">{t('Occasions (au moins une)')}</legend>{!recipientId ? <p className="muted">{t('Choisissez d’abord une personne.')}</p> : loadError ? <p role="alert" className="text-sm text-red-700">{localizeMessage(loadError, locale)}</p> : loadedRecipient !== recipientId ? <p role="status">{t('Chargement des occasions…')}</p> : options.length ? <OccasionPicker options={options} selected={selectedOccasions} person={people.find(person => String(person.id) === recipientId) ?? recipient} onToggle={selection => setSelectedOccasions(values => toggle(values, selection, sameSelection))}/> : <p className="muted">{t('Aucune occasion datée pour cette personne. Créez une occasion dans une famille commune avant de réserver.')}</p>}</fieldset>
     {recipientId && <fieldset className="mb-5"><legend className="label">{t('Inviter des participants')}</legend><div className="max-h-32 space-y-2 overflow-y-auto">{candidates.filter(person => String(person.id) !== recipientId).map(person => <label key={person.id} className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-brand-600" checked={selectedParticipants.some(id => String(id) === String(person.id))} onChange={() => setSelectedParticipants(values => toggle(values, person.id, (a, b) => String(a) === String(b)))}/>{nameOf(person)}</label>)}</div></fieldset>}
     <label className="mb-1 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 accent-brand-600" checked={open} onChange={event => setOpen(event.target.checked)}/><span>{t('Visible et ouvert aux participations')}<span className="muted block">{t('Les proches du bénéficiaire le verront et pourront demander à participer. Sinon, seuls vous et les participants invités le voient.')}</span></span></label>
-    <button disabled={busy || !recipientId || selectedOccasions.length === 0} className="primary mt-5 w-full">{t('Prévoir ce cadeau')}</button>
+    <button disabled={!canSave} className="primary mt-5 w-full">{t('Prévoir ce cadeau')}</button>
   </form>
 }
 

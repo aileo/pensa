@@ -8,6 +8,9 @@ minor bump may change behaviour.
 
 ### Added
 
+- Off-list gift actions above long wish lists and beside member/occasion
+  navigation, with editable recipient and occasion prefills, private defaults,
+  and loading/error safeguards when switching recipients ([#8](https://github.com/aileo/pensa/issues/8)).
 - Family-admin promotion and demotion controls with account eligibility and
   last-administrator protection.
 
