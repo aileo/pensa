@@ -181,8 +181,14 @@ Log in as **Charlie**.
 
 - [ ] The dashboard shows a *Cadeaux ouverts aux participations* section with *Week-end spa* for Bob Martin, organised by David, and a *Participer* button.
 - [ ] *Réservations* shows *Cours de poterie* with the *Hors liste* and *Privé* badges, its price and description, and the usual steps.
-- [ ] On Bob's page (*Ma famille* → Bob), *Cadeaux prévus hors liste* lists *Week-end spa*. *Prévoir un cadeau hors liste* opens the form with Bob preselected.
-- [ ] From *Réservations*, *Prévoir un cadeau hors liste* opens the form with a *Pour qui ?* selector. Occasions load once a person is chosen, and the first one is preselected. Only the title is required.
+- [ ] On Bob's page (*Ma famille* → Bob), *Cadeaux prévus hors liste* lists *Week-end spa*. The top *Prévoir un cadeau hors liste* action opens the form with Bob preselected but editable, even with a long wish list.
+- [ ] Household and family member rows offer *Cadeau hors liste* beside wishlist navigation, without nested buttons or an action for yourself. Check the family fallback with members but no households.
+- [ ] Upcoming occasions keep wishlist navigation and offer *Cadeau hors liste* with that recipient and exact occasion/year selected. You can deselect it and choose another occurrence.
+- [ ] From *Réservations*, *Prévoir un cadeau hors liste* opens the same editable *Pour qui ?* selector. Occasions load once a person is chosen, and the first dated occurrence is preselected. Recipient, title and at least one occasion are required; other gift details are optional.
+- [ ] Invite a participant, then choose them as recipient: they cannot remain a participant. Incompatible occasions clear and saving is disabled until the new recipient's occasions load. Switch recipients rapidly: late responses never restore old occasions.
+- [ ] Delay or fail the occasions request: loading or a localized error is shown, and neither clicking Save nor submitting with Enter sends stale occasions. No dated occasions also prevents saving.
+- [ ] New gifts are private by default. Create private and explicitly open gifts; verify the existing organizer, participant, uninvolved relative and beneficiary access before delivery.
+- [ ] Repeat the entry actions, editable prefills and loading/error checks in French and English, at narrow width and with keyboard activation. The form and adjacent wishlist actions remain reachable.
 - [ ] Create a visible gift for Bob: it appears in *Réservations* with *Visible par la famille*, and in the À faire list (*Acheter …*).
 - [ ] Click *Participer* on *Week-end spa*: the card shows *Demande envoyée, en attente de réponse.*
 - [ ] Log in as **David**, open *Réservations* and accept Charlie's request. Log back in as **Charlie**: *Week-end spa* is now in his reservations as participant, and no longer in the dashboard section.

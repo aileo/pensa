@@ -147,6 +147,14 @@ Tous les cadeaux ne sortent pas d'une liste. Un **cadeau hors liste** est une
 réservation créée directement pour une personne et une occasion, sans envie
 derrière : l'idée que vous avez eue tout seul.
 
+Prévoyez-en un en haut de la liste d'une personne, à côté de l'action pour voir
+la liste d'un membre, à côté d'une prochaine occasion, ou dans **Réservations**.
+Le bénéficiaire et l'occasion sont préremplis si vous partez de ce contexte,
+mais restent toujours modifiables. Changer de bénéficiaire charge ses occasions
+avant de permettre l'enregistrement. Le cadeau est privé par défaut ; cochez
+**Visible et ouvert aux participations** pour permettre aux proches de demander
+à participer.
+
 Il peut être :
 
 - **privé**, visible de vous et des participants invités pendant sa préparation ; ou

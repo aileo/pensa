@@ -140,6 +140,13 @@ Not every gift comes from a list. An **off-list gift** is a reservation created
 straight for a person and an occasion, with no wish behind it — the idea you had
 on your own.
 
+Create one from the top of a person's wish list, beside a member's list action,
+beside an upcoming occasion, or from **Reservations**. The recipient and occasion
+are prefilled when you start from that context, but you can always change them.
+Changing the recipient loads their occasions before you can save. The gift is
+private by default; choose **Visible and open to contributions** to invite others
+to ask to join.
+
 It can be:
 
 - **private**, visible only to you and invited participants while active; or
