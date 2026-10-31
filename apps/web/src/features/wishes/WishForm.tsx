@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, ApiError, json, nameOf, type Person, type Wish } from '../../api'
+import { useNavigate } from 'react-router'
+import { api, ApiError, HandledError, json, money, nameOf, type DuplicateWishError, type Person, type Wish } from '../../api'
+import { wishPath } from '../../routes'
 import { useTranslation } from '../../language-context'
 import { localizeMessage } from '../../locale'
 import { Icon } from '../../components/atoms/Icon'
@@ -7,14 +9,28 @@ import { TextArea } from '../../components/atoms/TextArea'
 import { TextInput } from '../../components/atoms/TextInput'
 import { FormField } from '../../components/molecules/FormField'
 
-export function WishForm({ owner, busy, perform, handleError }: { owner?: Person | null; busy: boolean; perform: (action: () => Promise<unknown>, success: string) => Promise<boolean>; handleError: (error: unknown) => void }) {
+type WishDraft = { url: string; title: string; image: string; description?: string; price?: number; tags: string[] }
+
+export function WishForm({ owner, busy, perform, handleError, onClose }: { owner?: Person | null; busy: boolean; perform: (action: () => Promise<unknown>, success: string) => Promise<boolean>; handleError: (error: unknown) => void; onClose: () => void }) {
   const { locale, t } = useTranslation()
+  const navigate = useNavigate()
   const [url, setUrl] = useState('')
   const [preview, setPreview] = useState<Partial<Wish> | null>(null)
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState('')
+  const [duplicate, setDuplicate] = useState<{ draft: WishDraft; existing: Wish[] } | null>(null)
   const reportError = useRef(handleError)
   useEffect(() => { reportError.current = handleError })
+  const save = (draft: WishDraft, allowDuplicate: boolean) => perform(async () => {
+    try {
+      await api(owner ? `/users/${owner.id}/wishes` : '/wishes', json('POST', { ...draft, allowDuplicate }))
+    } catch (problem) {
+      const body = problem instanceof ApiError && problem.status === 409 ? problem.body as Partial<DuplicateWishError> | undefined : undefined
+      if (!body?.duplicates?.length) throw problem
+      setDuplicate({ draft, existing: body.duplicates })
+      throw new HandledError(problem instanceof Error ? problem.message : '')
+    }
+  }, owner ? t('Envie ajoutée à la liste de {name}.', { name: nameOf(owner) }) : t('Envie ajoutée à votre liste.'))
   // Pasting a link should be enough, like in a messaging app: we look the page up on our own,
   // after a short pause so an address typed by hand is not queried at every keystroke.
   useEffect(() => {
@@ -38,7 +54,7 @@ export function WishForm({ owner, busy, perform, handleError }: { owner?: Person
     }, 600)
     return () => { clearTimeout(timer); controller.abort() }
   }, [url])
-  return <form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void perform(() => api(owner ? `/users/${owner.id}/wishes` : '/wishes', json('POST', { url, title: data.get('title'), image: data.get('image') || '', description: data.get('description') || undefined, price: data.get('price') ? Number(data.get('price')) : undefined, tags: String(data.get('tags') || '').split(',').map(tag => tag.trim()).filter(Boolean) })), owner ? t('Envie ajoutée à la liste de {name}.', { name: nameOf(owner) }) : t('Envie ajoutée à votre liste.')) }}>
+  return <form onChange={() => setDuplicate(null)} onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void save({ url, title: String(data.get('title') || ''), image: String(data.get('image') || ''), description: String(data.get('description') || '') || undefined, price: data.get('price') ? Number(data.get('price')) : undefined, tags: String(data.get('tags') || '').split(',').map(tag => tag.trim()).filter(Boolean) }, false) }}>
     <FormField id="product-url" label={t('Lien du produit')} hint={loading ? t('Lecture du lien…') : t('Collez un lien : les informations se remplissent toutes seules.')}><TextInput id="product-url" type="url" placeholder="https://example.com/product" value={url} onChange={event => { setUrl(event.target.value); setPreview(null); setNotice(''); setLoading(false) }} required/></FormField>
     {notice && <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"><span className="font-semibold">{localizeMessage(notice, locale)}.</span> {preview ? t('Nous avons repris le nom depuis le lien : vérifiez-le et complétez si besoin.') : t('Vous pouvez remplir les champs à la main : seul le nom est nécessaire.')}</p>}
     {preview && <div className="mt-4 flex items-center gap-3 rounded-xl bg-brand-50 p-3">{preview.image && <img src={preview.image} alt="" className="size-14 shrink-0 rounded-lg object-cover"/>}<span className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]">{preview.title || t('Produit trouvé')}</span></div>}
@@ -50,8 +66,40 @@ export function WishForm({ owner, busy, perform, handleError }: { owner?: Person
         <FormField id="product-price" label={t('Prix (€)')}><TextInput id="product-price" name="price" type="number" min="0" step="0.01" defaultValue={preview?.price ?? ''}/></FormField>
         <FormField id="product-tags" label={t('Tags')}><TextInput id="product-tags" name="tags" defaultValue={preview?.tags?.join(', ') || ''} placeholder={t('livre, déco')}/></FormField>
       </div>
-    </div><button disabled={busy} className="primary mt-6 w-full"><Icon name="plus" size={17}/> {owner ? t('Ajouter à sa liste') : t('Ajouter à ma liste')}</button>
+    </div>{duplicate ? <DuplicateWarning duplicate={duplicate} owner={owner} busy={busy}
+      onCancel={onClose}
+      onView={wish => { onClose(); navigate(wishPath(String(wish.id))) }}
+      onConfirm={() => void save(duplicate.draft, true)}/>
+      : <button disabled={busy} className="primary mt-6 w-full"><Icon name="plus" size={17}/> {owner ? t('Ajouter à sa liste') : t('Ajouter à ma liste')}</button>}
   </form>
+}
+
+const hostOf = (link?: string | null) => {
+  try { return link ? new URL(link).hostname.replace(/^www\./, '') : '' } catch { return '' }
+}
+
+function DuplicateWarning({ duplicate, owner, busy, onCancel, onView, onConfirm }: { duplicate: { draft: WishDraft; existing: Wish[] }; owner?: Person | null; busy: boolean; onCancel: () => void; onView: (wish: Wish) => void; onConfirm: () => void }) {
+  const { t } = useTranslation()
+  const summary = (wish: { title: string; url?: string | null; price?: number | string }) => <>
+    <p className="font-semibold [overflow-wrap:anywhere]">{wish.title}</p>
+    {hostOf(wish.url) && <p className="muted text-xs [overflow-wrap:anywhere]">{hostOf(wish.url)}</p>}
+    {wish.price != null && wish.price !== '' && <p className="muted text-xs">{money(wish.price)}</p>}
+  </>
+  return <div role="alert" className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+    <p className="font-semibold">{owner ? t('Cette envie ressemble à une envie déjà présente sur la liste de {name}.', { name: nameOf(owner) }) : t('Cette envie ressemble à une envie déjà présente sur votre liste.')}</p>
+    <p className="mt-1">{t('Comparez-les avant de continuer : ajoutez-la quand même seulement s’il s’agit d’une autre envie.')}</p>
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="rounded-lg bg-white p-3"><p className="eyebrow mb-1">{t('Déjà dans la liste')}</p>
+        <ul className="space-y-3">{duplicate.existing.map(wish => <li key={wish.id}>{summary(wish)}
+          <button type="button" className="secondary mt-2 text-xs" onClick={() => onView(wish)}>{t('Voir l’envie existante')} <Icon name="arrow" size={13}/></button></li>)}</ul>
+      </div>
+      <div className="rounded-lg bg-white p-3"><p className="eyebrow mb-1">{t('Nouvelle envie')}</p>{summary(duplicate.draft)}</div>
+    </div>
+    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+      <button type="button" className="secondary flex-1" onClick={onCancel}>{t('Annuler l’ajout')}</button>
+      <button type="button" disabled={busy} className="primary flex-1" onClick={onConfirm}><Icon name="plus" size={17}/> {t('Ajouter quand même')}</button>
+    </div>
+  </div>
 }
 
 // The title is immutable, with or without a reservation: it never appears as an input here,

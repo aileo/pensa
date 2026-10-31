@@ -169,11 +169,15 @@ people outside authorized history. URL selections survive back/forward, which
 rechecks access rather than reusing stale history. Loading, errors, no history
 and no matching gifts are distinct states.
 
-Search covers people and wishes in shared families. Wish results identify
-both the wish and the person whose list it belongs to. Hidden off-list,
+Search covers people, wishes and past gifts in shared families. Wish results
+identify both the wish and the person whose list it belongs to. Hidden off-list,
 deleted and gifted wishes are excluded, and reservation details stay hidden
-from the wish owner. Loading and errors are explicit, and changing a query
-clears previous results without moving focus out of the input.
+from the wish owner. Past gifts come from the history under its exact access
+rule, matched on their title and on the recorded recipient, organizer,
+participant and occasion names; each result is labeled as already given and
+opens the history filtered on its recipient, with the entry highlighted.
+Loading and errors are explicit, and changing a query clears previous results
+without moving focus out of the input.
 
 ## English and French
 

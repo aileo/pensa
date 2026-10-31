@@ -152,11 +152,26 @@ recipient names are labeled unavailable, not filled from current user data.
 An inaccessible recipient selection produces an empty filter with a generic
 unavailable label, never a lookup that reveals their identity.
 
-`GET /search?q=…` returns `{ people, wishes }`. Each wish includes an `owner`
+`GET /search?q=…` returns `{ people, wishes, history }`. Each wish includes an `owner`
 public identity so clients can identify its list. Search excludes off-list,
 deleted and gifted wishes, and uses the same reservation projection as wish
-details: the owner never receives reservation metadata. Empty queries return
-empty arrays; queries longer than 100 characters return a validation error.
+details: the owner never receives reservation metadata. `history` holds up to
+50 entries in the `GET /history` shape, newest first, filtered by the exact same
+access rule (never the recipient). Only exposed snapshot fields are matched: the
+title, the recipient, creator and participant names, and occasion names. Empty
+queries return empty arrays; queries longer than 100 characters return a
+validation error.
+
+## Duplicate wishes
+
+`POST /wishes` and `POST /users/:id/wishes` compare the new wish with the
+owner's visible list — not deleted, not gifted, not off-list. A wish with the
+same normalized link (scheme, `www.`, trailing slash, fragment and tracking
+parameters such as `utm_*` ignored; other query parameters sorted) or the same
+normalized title (case, accents and whitespace ignored) answers
+`409 { error, duplicates }`, where `duplicates` uses the wish detail projection.
+Sending `"allowDuplicate": true` saves it anyway. Off-list gifts are never
+compared, so the response cannot reveal them to the list owner.
 
 ## Joining a household or a family
 

@@ -15,8 +15,8 @@ import { historyEntry } from './history.js';
 
 export type Person = { id: string; household_id: string; first_name: string; last_name: string; email: string | null; birth_date: Date | string; name_day: string | null; avatar: string | null; household_admin?: boolean; password_hash?: string | null; managed?: boolean };
 type AuthRequest = Request & { person?: Person };
-class HttpError extends Error { constructor(public code: number, message: string) { super(message); } }
-const fail = (code: number, message: string): never => { throw new HttpError(code, message); };
+class HttpError extends Error { constructor(public code: number, message: string, public details?: Record<string, unknown>) { super(message); } }
+const fail = (code: number, message: string, details?: Record<string, unknown>): never => { throw new HttpError(code, message, details); };
 const english: Record<string, string> = {
   'Accès refusé à cette famille': 'Access to this family denied',
   'Origine interdite': 'Origin not allowed',
@@ -45,6 +45,7 @@ const english: Record<string, string> = {
   'Occasion introuvable': 'Occasion not found',
   'Occasion utilisée dans une réservation': 'Occasion is used in a reservation',
   'Souhait introuvable': 'Wish not found',
+  'Envie déjà présente dans la liste': 'This wish is already on the list',
   'URL invalide': 'Invalid URL',
   'URL non autorisée': 'URL not allowed',
   'Adresse non autorisée': 'Address not allowed',
@@ -397,7 +398,8 @@ const wishFilters = z.strictObject({
 
 const wishInput = z.object({ title: z.string().trim().min(1).max(200), image: httpUrl.or(z.literal('')).nullish(),
   url: z.url().max(2048), description: z.string().max(5000).nullish(),
-  price: z.coerce.number().min(0).max(99999999).nullable().optional(), tags: tags.default([]) });
+  price: z.coerce.number().min(0).max(99999999).nullable().optional(), tags: tags.default([]),
+  allowDuplicate: z.boolean().optional() });
 
 // The title is never part of this shape: it stays immutable after creation, with or without a
 // reservation, so there is no safe value that would let it through. Every other optional field
@@ -482,20 +484,22 @@ const wishes = createWishService(routeDeps);
 registerFamilyRoutes(api, routeDeps);
 registerWishRoutes(api, routeDeps, wishes);
 registerReservationRoutes(api, routeDeps);
-api.get('/history', async (req, res) => {
-  const rows = await query<{ id: string; recipient_id: string; snapshot: unknown; created_at: Date }>(
-    `SELECT h.id,h.recipient_id,h.snapshot,h.created_at FROM history h
-     WHERE h.recipient_id<>$1 AND EXISTS(
+// History is shared with the recipient's current families, never with the recipient: $1 is the viewer.
+const historyVisibility = `h.recipient_id<>$1 AND EXISTS(
        SELECT 1 FROM users viewer JOIN memberships mine ON mine.household_id=viewer.household_id
        JOIN users recipient ON recipient.id=h.recipient_id JOIN memberships theirs
          ON theirs.household_id=recipient.household_id AND theirs.family_id=mine.family_id
-       WHERE viewer.id=$1)
+       WHERE viewer.id=$1)`;
+api.get('/history', async (req, res) => {
+  const rows = await query<{ id: string; recipient_id: string; snapshot: unknown; created_at: Date }>(
+    `SELECT h.id,h.recipient_id,h.snapshot,h.created_at FROM history h
+     WHERE ${historyVisibility}
      ORDER BY h.created_at DESC,h.id`, [person(req).id]);
   res.json(rows.map(historyEntry));
 });
 api.get('/search', async (req, res) => {
   const q = z.string().trim().max(100).parse(req.query.q ?? '');
-  if (!q) { res.json({ people: [], wishes: [] }); return; }
+  if (!q) { res.json({ people: [], wishes: [], history: [] }); return; }
   const people = await query<Person>(`SELECT DISTINCT u.id,u.first_name,u.last_name,u.avatar,u.birth_date,u.password_hash IS NULL AS managed FROM users u
     JOIN memberships m ON m.household_id=u.household_id JOIN memberships mine ON mine.family_id=m.family_id
     WHERE mine.household_id=$1 AND (u.first_name ILIKE $2 OR u.last_name ILIKE $2) LIMIT 50`,
@@ -506,10 +510,24 @@ api.get('/search', async (req, res) => {
     AND (w.title ILIKE $2 OR EXISTS(SELECT 1 FROM unnest(w.tags) tag WHERE tag ILIKE $2)
       OR w.price::text ILIKE $2 OR u.first_name ILIKE $2 OR u.last_name ILIKE $2) LIMIT 100`,
     [person(req).household_id, `%${q}%`]);
+  // Only the fields a history entry exposes are searched, so a match never hints at what was
+  // stripped from the snapshot (e-mails, household ids…).
+  const jsonArray = (value: string) => `CASE WHEN jsonb_typeof(${value})='array' THEN ${value} ELSE '[]'::jsonb END`;
+  const historyRows = await query<{ id: string; recipient_id: string; snapshot: unknown; created_at: Date }>(
+    `SELECT h.id,h.recipient_id,h.snapshot,h.created_at FROM history h
+     WHERE ${historyVisibility}
+     AND (h.snapshot->>'title' ILIKE $2
+       OR EXISTS(SELECT 1 FROM jsonb_array_elements(jsonb_build_array(h.snapshot->'recipient',h.snapshot->'creator')
+           || ${jsonArray(`h.snapshot->'participants'`)}) p
+         WHERE jsonb_typeof(p)='object' AND concat_ws(' ',COALESCE(p->>'firstName',p->>'first_name'),
+           COALESCE(p->>'lastName',p->>'last_name')) ILIKE $2)
+       OR EXISTS(SELECT 1 FROM jsonb_array_elements(${jsonArray(`h.snapshot->'occasions'`)}) o
+         WHERE jsonb_typeof(o)='object' AND o->>'name' ILIKE $2))
+     ORDER BY h.created_at DESC,h.id LIMIT 50`, [person(req).id, `%${q}%`]);
   res.json({ people: people.map(publicPerson), wishes: await Promise.all(wishesRows.map(async w => ({
     ...await wishes.reservationView(w, person(req).id),
     owner: publicPerson(await first<Person>('SELECT * FROM users WHERE id=$1', [w.owner_id])),
-  }))) });
+  }))), history: historyRows.map(historyEntry) });
 });
 api.get('/dashboard', async (req, res) => {
   const actor = person(req);
@@ -618,6 +636,6 @@ app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
       status === 409 ? 'Conflit' : status === 413 ? 'Corps trop volumineux' :
         status === 429 ? 'Trop de requêtes' : 'Erreur serveur';
   res.vary('Accept-Language');
-  res.status(status).json({ error: localized(req, message) });
+  res.status(status).json({ ...(error instanceof HttpError ? error.details : undefined), error: localized(req, message) });
 });
 export { app };

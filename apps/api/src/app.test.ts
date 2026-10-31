@@ -9,7 +9,13 @@ let base: string;
 const cookies: Record<string, string> = {};
 // A client address can be supplied so a test that signs in and out repeatedly gets its own
 // rate-limit budget instead of spending the one shared by the whole suite.
+const wishCreation = /^\/(users\/[^/]+\/)?wishes$/;
 const call = async (as: string, path: string, method = 'GET', body?: unknown, language?: string, ip?: string) => {
+  // The suite reuses titles and links on every run against the same database, so list
+  // additions skip the duplicate warning unless a test sets allowDuplicate itself.
+  if (method === 'POST' && wishCreation.test(path) && body && typeof body === 'object' && !('allowDuplicate' in body)) {
+    body = { ...body, allowDuplicate: true };
+  }
   const response = await fetch(`${base}/api${path}`, {
     method, headers: { 'content-type': 'application/json', cookie: cookies[as] ?? '', origin: 'http://localhost:5173',
       ...(language ? { 'accept-language': language } : {}), ...(ip ? { 'x-forwarded-for': ip } : {}) },
@@ -68,8 +74,71 @@ describe('permissions métier sur l’API', () => {
       expect((await call(actor, '/search?q=Search context')).data.wishes).toEqual([]);
     }
     expect((await call('alice', `/reservations/${hidden.data.id}`, 'DELETE')).status).toBe(200);
-    expect((await call('alice', '/search?q=')).data).toEqual({ people: [], wishes: [] });
+    expect((await call('alice', '/search?q=')).data).toEqual({ people: [], wishes: [], history: [] });
     expect((await call('alice', `/search?q=${'x'.repeat(101)}`, 'GET', undefined, 'en')).status).toBe(400);
+  });
+  it('warns about a likely duplicate on the same list and lets it be added on purpose', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.15');
+    const run = Date.now();
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const original = await call('bob', '/wishes', 'POST', {
+      title: `Théière ${run}`, url: `https://www.shop.test/teapot-${run}/?utm_source=mail`, allowDuplicate: false,
+    });
+    expect(original.status).toBe(201);
+    const sameTitle = await call('bob', '/wishes', 'POST', { title: `  theiere   ${run} `, url: `https://other.test/${run}`, allowDuplicate: false });
+    expect(sameTitle.status).toBe(409);
+    expect(sameTitle.data.error).toBe('Envie déjà présente dans la liste');
+    expect(sameTitle.data.duplicates).toEqual([expect.objectContaining({ id: original.data.id, title: `Théière ${run}` })]);
+    const sameLink = await call('bob', '/wishes', 'POST', { title: `Teapot ${run}`, url: `http://shop.test/teapot-${run}#reviews`, allowDuplicate: false }, 'en');
+    expect(sameLink.status).toBe(409);
+    expect(sameLink.data.error).toBe('This wish is already on the list');
+    expect(sameLink.data.duplicates.map((w: { id: string }) => w.id)).toEqual([original.data.id]);
+    const elsewhere = await call('alice', '/wishes', 'POST', { title: `Théière ${run}`, url: `https://shop.test/teapot-${run}`, allowDuplicate: false });
+    expect(elsewhere.status).toBe(201);
+    const occasion = (await call('alice', `/occasions?recipientId=${bobId}`)).data.find((o: { nextDate?: string }) => o.nextDate);
+    const hidden = await call('alice', '/reservations/off-list', 'POST', {
+      recipientId: bobId, title: `Secret ${run}`, occasionIds: [{ id: occasion.id, year: Number(occasion.nextDate.slice(0, 4)) }],
+    });
+    expect(hidden.status).toBe(201);
+    const notSecret = await call('bob', '/wishes', 'POST', { title: `Secret ${run}`, url: `https://secret.test/${run}`, allowDuplicate: false });
+    expect(notSecret.status).toBe(201);
+    expect(notSecret.data).not.toHaveProperty('duplicates');
+    const forced = await call('bob', '/wishes', 'POST', { title: `Théière ${run}`, url: `https://shop.test/teapot-${run}`, allowDuplicate: true });
+    expect(forced.status).toBe(201);
+    for (const id of [original.data.id, forced.data.id]) expect((await call('bob', `/wishes/${id}`, 'DELETE')).status).toBe(200);
+    expect((await call('bob', '/wishes', 'POST', { title: `Théière ${run}`, url: `https://shop.test/teapot-${run}`, allowDuplicate: false })).status).toBe(201);
+    expect((await call('alice', `/reservations/${hidden.data.id}`, 'DELETE')).status).toBe(200);
+  });
+  it('finds past gifts in search with the same visibility as the history page', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.16');
+    const seeded = (await call('bob', '/search?q=appareil')).data.history
+      .find((h: { snapshot: { title: string } }) => h.snapshot.title === 'Appareil photo');
+    expect(seeded).toEqual((await call('bob', '/history')).data.find((h: { id: string }) => h.id === seeded.id));
+    for (const q of ['Appareil', 'alice', 'David', 'Noël']) {
+      for (const actor of ['bob', 'charlie', 'david']) {
+        expect((await call(actor, `/search?q=${encodeURIComponent(q)}`)).data.history.some((h: { id: string }) => h.id === seeded.id)).toBe(true);
+      }
+      for (const actor of ['alice', 'eloise']) {
+        expect((await call(actor, `/search?q=${encodeURIComponent(q)}`)).data.history.some((h: { id: string }) => h.id === seeded.id)).toBe(false);
+      }
+    }
+    expect((await call('bob', '/search?q=example.test')).data.history).toEqual([]);
+    const run = Date.now();
+    const bobId = (await call('bob', '/auth/me')).data.id;
+    const occasion = (await call('alice', `/occasions?recipientId=${bobId}`)).data.find((o: { nextDate?: string }) => o.nextDate);
+    const gift = await call('alice', '/reservations/off-list', 'POST', {
+      recipientId: bobId, title: `History search ${run}`, occasionIds: [{ id: occasion.id, year: Number(occasion.nextDate.slice(0, 4)) }],
+    });
+    expect(gift.status).toBe(201);
+    const found = async (actor: string) => (await call(actor, `/search?q=History search ${run}`)).data.history.length;
+    for (const actor of ['alice', 'bob', 'charlie', 'david', 'eloise']) expect(await found(actor)).toBe(0);
+    for (const status of ['purchased', 'wrapped', 'gifted']) {
+      expect((await call('alice', `/reservations/${gift.data.id}`, 'PATCH', { status })).status).toBe(200);
+    }
+    for (const actor of ['alice', 'charlie', 'david']) expect(await found(actor)).toBe(1);
+    for (const actor of ['bob', 'eloise']) expect(await found(actor)).toBe(0);
   });
   it('returns contextual history to current family members but never to the recipient', async () => {
     const call: typeof regressionCall = (as, path, method, body, language) =>

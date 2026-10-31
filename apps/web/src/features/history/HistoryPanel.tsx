@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { api, dateOf, nameOf, type HistoryEntry } from '../../api'
 import { useTranslation } from '../../language-context'
@@ -9,6 +9,8 @@ export function HistoryPanel({ revision }: { revision: number }) {
   const { locale, t } = useTranslation()
   const [params, setParams] = useSearchParams()
   const recipient = params.get('recipient') ?? ''
+  const highlighted = params.get('entry') ?? ''
+  const highlightedRef = useRef<HTMLElement>(null)
   const requestedSort = params.get('sort')
   const sort = requestedSort === 'oldest' || requestedSort === 'recipient' ? requestedSort : 'newest'
   const [state, setState] = useState<{ revision: number; items?: HistoryEntry[]; error?: string }>({ revision })
@@ -21,9 +23,12 @@ export function HistoryPanel({ revision }: { revision: number }) {
   const update = (key: string, value: string) => setParams(previous => {
     const next = new URLSearchParams(previous)
     if (value) next.set(key, value); else next.delete(key)
+    next.delete('entry')
     return next
   })
   const items = state.revision === revision ? state.items : undefined
+  // A search result opens the history on one entry: bring it into view once it has rendered.
+  useEffect(() => { highlightedRef.current?.scrollIntoView({ block: 'center' }) }, [items, highlighted])
   const recordedDate = (entry: HistoryEntry) => Date.parse(entry.snapshot.giftedAt ?? entry.created_at)
   const recipientName = (entry: HistoryEntry) => entry.snapshot.recipient && (entry.snapshot.recipient.firstName || entry.snapshot.recipient.lastName)
     ? nameOf(entry.snapshot.recipient) : t('Bénéficiaire indisponible')
@@ -56,7 +61,7 @@ export function HistoryPanel({ revision }: { revision: number }) {
           <option value="newest">{t('Plus récents d’abord')}</option><option value="oldest">{t('Plus anciens d’abord')}</option><option value="recipient">{t('Bénéficiaire (A–Z)')}</option>
         </select></div>
       </div>
-      {filtered.length ? <div className="card divide-y divide-line-soft">{filtered.map(entry => <article key={entry.id} className="compact-panel p-5">
+      {filtered.length ? <div className="card divide-y divide-line-soft">{filtered.map(entry => <article key={entry.id} id={`history-${entry.id}`} ref={entry.id === highlighted ? highlightedRef : undefined} aria-current={entry.id === highlighted || undefined} className={`compact-panel p-5${entry.id === highlighted ? ' border-l-4 border-sage-500 bg-sage-50' : ''}`}>
         <h3 className="font-semibold">{entry.snapshot.title || t('Un cadeau offert')}</h3>
         <p className="mt-1 text-sm">{t('Pour')} <strong>{recipientName(entry)}</strong></p>
         {entry.snapshot.creator && <p className="muted mt-1">{t('Organisé par')} {nameOf(entry.snapshot.creator)}</p>}

@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { Person, RouteDeps, Wish } from '../app.js';
+import { isLikelyDuplicate } from '../duplicates.js';
 
 type WishServiceDeps = Pick<
   RouteDeps,
@@ -109,6 +110,21 @@ export const createWishService = (deps: WishServiceDeps) => {
   const createWish = async (actor: Person, ownerId: string, d: WishInput) => {
     if (!/^https?:\/\//.test(d.url)) fail(400, 'URL HTTP(S) requise');
     const owner = await writableOwner(actor, ownerId);
+    if (!d.allowDuplicate) {
+      // Only the list the owner can see is compared: off-list gifts stay a secret, and the same
+      // idea on someone else's list is not a duplicate.
+      const listed = await query<Wish>(
+        `SELECT * FROM wishes WHERE owner_id=$1 AND deleted_at IS NULL AND gifted_at IS NULL AND NOT off_list
+      ORDER BY position,created_at`,
+        [owner],
+      );
+      const duplicates = listed.filter((wish) => isLikelyDuplicate(d, wish));
+      if (duplicates.length) {
+        fail(409, 'Envie déjà présente dans la liste', {
+          duplicates: await Promise.all(duplicates.map((wish) => reservationView(wish, actor.id))),
+        });
+      }
+    }
     const row = await first<Wish>(
       `INSERT INTO wishes(owner_id,title,image,url,description,price,tags,position)
     VALUES($1,$2,$3,$4,$5,$6,$7,(SELECT count(*) FROM wishes WHERE owner_id=$1 AND NOT off_list)) RETURNING *`,
