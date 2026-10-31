@@ -377,12 +377,23 @@ export const createFamilyService = (deps: FamilyServiceDeps) => {
     }
   };
 
+  const lockFamilyAdmin = async (client: import('pg').PoolClient, actor: Person, id: string) => {
+    await client.query('SELECT id FROM families WHERE id=$1 FOR UPDATE', [id]);
+    const authorized = await client.query(
+      `SELECT 1 FROM family_admins a JOIN users u ON u.id=a.user_id
+       JOIN memberships m ON m.household_id=u.household_id AND m.family_id=a.family_id
+       WHERE a.family_id=$1 AND a.user_id=$2`,
+      [id, actor.id],
+    );
+    if (!authorized.rowCount) fail(403, 'Accès refusé à cette famille');
+  };
+
   const removeFamilyHousehold = async (actor: Person, id: string, householdId: string) => {
     await ownFamily(actor, id);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('SELECT id FROM families WHERE id=$1 FOR UPDATE', [id]);
+      await lockFamilyAdmin(client, actor, id);
       const count = (
         await client.query<{ count: string }>('SELECT count(*) FROM memberships WHERE family_id=$1', [id])
       ).rows[0];
@@ -418,20 +429,47 @@ export const createFamilyService = (deps: FamilyServiceDeps) => {
   };
 
   const addFamilyAdmin = async (actor: Person, id: string, data: { userId: string }) => {
-    await ownFamily(actor, id);
-    const { userId } = data;
-    if (
-      !(await first(
-        'SELECT 1 FROM users u JOIN memberships m ON m.household_id=u.household_id WHERE u.id=$1 AND m.family_id=$2',
-        [userId, id],
-      ))
-    )
-      fail(403, 'Utilisateur hors famille');
-    if (await first('SELECT 1 FROM users WHERE id=$1 AND password_hash IS NULL', [userId]))
-      fail(409, 'Un membre géré ne peut pas administrer');
-    await query('INSERT INTO family_admins VALUES($1,$2) ON CONFLICT DO NOTHING', [id, userId]);
-    return { userId };
+    return changeFamilyAdmin(actor, id, data.userId, true);
   };
+
+  const changeFamilyAdmin = async (actor: Person, id: string, userId: string, admin: boolean) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await lockFamilyAdmin(client, actor, id);
+      const target = (
+        await client.query<{ managed: boolean }>(
+          `SELECT u.password_hash IS NULL AS managed FROM users u
+         JOIN memberships m ON m.household_id=u.household_id
+         WHERE u.id=$1 AND m.family_id=$2`,
+          [userId, id],
+        )
+      ).rows[0];
+      if (!target) fail(403, 'Utilisateur hors famille');
+      if (admin) {
+        if (target.managed) fail(409, 'Un membre géré ne peut pas administrer');
+        await client.query('INSERT INTO family_admins VALUES($1,$2) ON CONFLICT DO NOTHING', [id, userId]);
+      } else {
+        if (
+          !(
+            await client.query('SELECT 1 FROM family_admins WHERE family_id=$1 AND user_id<>$2', [id, userId])
+          ).rowCount
+        )
+          fail(409, 'Une famille doit conserver un administrateur');
+        await client.query('DELETE FROM family_admins WHERE family_id=$1 AND user_id=$2', [id, userId]);
+      }
+      await client.query('COMMIT');
+      return { userId };
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  };
+
+  const removeFamilyAdmin = async (actor: Person, id: string, userId: string) =>
+    changeFamilyAdmin(actor, id, userId, false);
 
   const listOccasions = async (actor: Person, recipientId: string) => upcoming(actor, recipientId);
 
@@ -489,6 +527,7 @@ export const createFamilyService = (deps: FamilyServiceDeps) => {
     joinFamily,
     removeFamilyHousehold,
     addFamilyAdmin,
+    removeFamilyAdmin,
     listOccasions,
     createOccasion,
     updateOccasion,

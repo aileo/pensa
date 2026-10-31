@@ -23,6 +23,15 @@ export function saveLocale(locale: Locale) {
 }
 
 const english = {
+  'Administrateurs de la famille': 'Family administrators',
+  'Ces droits concernent cette famille uniquement, pas les foyers.': 'These permissions apply only to this family, not to households.',
+  'Une famille doit conserver un administrateur': 'A family must retain an administrator',
+  'Nommer {name} admin de la famille ?': 'Appoint {name} as a family administrator?',
+  'Retirer les droits d’admin de la famille à {name} ?': 'Remove family administrator permissions from {name}?',
+  'Droits d’admin de la famille accordés.': 'Family administrator permissions granted.',
+  'Droits d’admin de la famille retirés.': 'Family administrator permissions removed.',
+  'Nommer admin de la famille': 'Appoint family admin',
+  'Retirer l’admin de la famille': 'Remove family admin',
   'Un proche': 'A loved one',
   'Connexion impossible. Vérifiez votre réseau et réessayez.': 'Could not connect. Check your network and try again.',
   'Une erreur est survenue ({status}).': 'An error occurred ({status}).',

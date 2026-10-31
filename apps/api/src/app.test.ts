@@ -34,6 +34,45 @@ afterAll(async () => {
   await pool.end();
 });
 describe('permissions métier sur l’API', () => {
+  it('grants and removes only family-admin rights and protects the last administrator', async () => {
+    const call: typeof regressionCall = (as, path, method, body, language) =>
+      regressionCall(as, path, method, body, language, '127.0.1.3');
+    const family = (await call('alice', '/families')).data.find((f: { name: string }) => f.name === 'Famille A');
+    const alice = (await call('alice', '/auth/me')).data;
+    const bob = (await call('bob', '/auth/me')).data;
+    const david = (await call('david', '/auth/me')).data;
+    const memberships = (await pool.query('SELECT * FROM memberships ORDER BY family_id, household_id')).rows;
+    expect((await call('bob', `/families/${family.id}/admins`, 'POST', { userId: bob.id })).status).toBe(403);
+    expect((await call('bob', `/families/${family.id}/admins/${alice.id}`, 'DELETE')).status).toBe(403);
+    expect((await call('alice', `/families/${family.id}/admins`, 'POST', { userId: david.id })).status).toBe(403);
+    expect((await call('alice', `/families/${family.id}/admins/${david.id}`, 'DELETE')).status).toBe(403);
+    const managed = await call('alice', `/households/${alice.householdId}/members`, 'POST', {
+      firstName: 'Managed', lastName: 'Admin eligibility', birthDate: '2015-01-01',
+    });
+    expect(managed.status).toBe(201);
+    const managedId = managed.data.members.find((p: { lastName: string }) => p.lastName === 'Admin eligibility').id;
+    expect((await call('alice', `/families/${family.id}/admins`, 'POST', { userId: managedId })).status).toBe(409);
+    expect((await call('alice', `/households/${alice.householdId}/members/${managedId}`, 'DELETE')).status).toBe(200);
+    expect((await call('alice', `/families/${family.id}/admins/${alice.id}`, 'DELETE')).status).toBe(409);
+    expect((await call('alice', `/families/${family.id}/admins`, 'POST', { userId: bob.id })).status).toBe(201);
+    expect((await call('bob', '/auth/me')).data).toMatchObject({ householdId: bob.householdId, householdAdmin: bob.householdAdmin });
+    expect((await call('bob', '/families')).data.find((f: { id: string }) => f.id === family.id).admin).toBe(true);
+    expect((await call('bob', `/families/${family.id}/invitations`, 'POST', {})).status).toBe(201);
+    expect((await call('bob', `/families/${family.id}`, 'PATCH', { name: family.name })).status).toBe(200);
+    const demotions = await Promise.all([
+      call('alice', `/families/${family.id}/admins/${alice.id}`, 'DELETE'),
+      call('bob', `/families/${family.id}/admins/${bob.id}`, 'DELETE'),
+    ]);
+    expect(demotions.map(result => result.status).sort()).toEqual([200, 409]);
+    const current = (await call('alice', '/families')).data.find((f: { id: string }) => f.id === family.id);
+    expect(current.members.filter((p: { familyAdmin: boolean }) => p.familyAdmin)).toHaveLength(1);
+    if (!current.admin) expect((await call('bob', `/families/${family.id}/admins`, 'POST', { userId: alice.id })).status).toBe(201);
+    expect((await call('alice', `/families/${family.id}/admins/${bob.id}`, 'DELETE')).status).toBe(200);
+    expect((await call('bob', `/families/${family.id}/invitations`, 'POST', {})).status).toBe(403);
+    expect((await call('bob', `/families/${family.id}`, 'PATCH', { name: family.name })).status).toBe(403);
+    expect((await call('bob', '/auth/me')).data).toMatchObject({ householdId: bob.householdId, householdAdmin: bob.householdAdmin });
+    expect((await pool.query('SELECT * FROM memberships ORDER BY family_id, household_id')).rows).toEqual(memberships);
+  });
   it('converts a deleted wish into a private, actionable off-list gift', async () => {
     const call: typeof regressionCall = (as, path, method, body, language) =>
       regressionCall(as, path, method, body, language, '127.0.1.1');

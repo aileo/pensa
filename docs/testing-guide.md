@@ -198,6 +198,17 @@ Log in as **Charlie**.
 - [ ] Edit, advance and cancel converted gifts using the normal off-list controls. Completing one keeps the existing history access for the beneficiary and participants.
 - [ ] Repeat these checks in French and English.
 
+### Family administration
+
+- [ ] In family management, promote an account-bearing member, verify invitation
+  and rename access, then demote them. Household permissions and memberships
+  remain unchanged.
+- [ ] Managed members have no promotion action. The last family administrator's
+  demotion action is disabled, and the API refuses concurrent last-admin removal.
+- [ ] Confirm cancelling the confirmation makes no change and controls are disabled
+  while saving. Refreshed family badges and management access reflect the new role.
+- [ ] Repeat in French and English, with keyboard navigation and a narrow viewport.
+
 ### 3.10 Product copy
 
 The wording is built around one promise: **organizing gifts without the mental load**. Warmth
