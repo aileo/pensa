@@ -4,3 +4,5 @@ dist/
 .DS_Store
 coverage/
 *.tsbuildinfo
+# What a page looked like when a screenshot step failed (screenshots/capture.mjs).
+docs/images/failed-*.png

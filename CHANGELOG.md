@@ -6,6 +6,16 @@ minor bump may change behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- Adding a wish that matches one already on the list — same normalized link or
+  title — shows both side by side and offers to cancel, view the existing wish
+  or add it anyway ([#9](https://github.com/aileo/pensa/issues/9)).
+- Search also finds past gifts, under the history's access rule, and opens the
+  history on the matching entry ([#13](https://github.com/aileo/pensa/issues/13)).
+- A Playwright script generates French and English screenshots for the user
+  guides, locally and on CI before the documentation site is built.
+
 ## [0.7.0] — 2026-10-31
 
 ### Added

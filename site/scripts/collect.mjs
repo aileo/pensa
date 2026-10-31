@@ -2,8 +2,8 @@
 // This copies it into the VitePress source tree and repairs the links that
 // point outside docs/ — VitePress fails the build on a dead link, and keeping
 // a second copy by hand would guarantee the two drift apart.
-import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const site = fileURLToPath(new URL('..', import.meta.url));
@@ -48,6 +48,24 @@ const copy = async (source, target, rules) => {
   await writeFile(target, rewrite(await readFile(source, 'utf8'), rules));
 };
 
+// Every file below a directory, as paths relative to it. A missing directory is empty.
+const filesIn = async (dir) => {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => []);
+  return entries.filter((entry) => entry.isFile()).map((entry) => relative(dir, join(entry.parentPath, entry.name)));
+};
+
+// The guides embed screenshots from docs/images/{en,fr}/, with the same
+// relative paths on GitHub and on the site.
+const collectImages = async () => {
+  const source = join(repo, 'docs', 'images');
+  const target = join(site, 'docs', 'images');
+  const kept = new Set(await filesIn(source));
+  if (kept.size) await cp(source, target, { recursive: true, force: true, filter: (path) => !/failed-[^/\\]*\.png$/.test(path) });
+  for (const file of await filesIn(target)) {
+    if (!kept.has(file) || /failed-[^/\\]*\.png$/.test(file)) await rm(join(target, file));
+  }
+};
+
 const collect = async () => {
   await mkdir(join(site, 'docs'), { recursive: true });
 
@@ -69,8 +87,9 @@ const collect = async () => {
   // directory, and emptying it under its feet is how a rename turns into a
   // blank page. Stale copies go once the fresh ones are in place.
   for (const name of await readdir(join(site, 'docs'))) {
-    if (!written.has(name)) await rm(join(site, 'docs', name));
+    if (name !== 'images' && !written.has(name)) await rm(join(site, 'docs', name));
   }
+  await collectImages();
 
   await copy(join(repo, 'AGENT.md'), join(site, 'agent.md'), fromRoot);
   await copy(join(repo, 'CHANGELOG.md'), join(site, 'changelog.md'), fromRoot);
@@ -92,7 +111,8 @@ if (process.argv.includes('--watch')) {
   const stamp = async () => {
     const dir = join(repo, 'docs');
     const names = await readdir(dir);
-    const files = [...names.map((name) => join(dir, name)), join(repo, 'AGENT.md'), join(repo, 'CHANGELOG.md')];
+    const images = (await filesIn(join(dir, 'images'))).map((name) => join(dir, 'images', name));
+    const files = [...names.map((name) => join(dir, name)), ...images, join(repo, 'AGENT.md'), join(repo, 'CHANGELOG.md')];
     const times = await Promise.all(files.map(async (file) => `${file}:${(await stat(file)).mtimeMs}`));
     return times.join('|');
   };

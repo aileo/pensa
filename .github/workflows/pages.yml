@@ -28,6 +28,14 @@ jobs:
           cache-dependency-path: site/package-lock.json
       - run: npm ci
         working-directory: site
+      # The guides' screenshots are retaken from a throwaway, freshly seeded
+      # instance, so the published site always shows the current interface.
+      # The committed copies in docs/images are what GitHub renders meanwhile.
+      - name: Take the user-guide screenshots
+        run: docker compose -f compose.screenshots.yaml run --rm --build screenshots
+      - name: Stop the screenshot instance
+        if: always()
+        run: docker compose -f compose.screenshots.yaml down -v
       # The build collects docs/ into the site and fails on a dead internal
       # link, so a pull request that breaks a cross-reference is caught here.
       - run: npm run build

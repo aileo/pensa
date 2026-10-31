@@ -30,6 +30,8 @@ Three ways in, depending on what you were given:
 If you are the very first person on a brand-new instance, the sign-up form is
 open without any code. After you, it closes.
 
+![The sign-in screen](images/en/sign-in.png)
+
 ::: tip Household or family?
 A **household** is the people who live together. A **family** connects several
 households — yours, your parents', your in-laws'. You can belong to more than
@@ -41,6 +43,8 @@ Your household has **administrators**. They are the ones who accept family
 invitations, add members who cannot sign in, and rename things. The first
 person in a household is one automatically.
 
+![The families screen, with each family's households and members](images/en/families.png)
+
 ## Your profile
 
 Two fields in your profile are doing work in the background:
@@ -48,6 +52,8 @@ Two fields in your profile are doing work in the background:
 - **Date of birth** creates your birthday occasion, and lets the app show ages.
 - **Name day** (`MM-DD`, optional) creates your name-day occasion. Without it,
   the occasion simply never comes round.
+
+![The profile page](images/en/profile.png)
 
 Everything else — your name, your email, your password — is what you would
 expect.
@@ -62,8 +68,21 @@ fills in the name, the image and the price for you; correct whatever it got
 wrong before saving. If the site refuses to be read — some do — type the title
 yourself and the wish works just the same.
 
+![A wish list, with tags, prices and reorder controls](images/en/my-wishes.png)
+
 **Tags** are free text: *books*, *cycling*, *small things*. They are what lets
 someone reading your list narrow it down to the part they were looking for.
+
+::: tip Already on the list?
+If the list already has a wish with the same link or the same name — ignoring
+capitals, accents, spacing and tracking bits in the link — Pensa shows the two
+side by side before saving. **Cancel** keeps the list as it is, **View the
+existing wish** opens the one already there, and **Add anyway** saves the new one
+when it really is a different wish, such as another size. Only that person's
+visible list is compared: the same idea on someone else's list is never flagged.
+:::
+
+![The duplicate warning, comparing the existing wish with the new one](images/en/duplicate-warning.png)
 
 ::: warning What stays editable
 Once a wish is saved, its **name never changes** — not even after it is
@@ -110,6 +129,8 @@ Open someone's list and you see their wishes. You can narrow it down by tag, by
 price range, and by what is still available — that last filter is one they will
 never see on their own list.
 
+![Someone else's wish list, with its filters](images/en/person-wishes.png)
+
 **Reserving** a wish tells the rest of the family it is taken, and tells the
 person concerned nothing at all. They will not see who reserved it, or that
 anything was reserved.
@@ -117,6 +138,8 @@ anything was reserved.
 A reservation is attached to one or more **occurrences** — the next birthday,
 the Christmas after that, or both at once when one gift covers two occasions.
 The form offers the next occurrence and the one after it.
+
+![Reserving a wish for one or more occasions](images/en/reserve.png)
 
 ::: tip Nobody can reserve the same gift twice by accident
 Two people clicking at the same second cannot both get it. The second one is
@@ -133,6 +156,10 @@ four steps:
 Tick each one as you go. What is left to do surfaces on your dashboard, with
 its date, so the app is a to-do list rather than a shelf of labels. When the
 last step is ticked the gift moves into the history.
+
+![The dashboard: upcoming occasions and what is left to do](images/en/dashboard.png)
+
+![Reservations and their progress](images/en/reservations.png)
 
 ## Gifts nobody asked for
 
@@ -194,6 +221,8 @@ screen: the lists your household keeps appear on your dashboard, and a row of
 shortcuts sits at the top of *Mes envies*. One click switches between your own
 list and theirs, and back.
 
+![A managed member's list, kept by the household](images/en/managed-list.png)
+
 Nobody stays managed forever. Two ways out:
 
 - **A claim code.** Generate one, hand it over, and the person opens their own
@@ -233,10 +262,18 @@ sorting remain in the URL when you use browser back/forward.
 Leaving the shared families removes access, even if you organized or contributed
 to those gifts. The recipient never sees their own gifts in history.
 
-**Search** covers people and wishes in your shared families. Each wish result
-names the person whose list it belongs to. Off-list, deleted and already given
-wishes do not appear, and your own results never reveal reservations.
+![The history, filtered and sorted](images/en/history.png)
+
+**Search** covers people, wishes and past gifts in your shared families. Each
+wish result names the person whose list it belongs to. Off-list, deleted and
+already given wishes do not appear as wishes, and your own results never reveal
+reservations. Gifts already given appear as **Already given** results — found by
+their name, their recipient, organizer, participants or occasion — under exactly
+the same rule as the history: never to their recipient. **View** opens the
+history on that recipient with the gift highlighted.
 While searching, previous results clear and loading or errors are shown.
+
+![Search finding a gift already given](images/en/search-history.png)
 
 ## French and English
 
