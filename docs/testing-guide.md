@@ -466,6 +466,34 @@ truth, not just a mirror of it.
       the production image, load a sub-resource URL directly (not via a click from `/`) — nginx's
       SPA fallback serves the app instead of a 404.
 
+### 3.18 Phone and tablet layouts
+
+Repeat in French and English at 320px, 390px, 768px and 1023px viewport widths,
+including a short landscape viewport. Compare with desktop at 1024px and
+1440px.
+
+- [ ] Registration, add/edit wish, occasion, off-list gift, profile, managed
+      member/account and name-day forms show each field on its own row below
+      1024px. History and wish filters follow the same rule.
+- [ ] Join/rename inputs do not compete with submit buttons for horizontal
+      space. Labels, hints, validation and errors remain readable.
+- [ ] Compact fields have 16px text, 8px vertical/10px horizontal padding and
+      at least 44px height. Primary, secondary and icon actions have at least
+      44px touch targets, including wish reorder arrows.
+- [ ] Dashboard, wish cards/lists/details, family/member actions, reservations,
+      search and history have no page-level horizontal overflow. Try long
+      names, titles, tags and URLs; actions must remain accessible.
+- [ ] The header keeps menu/search/account controls visible with a long title.
+      The drawer scrolls to its final item in a short viewport.
+- [ ] Dialogs scroll to their submit button in portrait and landscape.
+      Close buttons remain usable, and opening the keyboard does not make the
+      bottom of the form unreachable.
+- [ ] Reservation progress keeps all four numbered/labelled steps readable.
+- [ ] Submit representative add/edit/profile/member/reservation forms and use
+      filters and keyboard reorder controls; behavior remains unchanged.
+- [ ] Desktop form columns, card padding and navigation remain unchanged.
+      Keyboard focus indicators stay visible in every layout.
+
 ## 4. The name, the AI disclosure and the published images
 ### 4.1 The old name is gone
 
@@ -592,6 +620,15 @@ docker compose up site -d
       is caught here and nowhere else.
 - [ ] Nothing under `site/docs/`, `site/agent.md` or `site/changelog.md` is
       committed: they are copies, regenerated on every build.
+- [ ] At 320px, 390px, 768px and 1023px widths, both home languages have compact
+      spacing, readable features and accessible hero actions. Below 640px,
+      hero buttons stack. Desktop layouts remain unchanged.
+- [ ] Documents have no page-level horizontal overflow; wide tables and code
+      blocks scroll locally. The navigation menu opens and follows links on
+      tablets as well as phones; the sidebar and footer remain reachable.
+- [ ] Local search works in narrow and short landscape viewports: its input
+      uses 16px text, its actions have 44px touch targets, and results scroll
+      inside the dialog. Repeat with keyboard navigation and light/dark mode.
 
 After a push to `main`, the *Pages* workflow publishes
 https://aileo.github.io/pensa/. It fails until GitHub Pages is set to deploy

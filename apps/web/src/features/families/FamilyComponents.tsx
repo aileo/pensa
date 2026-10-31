@@ -22,7 +22,7 @@ export function OccasionForm({ family, busy, perform }: { family: Family; busy: 
     <FormField id="occasion-kind" label={t('Type d’occasion')}><SelectInput className="mb-4" id="occasion-kind" value={kind} onChange={event => setKind(event.target.value as Occasion['kind'])}>
       <option value="fixed">{t('Date fixe')}</option><option value="birthday">{t('Anniversaire (date de naissance)')}</option><option value="name_day">{t('Fête du prénom')}</option>
     </SelectInput></FormField>
-    {kind === 'fixed' && <div className="grid grid-cols-2 gap-3"><FormField id="occasion-day" label={t('Jour')}><TextInput id="occasion-day" name="day" type="number" min="1" max="31" required/></FormField><FormField id="occasion-month" label={t('Mois')}><TextInput id="occasion-month" name="month" type="number" min="1" max="12" required/></FormField></div>}
+    {kind === 'fixed' && <div className="grid gap-3 lg:grid-cols-2"><FormField id="occasion-day" label={t('Jour')}><TextInput id="occasion-day" name="day" type="number" min="1" max="31" required/></FormField><FormField id="occasion-month" label={t('Mois')}><TextInput id="occasion-month" name="month" type="number" min="1" max="12" required/></FormField></div>}
     {kind !== 'fixed' && <p className="muted">{t('La date est calculée à partir du profil de la personne lorsqu’elle est disponible.')}</p>}
     <button disabled={busy} className="primary mt-5 w-full">{t('Créer l’occasion')}</button>
   </form>
@@ -31,10 +31,10 @@ export function OccasionForm({ family, busy, perform }: { family: Family; busy: 
 export function JoinFamily({ busy, perform }: { busy: boolean; perform: (action: () => Promise<unknown>, success: string, close?: boolean) => Promise<boolean> }) {
   const { t } = useTranslation()
   const [code, setCode] = useState('')
-  return <section className="card mt-8 p-5 sm:p-6">
+  return <section className="compact-panel card mt-8 p-5 sm:p-6">
     <h3 className="font-['Outfit'] text-xl font-semibold">{t('Rejoindre une famille')}</h3>
     <p className="muted mt-2">{t('Saisissez le code d’invitation à la famille reçu de son administrateur pour y rattacher votre foyer.')}</p>
-    <form className="mt-4 flex flex-wrap gap-2" onSubmit={event => {
+    <form className="mt-4 flex flex-col gap-2 lg:flex-row lg:flex-wrap" onSubmit={event => {
       event.preventDefault()
       void perform(() => api<{ familyId: Id; householdId: Id }>('/families/join', json('POST', { code: code.trim() })), t('Votre foyer a rejoint la famille.'), false).then(ok => { if (ok) setCode('') })
     }}>
@@ -60,7 +60,7 @@ export function FamilyManagement({ family, busy, perform, handleError, onRename 
     } catch (problem) { handleError(problem) }
     finally { setGeneratingFamily(false) }
   }
-  return <section className="card mt-8 p-5 sm:p-6" aria-label={t('Administration de {name}', { name: family.name })}>
+  return <section className="compact-panel card mt-8 p-5 sm:p-6" aria-label={t('Administration de {name}', { name: family.name })}>
     <h3 className="font-['Outfit'] text-xl font-semibold">{t('Gérer la famille')}</h3>
     <div className="mt-5 grid gap-6 lg:grid-cols-2">
       <div>
@@ -74,7 +74,7 @@ export function FamilyManagement({ family, busy, perform, handleError, onRename 
         const name = String(new FormData(event.currentTarget).get('name')).trim()
         void perform(() => api(`/families/${family.id}`, json('PATCH', { name })), t('Famille renommée.'), false).then(ok => { if (ok) onRename(name) })
       }}>
-        <FormField id="rename-family" label={t('Renommer la famille')}><div className="flex flex-wrap gap-2"><TextInput key={family.name} className="min-w-0 flex-1" id="rename-family" name="name" defaultValue={family.name} required/><button disabled={busy} className="secondary">{t('Renommer')}</button></div></FormField>
+        <FormField id="rename-family" label={t('Renommer la famille')}><div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap"><TextInput key={family.name} className="min-w-0 flex-1" id="rename-family" name="name" defaultValue={family.name} required/><button disabled={busy} className="secondary">{t('Renommer')}</button></div></FormField>
       </form>
     </div>
     <div className="mt-6">
@@ -111,7 +111,7 @@ export function PersonRow({ person, me, onPerson, children }: { person: Person; 
   const { t } = useTranslation()
   const self = String(person.id) === String(me.id)
   return <li className="flex flex-wrap items-center gap-3 py-3">
-    <button className="flex min-w-0 flex-1 items-center gap-3 text-left hover:text-brand-700" onClick={() => onPerson(person)} aria-label={self ? t('Voir mes envies') : t('Voir les envies de {name}', { name: nameOf(person) })}>
+    <button className="flex min-h-11 w-full min-w-0 items-center gap-3 text-left hover:text-brand-700 lg:min-h-0 lg:w-auto lg:flex-1" onClick={() => onPerson(person)} aria-label={self ? t('Voir mes envies') : t('Voir les envies de {name}', { name: nameOf(person) })}>
       <Avatar person={person} size="sm"/>
       <span className="min-w-0"><span className="block truncate font-semibold">{nameOf(person)}{self && <span className="muted font-normal"> {t('(vous)')}</span>}</span><span className="mt-1 flex flex-wrap gap-1"><RoleBadges person={person}/></span></span>
     </button>
@@ -122,7 +122,7 @@ export function PersonRow({ person, me, onPerson, children }: { person: Person; 
 export function FamilyHouseholds({ family, me, onPerson, onGift }: { family: Family; me: Person; onPerson: (person: Person) => void; onGift?: (person: Person) => void }) {
   const { t } = useTranslation()
   if (!family.households?.length) return family.members?.length
-    ? <ul className="card p-5">{family.members.map(member => <PersonRow key={member.id} person={member} me={me} onPerson={onPerson}>
+    ? <ul className="compact-panel card p-5">{family.members.map(member => <PersonRow key={member.id} person={member} me={me} onPerson={onPerson}>
       {onGift && String(member.id) !== String(me.id) && <button className="secondary text-xs" onClick={() => onGift(member)} aria-label={t('Prévoir un cadeau hors liste pour {name}', { name: nameOf(member) })}><Icon name="gift" size={16}/> {t('Cadeau hors liste')}</button>}
     </PersonRow>)}</ul> : <p className="muted">{t('Aucun membre affiché')}</p>
   return <div className="grid gap-4 lg:grid-cols-2">{family.households?.map(household => <HouseholdCard key={household.id} household={household} me={me} onPerson={onPerson} onGift={onGift}/>)}</div>
@@ -130,7 +130,7 @@ export function FamilyHouseholds({ family, me, onPerson, onGift }: { family: Fam
 
 export function HouseholdCard({ household, me, onPerson, onGift }: { household: Household; me: Person; onPerson: (person: Person) => void; onGift?: (person: Person) => void }) {
   const { t } = useTranslation()
-  return <article className="card p-5">
+  return <article className="compact-panel card p-5">
     <div className="flex items-center gap-3"><span className="rounded-xl bg-brand-50 p-2 text-brand-600"><Icon name="home" size={19}/></span><h3 className="font-['Outfit'] text-lg font-semibold">{household.name}</h3></div>
     {household.members?.length ? <ul className="mt-2 divide-y divide-line-soft">{household.members.map(member => <PersonRow key={member.id} person={member} me={me} onPerson={onPerson}>
       {onGift && String(member.id) !== String(me.id) && <button className="secondary text-xs" onClick={() => onGift(member)} aria-label={t('Prévoir un cadeau hors liste pour {name}', { name: nameOf(member) })}><Icon name="gift" size={16}/> {t('Cadeau hors liste')}</button>}
@@ -172,15 +172,15 @@ export function ManagedMemberActions({ household, member, busy, perform, handleE
         setOpen('')
       }, t('Fiche mise à jour.'), false)
     }}>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <div><label className="label" htmlFor={`first-name-${member.id}`}>{t('Prénom')}</label><input className="field" id={`first-name-${member.id}`} name="firstName" defaultValue={member.firstName} required/></div>
         <div><label className="label" htmlFor={`last-name-${member.id}`}>{t('Nom')}</label><input className="field" id={`last-name-${member.id}`} name="lastName" defaultValue={member.lastName} required/></div>
       </div>
       <div><label className="label" htmlFor={`birth-date-${member.id}`}>{t('Date de naissance')}</label><input className="field" id={`birth-date-${member.id}`} name="birthDate" type="date" defaultValue={member.birthDate ?? ''} required/></div>
       <NameDayFields idPrefix={`member-${member.id}`} value={member.nameDay} hint={t('Facultative. Sans elle, l’occasion « Fête » ne sera pas annoncée pour cette personne.')}/>
-      <div className="flex gap-2"><button className="primary" disabled={busy}>{t('Enregistrer')}</button><button type="button" className="secondary" onClick={() => setOpen('')}>{t('Annuler')}</button></div>
+      <div className="flex flex-wrap gap-2"><button className="primary" disabled={busy}>{t('Enregistrer')}</button><button type="button" className="secondary" onClick={() => setOpen('')}>{t('Annuler')}</button></div>
     </form>}
-    {open === 'account' && <form className="flex flex-wrap items-end gap-2 rounded-xl bg-brand-50 p-3" onSubmit={event => {
+    {open === 'account' && <form className="flex flex-col items-stretch gap-2 rounded-xl bg-brand-50 p-3 lg:flex-row lg:flex-wrap lg:items-end" onSubmit={event => {
       event.preventDefault()
       const data = new FormData(event.currentTarget)
       void perform(() => api(`${path}/account`, json('POST', { email: String(data.get('email')).trim(), password: String(data.get('password')) })), t('Compte créé : cette personne peut se connecter.'), false)
@@ -219,7 +219,7 @@ export function HouseholdPanel({ household, me, isAdmin, busy, perform, handleEr
   return <section aria-labelledby="my-household-title">
     <div className="mb-5"><p className="eyebrow mb-1">{t('MON FOYER')}</p><h2 id="my-household-title" className="font-['Outfit'] text-2xl font-semibold tracking-tight text-ink-900">{household.name}</h2><p className="muted mt-1">{t('Les personnes qui vivent avec vous. Votre foyer rejoint les familles ensemble.')}</p></div>
     <div className="grid gap-5 lg:grid-cols-2">
-      <div className="card p-5 sm:p-6">
+      <div className="compact-panel card p-5 sm:p-6">
         <h3 className="label">{t('Membres du foyer')}</h3>
         <ul className="divide-y divide-line-soft">{members.map(member => {
           const lastAdmin = member.householdAdmin && adminCount <= 1
@@ -248,24 +248,24 @@ export function HouseholdPanel({ household, me, isAdmin, busy, perform, handleEr
             }, t('Membre ajouté au foyer.'), false)
           }}>
             <p className="muted">{t('Pour un enfant ou toute personne sans compte : votre foyer tient sa liste à sa place.')}</p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 lg:grid-cols-2">
               <div><label className="label" htmlFor="member-first-name">{t('Prénom')}</label><input className="field" id="member-first-name" name="firstName" required/></div>
               <div><label className="label" htmlFor="member-last-name">{t('Nom')}</label><input className="field" id="member-last-name" name="lastName" required/></div>
             </div>
             <div><label className="label" htmlFor="member-birth-date">{t('Date de naissance')}</label><input className="field" id="member-birth-date" name="birthDate" type="date" required/></div>
             <NameDayFields idPrefix="member" hint={t('Facultative. Sans elle, l’occasion « Fête » ne sera pas annoncée pour cette personne.')}/>
-            <div className="flex gap-2"><button className="primary" disabled={busy}>{t('Ajouter au foyer')}</button><button type="button" className="secondary" onClick={() => setAdding(false)}>{t('Annuler')}</button></div>
+            <div className="flex flex-wrap gap-2"><button className="primary" disabled={busy}>{t('Ajouter au foyer')}</button><button type="button" className="secondary" onClick={() => setAdding(false)}>{t('Annuler')}</button></div>
           </form> : <button className="secondary" onClick={() => setAdding(true)}><Icon name="plus" size={17}/> {t('Ajouter un membre sans compte')}</button>}
         </div>}
       </div>
-      {isAdmin ? <div className="card space-y-6 p-5 sm:p-6">
+      {isAdmin ? <div className="compact-panel card space-y-6 p-5 sm:p-6">
         <form onSubmit={event => {
           event.preventDefault()
           const name = String(new FormData(event.currentTarget).get('name')).trim()
           if (name) void perform(() => api(`/households/${household.id}`, json('PATCH', { name })), t('Foyer renommé.'), false)
         }}>
           <label className="label" htmlFor="rename-household">{t('Renommer le foyer')}</label>
-          <div className="flex flex-wrap gap-2"><input key={household.name} className="field min-w-0 flex-1" id="rename-household" name="name" defaultValue={household.name} required/><button disabled={busy} className="secondary">{t('Renommer')}</button></div>
+          <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap"><input key={household.name} className="field min-w-0 flex-1" id="rename-household" name="name" defaultValue={household.name} required/><button disabled={busy} className="secondary">{t('Renommer')}</button></div>
         </form>
         <div>
           <p className="label">{t('Inviter dans mon foyer')}</p>
@@ -273,7 +273,7 @@ export function HouseholdPanel({ household, me, isAdmin, busy, perform, handleEr
           <button type="button" disabled={generating} className="secondary" onClick={() => void invite()}>{generating ? t('Création…') : t('Créer un code d’invitation au foyer')}</button>
           {code && <div role="status" className="mt-3 rounded-xl bg-brand-50 p-3"><p className="mb-1 text-sm font-semibold">{t('Code d’invitation au foyer pour l’inscription (visible uniquement maintenant)')}</p><output className="block break-all font-mono text-sm text-brand-700">{code}</output></div>}
         </div>
-      </div> : <div className="card p-5 sm:p-6"><p className="muted">{t('Seuls les admins du foyer peuvent le renommer, inviter des personnes ou rejoindre une famille.')}</p></div>}
+      </div> : <div className="compact-panel card p-5 sm:p-6"><p className="muted">{t('Seuls les admins du foyer peuvent le renommer, inviter des personnes ou rejoindre une famille.')}</p></div>}
     </div>
   </section>
 }

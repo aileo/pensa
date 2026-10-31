@@ -57,6 +57,30 @@ than with a regular expression — Tailwind v4 emits `oklab(...)`, not hex.
   `focus:outline-none` to a component without providing an equally visible
   replacement.
 
+## Compact layouts
+
+Below 1024px, application forms and filter panels show one field per row,
+including day/month selectors. Inline join, rename and account forms place
+their submit actions below the inputs. Desktop layouts keep their existing
+columns and spacing.
+
+Compact fields use 8px vertical and 10px horizontal padding, at least 16px
+text and a 44px minimum height. Primary/secondary actions and icon buttons
+keep a minimum 44px touch target, including reorder controls with smaller
+size utilities. Labels, hints and focus rings remain visible.
+
+Spacious cards opt into `compact-panel` for 16px padding below the breakpoint.
+Content and actions wrap rather than forcing page-level horizontal scrolling;
+reservation progress uses a two-by-two layout to keep every step label readable.
+Dialogs use the dynamic viewport height so their contents can scroll in short
+landscape viewports.
+
+The documentation website uses the same compact breakpoint for reduced
+home/document padding and touch-friendly search controls. Its navigation
+uses the existing menu drawer on tablets as well as phones. Long text wraps;
+wide tables and code blocks scroll inside their own containers. Desktop
+styling and website light/dark palettes are unchanged.
+
 ## Icons
 
 Icons come from a small in-house set — the `paths` record in `App.tsx` — drawn

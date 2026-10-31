@@ -22,7 +22,7 @@ export function ProfileMenu({ me, busy, onProfile, onLogout }: { me: Person; bus
     return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onClick) }
   }, [open])
   return <div className="relative" ref={ref}>
-    <button ref={trigger} className="flex items-center gap-2 rounded-full p-0.5 pr-2 hover:bg-brand-50" aria-haspopup="true" aria-expanded={open} aria-controls="account-menu" aria-label={t('Menu du compte')} onClick={() => setOpen(value => !value)}>
+    <button ref={trigger} className="flex min-h-11 items-center gap-2 rounded-full p-0.5 pr-2 hover:bg-brand-50 lg:min-h-0" aria-haspopup="true" aria-expanded={open} aria-controls="account-menu" aria-label={t('Menu du compte')} onClick={() => setOpen(value => !value)}>
       <Avatar person={me} size="sm"/><span className="hidden max-w-[140px] truncate text-sm font-semibold sm:block">{nameOf(me)}</span><Icon name="chevron" size={14} className={`transition ${open ? '-rotate-90' : 'rotate-90'}`}/>
     </button>
     {open && <div id="account-menu" className="absolute right-0 top-12 z-30 w-64 rounded-2xl border border-line bg-white p-2 shadow-xl">
@@ -53,7 +53,7 @@ export function ProfileForm({ me, busy, perform, onSaved }: {
     }, t('Profil mis à jour.'), false)
   }}>
     <h3 className="font-['Outfit'] text-lg font-semibold">{t('Modifier mon profil')}</h3>
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2">
       <FormField id="profile-first-name" label={t('Prénom')}><TextInput id="profile-first-name" name="firstName" defaultValue={me.firstName} required/></FormField>
       <FormField id="profile-last-name" label={t('Nom')}><TextInput id="profile-last-name" name="lastName" defaultValue={me.lastName} required/></FormField>
     </div>
