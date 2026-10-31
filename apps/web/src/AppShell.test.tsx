@@ -52,6 +52,21 @@ async function click(label: string) {
   await act(async () => button!.click())
 }
 async function settleSave() { await act(async () => { await vi.advanceTimersByTimeAsync(500) }) }
+function sortableRows() {
+  const rows = [...host.querySelectorAll<HTMLElement>('[data-sortable="true"]')]
+  rows.forEach((row, i) => { row.getBoundingClientRect = () => new DOMRect(0, 200 + i * 100, 600, 80) })
+  return rows
+}
+function pointer(type: string, clientY: number) {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientY })
+  Object.defineProperties(event, { pointerId: { value: 1 }, pointerType: { value: 'mouse' } })
+  return event
+}
+async function pointerDrag(row: HTMLElement, fromY: number, toY: number, end = 'pointerup') {
+  await act(async () => row.querySelector('h2')!.dispatchEvent(pointer('pointerdown', fromY)))
+  for (const y of [fromY + 2, (fromY + toY) / 2, toY]) await act(async () => window.dispatchEvent(pointer('pointermove', y)))
+  await act(async () => window.dispatchEvent(end === 'Escape' ? new KeyboardEvent('keydown', { key: 'Escape' }) : pointer(end, toY)))
+}
 
 it.each(['/wishes', '/users/child/wishes'])('saves ten rapid arrow moves with one PATCH and no unrelated GETs on %s', async path => {
   await render(path)
@@ -70,10 +85,8 @@ it.each(['/wishes', '/users/child/wishes'])('saves ten rapid arrow moves with on
 it('saves a drag/drop once and retains a pending save across list navigation', async () => {
   await render('/wishes')
   requests = []
-  const rows = host.querySelectorAll('[draggable="true"]')
-  const drop = new Event('drop', { bubbles: true, cancelable: true })
-  Object.defineProperty(drop, 'dataTransfer', { value: { getData: () => 'wish-0' } })
-  await act(async () => rows[2].dispatchEvent(drop))
+  const rows = sortableRows()
+  await pointerDrag(rows[0], 240, 450)
   const navigation = [...host.querySelectorAll('button')].find(button => button.textContent === 'My family')!
   await act(async () => navigation.click())
   await settleSave()
@@ -96,27 +109,25 @@ it.each(['/wishes', '/users/child/wishes'])('moves a wish to the top or bottom w
   expect(host.querySelector<HTMLButtonElement>('button[aria-label="Move Wish 1 to the bottom"]')!.disabled).toBe(true)
 })
 
-it('reorders through a full drag sequence even when drop data is unavailable', async () => {
-  await render('/wishes')
+it('drags a row with the pointer, ignores tiny moves and cancels on Escape', async () => {
+  await render('/users/child/wishes')
   requests = []
-  const rows = host.querySelectorAll('[draggable="true"]')
-  const dragEvent = (type: string) => {
-    const event = new Event(type, { bubbles: true, cancelable: true })
-    Object.defineProperty(event, 'dataTransfer', { value: { setData: () => {}, getData: () => '', effectAllowed: '', dropEffect: '' } })
-    return event
-  }
-  await act(async () => rows[0].dispatchEvent(dragEvent('dragstart')))
-  await act(async () => rows[2].dispatchEvent(dragEvent('dragover')))
-  await act(async () => rows[2].dispatchEvent(dragEvent('drop')))
-  await act(async () => rows[0].dispatchEvent(dragEvent('dragend')))
+  let rows = sortableRows()
+  await pointerDrag(rows[0], 240, 243)
+  await pointerDrag(rows[0], 240, 650, 'Escape')
+  await settleSave()
+  expect(requests).toEqual([])
+  expect(document.body.style.userSelect).toBe('')
+  rows = sortableRows()
+  await pointerDrag(rows[3], 540, 230)
   await settleSave()
   expect(requests).toHaveLength(1)
-  expect(JSON.parse(requests[0].body!).ids.slice(0, 3)).toEqual(['wish-1', 'wish-2', 'wish-0'])
+  expect(JSON.parse(requests[0].body!).ids.slice(0, 4)).toEqual(['child-wish-3', 'child-wish-0', 'child-wish-1', 'child-wish-2'])
 })
 
 it('disables managed-list reordering when filters are active', async () => {
   await render('/users/child/wishes?tag=books')
-  expect(host.querySelectorAll('[draggable="true"]')).toHaveLength(0)
+  expect(host.querySelectorAll('[data-sortable="true"]')).toHaveLength(0)
   expect(host.textContent).toContain('Clear the filters to reorder this list.')
 })
 

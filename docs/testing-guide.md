@@ -47,8 +47,9 @@ wishlist. Repeat on a household-managed member's unfiltered list.
       500 ms of the previous one. Movement is immediate; after the last move,
       one PATCH saves the complete final order and no unrelated GETs run.
 - [ ] Drag and drop a wish, picking it up by its text, its image and its grip:
-      the dragged row dims, the target row is outlined, and one PATCH follows
-      the pause. Undo a move before the
+      the dragged row follows the cursor, the other rows make room, and one
+      PATCH follows the pause. *Escape* during a drag cancels it. Clicking
+      the row's buttons and links never starts a drag. Undo a move before the
       pause ends: no PATCH for an unchanged order.
 - [ ] *Move to top* / *Move to bottom* place the wish first / last with one
       PATCH; they are disabled on the first / last wish.
